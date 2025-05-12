@@ -6,6 +6,7 @@ import asyncio
 import warnings
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -41,6 +42,42 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 warnings.filterwarnings("ignore", category=UserWarning, module="requests")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+
+def crawl_webpage(start_url: str, max_pages: int = 10) -> list[str]:
+    """
+    Crawl a webpage and find all web pages under it.
+    Args:
+        start_url (str): The URL to start crawling from
+        max_pages (int): The maximum number of pages to crawl
+    Returns:
+        list[str]: A list of URLs found
+    """
+    print(f"Crawling {start_url} with max {max_pages} pages")
+
+    visited_urls = set()
+    urls_to_visit = [start_url]
+    found_urls = []
+
+    while urls_to_visit and len(visited_urls) < max_pages:
+        current_url = urls_to_visit.pop(0)
+        if current_url in visited_urls:
+            continue
+
+        try:
+            response = requests.get(current_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            visited_urls.add(current_url)
+            found_urls.append(current_url)
+
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                full_url = urljoin(current_url, href)
+                if urlparse(full_url).netloc == urlparse(start_url).netloc and full_url not in visited_urls:
+                    urls_to_visit.append(full_url)
+        except Exception as e:
+            print(f"Error crawling {current_url}: {e}")
+
+    return found_urls
 
 class RagMe:
     def __init__(self):
@@ -82,6 +119,17 @@ class RagMe:
     def _create_ragme_agent(self):
         llm = OpenAI(model="gpt-4o-mini")
 
+        def find_urls_crawling_webpage(start_url: str, max_pages: int = 10) -> list[str]:
+            """
+            Crawl a webpage and find all web pages under it.
+            Args:
+                start_url (str): The URL to start crawling from
+                max_pages (int): The maximum number of pages to crawl
+            Returns:
+                list[str]: A list of URLs found
+            """
+            return crawl_webpage(start_url, max_pages)
+                
         def write_to_ragme_collection(urls=list[str]):
             """
             Useful for writing new content to the RagMeDocs collection
@@ -90,7 +138,7 @@ class RagMe:
             """
             self.write_webpages_to_weaviate(urls)
 
-        def find_all_post_urls(self, blog_url: str, search_term: str) -> list[str]:
+        def find_all_post_urls(blog_url: str, search_term: str) -> list[str]:
             """
             Find all post URLs from a given blog URL given a search term.
             Args:
@@ -102,6 +150,7 @@ class RagMe:
             response = requests.get(blog_url)
             soup = BeautifulSoup(response.text, 'html.parser')
             post_urls = [a['href'] for a in soup.find_all('a', href=True) if search_term in a['href']]
+            print(f"Found the {len(post_urls)} post URLs: {post_urls}")
             return post_urls
 
         def query_agent(query: str) -> str:
@@ -116,7 +165,7 @@ class RagMe:
             return response.final_answer
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, find_all_post_urls, query_agent],
+            tools=[write_to_ragme_collection, find_all_post_urls, find_urls_crawling_webpage, query_agent],
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
