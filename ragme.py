@@ -83,16 +83,40 @@ class RagMe:
         llm = OpenAI(model="gpt-4o-mini")
 
         def write_to_ragme_collection(urls=list[str]):
-            """Useful for writing new content to the RagMeDocs collection"""
+            """
+            Useful for writing new content to the RagMeDocs collection
+            Args:
+                urls (list[str]): A list of URLs to write to the RagMeDocs collection
+            """
             self.write_webpages_to_weaviate(urls)
 
+        def find_all_post_urls(self, blog_url: str, search_term: str) -> list[str]:
+            """
+            Find all post URLs from a given blog URL given a search term.
+            Args:
+                blog_url (str): The URL of the blog to search
+                search_term (str): The search term to find in the blog URLs
+            Returns:
+                list[str]: A list of post URLs
+            """
+            response = requests.get(blog_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            post_urls = [a['href'] for a in soup.find_all('a', href=True) if search_term in a['href']]
+            return post_urls
+
         def query_agent(query: str) -> str:
-            """Useful for asking questions about RagMe docs and website"""
+            """
+            Useful for asking questions about RagMe docs and website
+            Args:
+                query (str): The query to ask the QueryAgent
+            Returns:
+                str: The response from the QueryAgent
+            """
             response = self.query_agent.run(query)
             return response.final_answer
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, query_agent],
+            tools=[write_to_ragme_collection, find_all_post_urls, query_agent],
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
@@ -113,11 +137,11 @@ class RagMe:
             for doc in documents:
                 batch.add_object(properties={"url": doc.id_,
                                             "text": doc.text})
-    def find_all_post_urls(self, blog_url: str) -> list[str]:
+    def find_all_post_urls(self, blog_url: str, search_term: str) -> list[str]:
         """Find all post URLs from a given blog URL."""
         response = requests.get(blog_url)
         soup = BeautifulSoup(response.text, 'html.parser')
-        post_urls = [a['href'] for a in soup.find_all('a', href=True) if 'reviews' in a['href']]
+        post_urls = [a['href'] for a in soup.find_all('a', href=True) if search_term in a['href']]
         return post_urls
 
     async def run(self, query: str):
@@ -125,7 +149,6 @@ class RagMe:
             user_msg=query
         )
         return str(response)
-
 
 if __name__ == "__main__":
     ragme = RagMe()
@@ -136,8 +159,9 @@ if __name__ == "__main__":
             urls = urls.split(',')
         else:
             url = urls
+            search_term = input("Give me a search term to find all post URLs: ")
             prefix = '/'.join(url.split('/')[:-1])
-            urls = ragme.find_all_post_urls(url)
+            urls = ragme.find_all_post_urls(url, search_term)
             urls = [prefix + '/' + url for url in urls]
             urls = list(set(urls))
             print(f"Found the following post URLs: {urls}")
