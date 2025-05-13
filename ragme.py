@@ -5,6 +5,7 @@ from typing import List, Union
 import asyncio
 import warnings
 import requests
+#import opik
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 
@@ -24,6 +25,7 @@ from weaviate.classes.config import Configure, Property, DataType
 
 import dotenv
 
+#opik.configure(use_local=True)
 dotenv.load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -156,7 +158,8 @@ class RagMe:
             post_urls = [a['href'] for a in soup.find_all('a', href=True) if search_term in a['href']]
             print(f"Found the {len(post_urls)} post URLs: {post_urls}")
             return post_urls
-
+        
+        #@opik.track(name="query_agent")
         def query_agent(query: str) -> str:
             """
             Useful for asking questions about RagMe docs and website
