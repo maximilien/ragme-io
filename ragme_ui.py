@@ -19,12 +19,12 @@ if "messages" not in st.session_state:
 
 # Page header
 st.title("🤖 RAGme.ai Assistant")
-st.markdown("Search and create reports through the collection of web pages")
+st.markdown("Search and create reports through the collection of web pages (crawled or added manually)")
 
 # Display chat messages
 for message in st.session_state.messages:
     if message["role"] == "assistant":
-        with st.chat_message(message["role"], avatar="📸"):
+        with st.chat_message(message["role"], avatar="🤖"):
             st.markdown(message["content"])
     else:
         with st.chat_message(message["role"], avatar="👤"):
