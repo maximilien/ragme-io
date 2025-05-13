@@ -101,9 +101,7 @@ class RagMe:
         return self.weeviate_client
     
     def _setup_weaviate(self):
-        if self.weeviate_client.collections.exists(self.collection_name):
-            self.weeviate_client.collections.delete(self.collection_name)
-        else:
+        if not self.weeviate_client.collections.exists(self.collection_name):
             self.weeviate_client.collections.create(
                 self.collection_name,
                 description="A dataset with the contents of RagMe docs and website",
@@ -130,6 +128,12 @@ class RagMe:
             """
             return crawl_webpage(start_url, max_pages)
                 
+        def delete_ragme_collection():
+            """
+            Reset and delete the RagMeDocs collection
+            """
+            self.weeviate_client.collections.delete(self.collection_name)
+
         def write_to_ragme_collection(urls=list[str]):
             """
             Useful for writing new content to the RagMeDocs collection
@@ -165,7 +169,7 @@ class RagMe:
             return response.final_answer
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, find_all_post_urls, find_urls_crawling_webpage, query_agent],
+            tools=[write_to_ragme_collection, delete_ragme_collection, find_all_post_urls, find_urls_crawling_webpage, query_agent],
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
