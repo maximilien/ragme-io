@@ -1,0 +1,18 @@
+[project]
+name = "ragme-ai"
+version = "0.1.0"
+description = "RAGme.ai is a personalized RAG agent for the web sites you visit and care about"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "bs4>=0.0.2",
+    "httpx>=0.28.1",
+    "llama-index>=0.12.37",
+    "llama-index-readers-web>=0.4.1",
+    "openai>=1.81.0",
+    "pyarrow",
+    "pydantic>=2.11.4",
+    "requests>=2.32.3",
+    "streamlit>=1.45.1",
+    "weaviate-client[agents]>=4.14.4",
+]
