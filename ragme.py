@@ -190,13 +190,7 @@ class RagMe:
             for doc in documents:
                 batch.add_object(properties={"url": doc.id_,
                                             "text": doc.text})
-    def find_all_post_urls(self, blog_url: str, search_term: str) -> list[str]:
-        """Find all post URLs from a given blog URL."""
-        response = requests.get(blog_url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        post_urls = [a['href'] for a in soup.find_all('a', href=True) if search_term in a['href']]
-        return post_urls
-
+    
     async def run(self, query: str):
         response = await self.ragme_agent.run(
             user_msg=query
