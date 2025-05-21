@@ -32,9 +32,14 @@ Setup your virtual environment
 
 ```bash
 uv venv
-
+source .venv/bin/activate
 ```
 
+Install dependencies
+
+```bash
+uv sync
+```
 
 ## API keys
 
