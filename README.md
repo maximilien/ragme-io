@@ -1,10 +1,10 @@
 # RAGme.ai
 
-A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) web sites and documents you care about and let your query them in an agentic fashion.
+A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) web sites and documents you care about and let you query them in an agentic fashion.
 
 # Use cases
 
-1. Interractive personal RAG adding web sites and document and using an LLM agent to query
+1. Interractive personal RAG adding web sites and documents and using an LLM agent to query
 2. Collecting web sites or documents on a particular topic and RAGing and searching them
 3. Collecting posts from a blog and RAGing and searching them
 4. Collecting visited sites from a user's daily activities and RAGing and searching them
