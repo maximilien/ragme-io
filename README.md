@@ -101,8 +101,8 @@ This should launch the RAGme.ai UI on your default browser or go to `http://loca
 flowchart LR
     user((User)) -- "1 add URL" --> ragme-agent["RAGme agent 🤖"]
 
-    ragme-agent -- "2 parse URL" --> llama-index-parse["parse 📄"]
-    ragme-agent -- "3 chunk" --> llama-index-chunk["chunk 📑"]
+    ragme-agent -- "2 parse URL" --> llama-index-parse["🦙LlamaIndex parse 📄"]
+    ragme-agent -- "3 chunk" --> llama-index-chunk["🦙LlamaIndex chunk 📑"]
     llama-index-parse --> vector-db[(DB)]
     llama-index-chunk --> vector-db[(DB)]
 
