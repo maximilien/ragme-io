@@ -1,6 +1,6 @@
 # RAGme.ai
 
-A personalized agent to RAG web sites and documents you care about and let your query them in an agentic fashion.
+A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) web sites and documents you care about and let your query them in an agentic fashion.
 
 # Use cases
 
@@ -43,7 +43,7 @@ uv sync
 
 ## API keys
 
-The current version of RAGme.ai uses OpenAI as the LLM provider and Weeviate as the vector DB. 
+The current version of RAGme.ai uses [OpenAI](https://auth.openai.com/log-in) as the LLM provider and [Weeviate](https://console.weaviate.cloud/) as the vector DB. 
 
 You will need to have API keys for both. And for weeviate after creating a cluser and a collection you will need the API key and cluster URL.
 
@@ -81,7 +81,7 @@ This should launch the RAGme.ai UI on your default browser or go to `http://loca
 
 ### Current affairs
 
-1. Go to Google News and add a few articles you care about
+1. Go to [Google News](https://news.google.com/home?hl=en-US&gl=US&ceid=US:en) and add a few articles you care about
 2. Ask RAGme.ai to summarize or ask any question on the article
 
 ### Blogs 
@@ -124,8 +124,8 @@ flowchart LR
 
 # Next steps
 
-1. Decouple the weeviate vector database dependency. Allow others like OpenSearch
-2. Decouple Llamaindex for the RAGing of document. Allow others like docling
+1. Decouple the weeviate vector database dependency. Allow others like [OpenSearch](https://opensearch.org/)
+2. Decouple [Llamaindex](https://www.llamaindex.ai/) for parsing and RAGing of document. Allow others like [docling](https://github.com/docling-project)
 3. Decouple Llamaindex as the query agent
 
 # How can I help
