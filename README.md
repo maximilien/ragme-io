@@ -51,9 +51,9 @@ Create a `.env` file with the the keys and URL
 
 ```bash
 cat .env
-OPENAI_API_KEY=sk-proj-*****-gA
+OPENAI_API_KEY=sk-proj-*****-**
 WEAVIATE_API_KEY=*****
-WEAVIATE_URL=*****.weaviate.cloud%
+WEAVIATE_URL=*****.weaviate.cloud
 ```
 
 Replace `*****` with appropriate values.
