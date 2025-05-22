@@ -67,7 +67,7 @@ uv run streamlit run ./ragme_ui.py
   You can now view your Streamlit app in your browser.
 
   Local URL: http://localhost:8507
-  Network URL: http://172.26.115.175:8507
+  Network URL: http://xxx.xx.xxx.xxx:8507
 
   For better performance, install the Watchdog module:
 
@@ -98,6 +98,21 @@ This should launch the RAGme.ai UI on your default browser or go to `http://loca
 # Architecture
 
 ```mermaid
+flowchart LR
+    user((User)) -- "1 add URL" --> ragme-agent["RAGme agent 🤖"]
+
+    ragme-agent -- "2 parse URL" --> llama-index-parse["parse 📄"]
+    ragme-agent -- "3 chunk" --> llama-index-chunk["chunk 📑"]
+    llama-index-parse --> vector-db[(DB)]
+    llama-index-chunk --> vector-db[(DB)]
+
+    user((User)) -- "4 query" --> ragme-agent["RAGme agent 🤖"]
+    ragme-agent -- "5 find best document for query" --> vector-db[(DB)]
+    
+    ragme-agent -- "6 prompt llm with docs for response" --> llm["LLM 🤖"]
+    llm -- "7 create a response" --> ragme-agent
+    
+    ragme-agent -- "8 final response" --> user((User))
 ```
 
 # Limitations
