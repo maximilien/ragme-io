@@ -7,6 +7,7 @@ import warnings
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+from common import crawl_webpage
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -43,43 +44,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 warnings.filterwarnings("ignore", category=UserWarning, module="requests")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
 
-def crawl_webpage(start_url: str, max_pages: int = 10) -> list[str]:
-    """
-    Crawl a webpage and find all web pages under it.
-    Args:
-        start_url (str): The URL to start crawling from
-        max_pages (int): The maximum number of pages to crawl
-    Returns:
-        list[str]: A list of URLs found
-    """
-    print(f"Crawling {start_url} with max {max_pages} pages")
-
-    visited_urls = set()
-    urls_to_visit = [start_url]
-    found_urls = []
-
-    while urls_to_visit and len(visited_urls) < max_pages:
-        current_url = urls_to_visit.pop(0)
-        if current_url in visited_urls:
-            continue
-
-        try:
-            response = requests.get(current_url)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            visited_urls.add(current_url)
-            found_urls.append(current_url)
-
-            for a in soup.find_all('a', href=True):
-                href = a['href']
-                full_url = urljoin(current_url, href)
-                if urlparse(full_url).netloc == urlparse(start_url).netloc and full_url not in visited_urls:
-                    urls_to_visit.append(full_url)
-        except Exception as e:
-            print(f"Error crawling {current_url}: {e}")
-
-    return found_urls
-
 class RagMe:
+    """A class for managing RAG (Retrieval-Augmented Generation) operations with web content using Weaviate."""
+    
     def __init__(self):
         self.collection_name = "RagMeDocs"
         self.weeviate_client, self.query_agent, self.ragme_agent = None, None, None
@@ -182,8 +149,12 @@ class RagMe:
         if self.weeviate_client:
             self.weeviate_client.close()
 
-    # TODO: avoid re-writing the same URLs
     def write_webpages_to_weaviate(self, urls: list[str]):
+        """
+        Write the contents of a list of URLs to the RagMeDocs collection in Weaviate.
+        Args:
+            urls (list[str]): A list of URLs to write to the RagMeDocs collection
+        """
         documents = SimpleWebPageReader(html_to_text=True).load_data(urls)
         collection = self.weeviate_client.collections.get(self.collection_name)
         with collection.batch.dynamic() as batch:
