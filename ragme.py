@@ -41,7 +41,6 @@ if not WEAVIATE_URL:
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
-warnings.filterwarnings("ignore", category=UserWarning, module="requests")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
 
 class RagMe:

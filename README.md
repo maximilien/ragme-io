@@ -21,6 +21,7 @@ Install and / or update the following if needed
 1. Install [Python 3.12](https://www.python.org/downloads/) or later
 2. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) 
 3. Install [`gh`](https://cli.github.com/) from github
+4. Weeviate Cloud (Vector DB) cluster and collection named: `RagMeDocs`
 
 ## Get code, setup dependencies
 
@@ -40,6 +41,14 @@ Install dependencies
 ```bash
 uv sync
 ```
+
+## Weeviate Cloud
+
+Create an account and cluster at [Weeviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster create a collection named "RagMeDocs".
+
+Once you have the cluster, Weeviate should give you a page with the cluster REST Endpoint and the API Key (select the Admin one).
+
+These will be your `WEAVIATE_URL` and `WEAVIATE_API_KEY` respectively.
 
 ## API keys
 
