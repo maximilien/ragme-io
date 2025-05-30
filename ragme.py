@@ -101,6 +101,12 @@ class RagMe:
             """
             self.weeviate_client.collections.delete(self.collection_name)
 
+        def list_ragme_collection(limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+            """
+            List the contents of the RagMeDocs collection
+            """
+            return self.list_documents()
+
         def write_to_ragme_collection(urls=list[str]):
             """
             Useful for writing new content to the RagMeDocs collection
@@ -121,7 +127,7 @@ class RagMe:
             return response.final_answer
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, delete_ragme_collection, find_urls_crawling_webpage, query_agent],
+            tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent],
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
@@ -144,8 +150,10 @@ class RagMe:
         collection = self.weeviate_client.collections.get(self.collection_name)
         with collection.batch.dynamic() as batch:
             for doc in documents:
+                metadata_text = json.dumps({"type": "webpage", "url": doc.id_}, ensure_ascii=False)
                 batch.add_object(properties={"url": doc.id_,
-                                            "text": doc.text})
+                                             "metadata": metadata_text,
+                                             "text": doc.text})
     
     def write_json_to_weaviate(self, json_data: Dict[str, Any], metadata: Dict[str, Any] = None):
         """
@@ -163,10 +171,50 @@ class RagMe:
         collection = self.weeviate_client.collections.get(self.collection_name)
         with collection.batch.dynamic() as batch:
             batch.add_object(properties={
-                "url": "json_content",  # Using a placeholder URL
+                "url": json_data.get("filename", "filename not found"),
                 "text": json_text,
                 "metadata": metadata_text
             })
+
+    def list_documents(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        List documents in the Weaviate collection.
+        
+        Args:
+            limit (int): Maximum number of documents to return
+            offset (int): Number of documents to skip
+            
+        Returns:
+            List[Dict[str, Any]]: List of documents with their properties
+        """
+        collection = self.weeviate_client.collections.get(self.collection_name)
+        
+        # Query the collection
+        result = collection.query.fetch_objects(
+            limit=limit,
+            offset=offset,
+            include_vector=False  # Don't include vector data in response
+        )
+        
+        # Process the results
+        documents = []
+        for obj in result.objects:
+            doc = {
+                "id": obj.uuid,
+                "url": obj.properties.get("url", ""),
+                "text": obj.properties.get("text", ""),
+                "metadata": obj.properties.get("metadata", "{}")
+            }
+            
+            # Try to parse metadata if it's a JSON string
+            try:
+                doc["metadata"] = json.loads(doc["metadata"])
+            except json.JSONDecodeError:
+                pass
+                
+            documents.append(doc)
+            
+        return documents
 
     async def run(self, query: str):
         response = await self.ragme_agent.run(
