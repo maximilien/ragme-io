@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -54,6 +54,7 @@ async def add_json(json_input: JSONInput):
             "message": "Successfully processed JSON content"
         }
     except Exception as e:
+        print(e.print_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/add-urls")
@@ -93,6 +94,35 @@ async def query(query_input: QueryInput):
         return {
             "status": "success",
             "response": response
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/list-documents")
+async def list_documents(
+    limit: int = Query(default=10, ge=1, le=100, description="Maximum number of documents to return"),
+    offset: int = Query(default=0, ge=0, description="Number of documents to skip")
+):
+    """
+    List documents in the RAG system.
+    
+    Args:
+        limit: Maximum number of documents to return (1-100)
+        offset: Number of documents to skip
+        
+    Returns:
+        dict: List of documents and pagination info
+    """
+    try:
+        documents = ragme.list_documents(limit=limit, offset=offset)
+        return {
+            "status": "success",
+            "documents": documents,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "count": len(documents)
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
