@@ -1,7 +1,7 @@
 import os, logging, json
 from enum import Enum
 from pydantic import BaseModel, Field
-from typing import List, Union
+from typing import List, Union, Dict, Any
 import asyncio
 import warnings
 import requests
@@ -75,6 +75,7 @@ class RagMe:
                 properties=[
                     Property(name="url", data_type=DataType.TEXT, description="the source URL of the webpage"),
                     Property(name="text", data_type=DataType.TEXT, description="the content of the webpage"),
+                    Property(name="metadata", data_type=DataType.TEXT, description="additional metadata in JSON format"),
             ])
 
     def _create_query_agent(self):
@@ -108,21 +109,6 @@ class RagMe:
             """
             self.write_webpages_to_weaviate(urls)
 
-        def find_all_post_urls(blog_url: str, search_term: str) -> list[str]:
-            """
-            Find all post URLs from a given blog URL given a search term.
-            Args:
-                blog_url (str): The URL of the blog to search
-                search_term (str): The search term to find in the blog URLs
-            Returns:
-                list[str]: A list of post URLs
-            """
-            response = requests.get(blog_url)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            post_urls = [a['href'] for a in soup.find_all('a', href=True) if search_term in a['href']]
-            print(f"Found the {len(post_urls)} post URLs: {post_urls}")
-            return post_urls
-
         def query_agent(query: str) -> str:
             """
             Useful for asking questions about RagMe docs and website
@@ -135,7 +121,7 @@ class RagMe:
             return response.final_answer
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, delete_ragme_collection, find_all_post_urls, find_urls_crawling_webpage, query_agent],
+            tools=[write_to_ragme_collection, delete_ragme_collection, find_urls_crawling_webpage, query_agent],
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
@@ -161,6 +147,27 @@ class RagMe:
                 batch.add_object(properties={"url": doc.id_,
                                             "text": doc.text})
     
+    def write_json_to_weaviate(self, json_data: Dict[str, Any], metadata: Dict[str, Any] = None):
+        """
+        Write JSON content to the RagMeDocs collection in Weaviate.
+        Args:
+            json_data (Dict[str, Any]): The JSON data to write
+            metadata (Dict[str, Any], optional): Additional metadata to store with the content
+        """
+        # Convert JSON data to string for storage
+        json_text = json.dumps(json_data, ensure_ascii=False)
+        
+        # Convert metadata to string if provided
+        metadata_text = json.dumps(metadata, ensure_ascii=False) if metadata else "{}"
+        
+        collection = self.weeviate_client.collections.get(self.collection_name)
+        with collection.batch.dynamic() as batch:
+            batch.add_object(properties={
+                "url": "json_content",  # Using a placeholder URL
+                "text": json_text,
+                "metadata": metadata_text
+            })
+
     async def run(self, query: str):
         response = await self.ragme_agent.run(
             user_msg=query
