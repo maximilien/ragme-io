@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any, Optional
 import asyncio
 from ragme import RagMe
 
@@ -30,6 +30,31 @@ class URLInput(BaseModel):
 class QueryInput(BaseModel):
     """Input model for querying the RAG system."""
     query: str
+
+class JSONInput(BaseModel):
+    """Input model for adding JSON content to the RAG system."""
+    data: Dict[str, Any]
+    metadata: Optional[Dict[str, Any]] = None
+
+@app.post("/add-json")
+async def add_json(json_input: JSONInput):
+    """
+    Add JSON content to the RAG system.
+    
+    Args:
+        json_input: JSON data and optional metadata to add
+        
+    Returns:
+        dict: Status message
+    """
+    try:
+        ragme.write_json_to_weaviate(json_input.data, json_input.metadata)
+        return {
+            "status": "success",
+            "message": "Successfully processed JSON content"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/add-urls")
 async def add_urls(url_input: URLInput):
