@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Process ID files
+.pid
+
 # C extensions
 *.so
 
