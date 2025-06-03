@@ -57,5 +57,13 @@ def test_write_webpages_to_weaviate():
         
         # Verify the calls
         assert mock_batch.add_object.call_count == 2
-        mock_batch.add_object.assert_any_call(properties={"url": "url1", "text": "text1"})
-        mock_batch.add_object.assert_any_call(properties={"url": "url2", "text": "text2"}) 
+        mock_batch.add_object.assert_any_call(properties={
+            "url": "url1",
+            "text": "text1",
+            "metadata": '{"type": "webpage", "url": "url1"}'
+        })
+        mock_batch.add_object.assert_any_call(properties={
+            "url": "url2",
+            "text": "text2",
+            "metadata": '{"type": "webpage", "url": "url2"}'
+        }) 

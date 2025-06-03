@@ -20,27 +20,27 @@ cleanup() {
 # Set up error handling
 trap cleanup ERR
 
-# Start ragme-api.py
-echo "Starting ragme-api.py..."
-uv run uvicorn ragme-api:app --reload --host 0.0.0.0 --port 8000 &
+# Start ragme_api.py
+echo "Starting ragme_api.py..."
+uv run uvicorn ragme_api:app --reload --host 0.0.0.0 --port 8000 &
 echo $! >> .pid
 sleep 2
 
 # Start ragme-mcp.py
-echo "Starting ragme-mcp.py..."
-uv run uvicorn ragme-mcp:app --reload --host 0.0.0.0 --port 8000 &
+echo "Starting ragme_mcp.py..."
+uv run uvicorn ragme_mcp:app --reload --host 0.0.0.0 --port 8000 &
 echo $! >> .pid
 sleep 2
 
 # Start ragme-agent.py
-echo "Starting ragme-agent.py..."
-uv run python ragme-agent.py &
+echo "Starting ragme_agent.py..."
+uv run python ragme_agent.py &
 echo $! >> .pid
 sleep 2
 
 # Start ragme-ui.py
-echo "Starting ragme-ui.py..."
-uv run streamlit run ragme-ui.py &
+echo "Starting ragme_ui.py..."
+uv run streamlit run ragme_ui.py &
 echo $! >> .pid
 
 echo "All RAGme processes started successfully!"
