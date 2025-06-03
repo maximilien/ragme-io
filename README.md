@@ -124,6 +124,33 @@ flowchart LR
     ragme-agent -- "8 final response" --> user((User))
 ```
 
+### MCP
+
+Built on top of existing [RAGme-ai](https://github.com/maximilien/ragme-ai)
+
+1. MCP server to load and RAG files: PDFs and docs
+2. agent to load pass these to RAGme
+3. agent to find web sites using browserbase and add to the RAG
+4. agent to create insights from today's documents
+
+```mermaid
+flowchart LR
+    user((User)) -- "1 add doc (PDF or DOCs)" --> monitor-agent["Monitor agent 🤖"]
+
+    monitor-agent -- "2 parse doc" --> docling["🐥 Docling parse 📄"]
+    monitor-agent --> mcp-server[(Server)]
+
+    mcp-server--> ragme-api[(Server)]
+    
+    user((User)) -- "4 query" --> ragme-agent["RAGme agent 🤖"]
+    ragme-agent -- "5 find best document for query" --> vector-db[(DB)]
+    
+    ragme-agent -- "6 prompt llm with docs for response" --> llm["LLM 🤖"]
+    llm -- "7 create a response" --> ragme-agent
+    
+    ragme-agent -- "8 final response" --> user((User))
+```
+
 # Limitations
 
 1. Uses the same collection for all users
@@ -136,6 +163,10 @@ flowchart LR
 1. Decouple the weeviate vector database dependency. Allow others like [OpenSearch](https://opensearch.org/)
 2. Decouple [Llamaindex](https://www.llamaindex.ai/) for parsing and RAGing of document. Allow others like [docling](https://github.com/docling-project)
 3. Decouple Llamaindex as the query agent
+4. Add security at minimum https
+5. Add ability to add images and videos
+5. Allow multiple users (SaaS)
+
 
 # How can I help
 
