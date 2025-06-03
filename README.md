@@ -140,7 +140,7 @@ flowchart LR
     monitor-agent -- "2 parse doc" --> docling["🐥 Docling parse 📄"]
     monitor-agent --> mcp-server[(Server)]
 
-    mcp-server--> ragme-api[(Server)]
+    mcp-server--> ragme_api[(Server)]
     
     user((User)) -- "4 query" --> ragme-agent["RAGme agent 🤖"]
     ragme-agent -- "5 find best document for query" --> vector-db[(DB)]

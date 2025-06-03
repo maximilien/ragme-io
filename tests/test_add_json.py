@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-from api import app
+from ragme_api import app
 import json
 
 @pytest.fixture
@@ -12,7 +12,7 @@ def client():
 @pytest.fixture
 def mock_ragme():
     """Mock the RagMe instance."""
-    with patch('api.ragme') as mock:
+    with patch('ragme_api.ragme') as mock:
         # Setup mock methods
         mock.write_json_to_weaviate = MagicMock()
         mock.run = MagicMock()

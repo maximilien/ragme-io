@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import asyncio
 from ragme import RagMe
+import traceback
 
 app = FastAPI(
     title="RagMe API",
@@ -54,7 +55,7 @@ async def add_json(json_input: JSONInput):
             "message": "Successfully processed JSON content"
         }
     except Exception as e:
-        print(e.print_exc())
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/add-urls")
