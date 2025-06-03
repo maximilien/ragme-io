@@ -1,7 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock, AsyncMock
-from api import app
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ragme_api import app
 from llama_index.readers.web import SimpleWebPageReader
 
 @pytest.fixture
@@ -12,7 +15,7 @@ def client():
 @pytest.fixture
 def mock_ragme():
     """Mock the RagMe instance."""
-    with patch('api.ragme') as mock:
+    with patch('ragme_api.ragme') as mock:
         # Setup mock methods
         mock.write_webpages_to_weaviate = MagicMock()
         mock.run = AsyncMock()  # Use AsyncMock for async methods
