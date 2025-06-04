@@ -9,6 +9,13 @@ import requests
 import json
 import traceback
 
+import dotenv
+
+dotenv.load_dotenv()
+
+RAGME_API_URL=os.getenv("RAGME_API_URL")
+RAGME_MCP_URL=os.getenv("RAGME_MCP_URL")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -71,7 +78,7 @@ def add_to_rag(data: dict) -> bool:
         print(f"Adding to RAG: {json.dumps(data, indent=2)}")  # Pretty print error response
         # Wrap the data in a 'data' field as expected by the API
         response = requests.post(
-            'http://localhost:8000/add-json',
+            f"{RAGME_API_URL}/add-json",
             json=data
         )
         
@@ -108,7 +115,7 @@ def process_pdf_file(file_path: Path) -> bool:
             
             # Call the MCP server
             response = requests.post(
-                'http://localhost:8010/tool/process_pdf',
+                f"{RAGME_MCP_URL}/tool/process_pdf",
                 files=files
             )
             
@@ -149,7 +156,7 @@ def process_docx_file(file_path: Path) -> bool:
             
             # Call the MCP server
             response = requests.post(
-                'http://localhost:8010/tool/process_docx',
+                f"{RAGME_MCP_URL}/tool/process_docx",
                 files=files
             )
             
