@@ -22,13 +22,13 @@ trap cleanup ERR
 
 # Start ragme_api.py
 echo "Starting ragme_api.py..."
-uv run uvicorn ragme_api:app --reload --host 0.0.0.0 --port 8000 &
+uv run uvicorn ragme_api:app --reload --host 0.0.0.0 --port 8021 &
 echo $! >> .pid
 sleep 2
 
 # Start ragme-mcp.py
 echo "Starting ragme_mcp.py..."
-uv run uvicorn ragme_mcp:app --reload --host 0.0.0.0 --port 8000 &
+uv run uvicorn ragme_mcp:app --reload --host 0.0.0.0 --port 8022 &
 echo $! >> .pid
 sleep 2
 
@@ -40,7 +40,7 @@ sleep 2
 
 # Start ragme-ui.py
 echo "Starting ragme_ui.py..."
-uv run streamlit run ragme_ui.py &
+uv run streamlit run ragme_ui.py --server.port 8020 &
 echo $! >> .pid
 
 echo "All RAGme processes started successfully!"

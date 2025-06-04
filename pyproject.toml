@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "bs4>=0.0.2",
+    "docx>=0.2.4",
     "fastapi>=0.115.12",
     "httpx>=0.28.1",
     "llama-index>=0.12.37",
@@ -13,10 +14,12 @@ dependencies = [
     "openai>=1.81.0",
     "pyarrow",
     "pydantic>=2.11.4",
+    "pypdf2>=3.0.1",
     "pytest>=8.3.5",
     "requests>=2.32.3",
     "requests-mock>=1.12.1",
     "streamlit>=1.45.1",
     "uvicorn>=0.34.2",
+    "watchdog>=6.0.0",
     "weaviate-client[agents]>=4.14.4",
 ]
