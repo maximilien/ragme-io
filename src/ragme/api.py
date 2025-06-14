@@ -1,14 +1,19 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
+import json
+import traceback
+from typing import List, Dict, Any, Optional
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-import asyncio
-from ragme import RagMe
-import traceback
+
+from .ragme import RagMe
 
 app = FastAPI(
     title="RagMe API",
-    description="API for RAG operations with web content using Weaviate",
+    description="API for RAG operations with web content using a Vector Database",
     version="1.0.0"
 )
 
@@ -135,4 +140,4 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8021)

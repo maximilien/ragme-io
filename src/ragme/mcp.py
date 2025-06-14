@@ -1,13 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
+import os
+import tempfile
+from pathlib import Path
+from typing import Optional, Dict, Any
+
+import docx
+import PyPDF2
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
-import PyPDF2
-import docx
-import tempfile
-import os
-from pathlib import Path
 
-app = FastAPI(title="MCP PDF Processing Server")
+app = FastAPI(title="RagMe MCP Server")
 
 class ToolResponse(BaseModel):
     success: bool
@@ -124,4 +128,4 @@ async def process_docx(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8010) 
+    uvicorn.run(app, host="0.0.0.0", port=8022)

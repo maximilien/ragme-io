@@ -1,14 +1,24 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
 import pytest
+import sys
+import os
+
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from unittest.mock import patch, MagicMock
-from ragme import RagMe
+
+from src.ragme.ragme import RagMe
 
 def test_ragme_init():
-    with patch('ragme.weaviate.connect_to_weaviate_cloud') as mock_connect, \
-         patch('ragme.weaviate.auth.Auth.api_key') as mock_api_key, \
-         patch('ragme.weaviate') as mock_weaviate, \
-         patch('ragme.OpenAI') as mock_openai, \
-         patch('ragme.QueryAgent') as mock_query_agent, \
-         patch('ragme.FunctionAgent') as mock_function_agent:
+    with patch('src.ragme.ragme.weaviate.connect_to_weaviate_cloud') as mock_connect, \
+         patch('src.ragme.ragme.weaviate.auth.Auth.api_key') as mock_api_key, \
+         patch('src.ragme.ragme.weaviate') as mock_weaviate, \
+         patch('src.ragme.ragme.OpenAI') as mock_openai, \
+         patch('src.ragme.ragme.QueryAgent') as mock_query_agent, \
+         patch('src.ragme.ragme.FunctionAgent') as mock_function_agent:
         # Setup mocks
         mock_client = MagicMock()
         mock_connect.return_value = mock_client
@@ -25,12 +35,12 @@ def test_ragme_init():
         assert ragme.ragme_agent is not None
 
 def test_write_webpages_to_weaviate():
-    with patch('ragme.SimpleWebPageReader') as mock_reader, \
+    with patch('src.ragme.ragme.SimpleWebPageReader') as mock_reader, \
          patch('weaviate.connect_to_weaviate_cloud') as mock_connect, \
          patch('weaviate.auth.Auth.api_key') as mock_api_key, \
-         patch('ragme.OpenAI') as mock_openai, \
-         patch('ragme.QueryAgent') as mock_query_agent, \
-         patch('ragme.FunctionAgent') as mock_function_agent:
+         patch('src.ragme.ragme.OpenAI') as mock_openai, \
+         patch('src.ragme.ragme.QueryAgent') as mock_query_agent, \
+         patch('src.ragme.ragme.FunctionAgent') as mock_function_agent:
         # Setup mocks
         mock_client = MagicMock()
         mock_connect.return_value = mock_client

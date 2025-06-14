@@ -67,16 +67,16 @@ WEAVIATE_URL=*****.weaviate.cloud
 
 Replace `*****` with appropriate values.
 
-
 ## Run streamlit UI
 
 ```bash
-uv run streamlit run ./ragme_ui.py
+# Run with project root in PYTHONPATH
+PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port 8020
 
   You can now view your Streamlit app in your browser.
 
-  Local URL: http://localhost:8507
-  Network URL: http://xxx.xx.xxx.xxx:8507
+  Local URL: http://localhost:8020
+  Network URL: http://xxx.xx.xxx.xxx:8020
 
   For better performance, install the Watchdog module:
 
@@ -84,7 +84,7 @@ uv run streamlit run ./ragme_ui.py
   $ pip install watchdog
 ```
 
-This should launch the RAGme.ai UI on your default browser or go to `http://localhost:8507`
+This should launch the RAGme.ai UI on your default browser or go to `http://localhost:8020`
 
 ## Some example usage
 
