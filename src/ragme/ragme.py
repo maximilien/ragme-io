@@ -1,36 +1,38 @@
-import os, logging, json
-from enum import Enum
-from pydantic import BaseModel, Field
-from typing import List, Union, Dict, Any
-import asyncio
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
+import json
+import logging
+import os
 import warnings
+from typing import List, Dict, Any
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-from common import crawl_webpage
-
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
-from llama_index.core.workflow import (StartEvent, StopEvent, Workflow, step, Event, Context)
-from llama_index.readers.web import SimpleWebPageReader
 from llama_index.core.llms import ChatMessage
 from llama_index.core.tools import FunctionTool
-from llama_index.llms.openai import OpenAI
 from llama_index.core.agent.workflow import FunctionAgent
-
+from llama_index.llms.openai import OpenAI
+from llama_index.readers.web import SimpleWebPageReader
+from pydantic import BaseModel, Field
 import weaviate
 from weaviate.auth import Auth
 from weaviate.agents.query import QueryAgent
 from weaviate.classes.config import Configure, Property, DataType
 
+from src.ragme.common import crawl_webpage
+
 import dotenv
 
 dotenv.load_dotenv()
 
+# Get environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL")
 
+# Check if environment variables are set
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is not set")
 if not WEAVIATE_API_KEY:
@@ -38,13 +40,15 @@ if not WEAVIATE_API_KEY:
 if not WEAVIATE_URL:
     raise ValueError("WEAVIATE_URL is not set")
 
+# Filter warnings
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
 
+
 class RagMe:
-    """A class for managing RAG (Retrieval-Augmented Generation) operations with web content using Weaviate."""
+    """A class for managing RAG (Retrieval-Augmented Generation) operations with web content using a Vector Database."""
     
     def __init__(self):
         self.collection_name = "RagMeDocs"

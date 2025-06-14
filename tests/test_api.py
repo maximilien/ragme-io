@@ -1,10 +1,16 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock, AsyncMock
 import sys
 import os
+
+# Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from ragme_api import app
+
+from src.ragme.api import app
 from llama_index.readers.web import SimpleWebPageReader
 
 @pytest.fixture
@@ -15,7 +21,7 @@ def client():
 @pytest.fixture
 def mock_ragme():
     """Mock the RagMe instance."""
-    with patch('ragme_api.ragme') as mock:
+    with patch('src.ragme.api.ragme') as mock:
         # Setup mock methods
         mock.write_webpages_to_weaviate = MagicMock()
         mock.run = AsyncMock()  # Use AsyncMock for async methods

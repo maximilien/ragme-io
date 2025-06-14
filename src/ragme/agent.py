@@ -1,13 +1,18 @@
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import time
-import os
-from pathlib import Path
-import logging
-from typing import Optional, Callable
-import requests
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
 import json
+import logging
+import os
+import time
 import traceback
+from pathlib import Path
+from typing import Optional, Callable
+
+import dotenv
+import requests
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 # Configure logging
 logging.basicConfig(
@@ -15,6 +20,13 @@ logging.basicConfig(
     format='%(asctime)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+# Load environment variables
+dotenv.load_dotenv()
+
+# Get MCP server URL from environment variables
+RAGME_API_URL = os.getenv('RAGME_API_URL')
+RAGME_MCP_URL = os.getenv('RAGME_MCP_URL')
 
 class FileHandler(FileSystemEventHandler):
     def __init__(self, callback: Optional[Callable] = None):
@@ -71,7 +83,7 @@ def add_to_rag(data: dict) -> bool:
         print(f"Adding to RAG: {json.dumps(data, indent=2)}")  # Pretty print error response
         # Wrap the data in a 'data' field as expected by the API
         response = requests.post(
-            'http://localhost:8020/add-json',
+            f'{RAGME_API_URL}/add-json',
             json=data
         )
         
@@ -108,7 +120,7 @@ def process_pdf_file(file_path: Path) -> bool:
             
             # Call the MCP server
             response = requests.post(
-                'http://localhost:8021/tool/process_pdf',
+                f'{RAGME_MCP_URL}/tool/process_pdf',
                 files=files
             )
             
@@ -149,7 +161,7 @@ def process_docx_file(file_path: Path) -> bool:
             
             # Call the MCP server
             response = requests.post(
-                'http://localhost:8021/tool/process_docx',
+                f'{RAGME_MCP_URL}/tool/process_docx',
                 files=files
             )
             

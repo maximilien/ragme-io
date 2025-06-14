@@ -1,7 +1,22 @@
-import asyncio, re, timeit
-import streamlit as st
-from ragme import RagMe
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
 
+import asyncio
+import json
+import logging
+import os
+import timeit
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+import dotenv
+import requests
+import streamlit as st
+from bs4 import BeautifulSoup
+
+from src.ragme.ragme import RagMe
+
+# Initialize RagMe
 ragme = RagMe()
 
 # Set page configuration

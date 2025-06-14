@@ -1,7 +1,16 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 dr.max
+
+import sys
+import os
 import pytest
 import requests
 import requests_mock
-from common import crawl_webpage
+
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.ragme.common import crawl_webpage
 
 def test_crawl_webpage():
     """Test the crawl_webpage function with mocked responses."""

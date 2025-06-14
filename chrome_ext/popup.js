@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusDiv = document.getElementById('status');
 
   // Configuration
-  const RAGME_API_URL = 'http://localhost:8000'; // Update this with your actual API URL
+  const RAGME_API_URL = 'http://localhost:8021'; //TODO:Update this with your actual API URL
 
   function showStatus(message, isError = false) {
     statusDiv.textContent = message;
