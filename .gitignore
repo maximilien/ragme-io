@@ -181,3 +181,6 @@ ragme-ai.code-workspace
 
 # VSCode
 .vscode
+
+# watch directory
+watch_directory/

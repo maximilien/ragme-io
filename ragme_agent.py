@@ -71,7 +71,7 @@ def add_to_rag(data: dict) -> bool:
         print(f"Adding to RAG: {json.dumps(data, indent=2)}")  # Pretty print error response
         # Wrap the data in a 'data' field as expected by the API
         response = requests.post(
-            'http://localhost:8000/add-json',
+            'http://localhost:8020/add-json',
             json=data
         )
         
@@ -108,7 +108,7 @@ def process_pdf_file(file_path: Path) -> bool:
             
             # Call the MCP server
             response = requests.post(
-                'http://localhost:8010/tool/process_pdf',
+                'http://localhost:8021/tool/process_pdf',
                 files=files
             )
             
@@ -149,7 +149,7 @@ def process_docx_file(file_path: Path) -> bool:
             
             # Call the MCP server
             response = requests.post(
-                'http://localhost:8010/tool/process_docx',
+                'http://localhost:8021/tool/process_docx',
                 files=files
             )
             
