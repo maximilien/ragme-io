@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "bs4>=0.0.2",
+    "exif>=1.6.1",
     "fastapi>=0.115.12",
     "httpx>=0.28.1",
     "llama-index>=0.12.37",

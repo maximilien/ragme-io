@@ -29,7 +29,8 @@ def test_ragme_init():
         mock_api_key.return_value = 'fake-key'
 
         ragme = RagMe()
-        assert ragme.collection_name == "RagMeDocs"
+        assert ragme.docs_collection_name == "RagMeDocs"
+        assert ragme.images_collection_name == "RagMeImages"
         assert ragme.weeviate_client is not None
         assert ragme.query_agent is not None
         assert ragme.ragme_agent is not None

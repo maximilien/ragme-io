@@ -1,15 +1,25 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import warnings
+# Suppress Pydantic deprecation warnings from dependencies
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-based `config` is deprecated.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic._internal._config")
+
+import base64
 import json
 import logging
 import os
-import warnings
+import requests
+
 from typing import List, Dict, Any
 from urllib.parse import urljoin, urlparse
 
-import requests
+from PIL import Image, ExifTags
+from exif import Image as ExifImage
 from bs4 import BeautifulSoup
+
 from llama_index.core.llms import ChatMessage
 from llama_index.core.tools import FunctionTool
 from llama_index.core.agent.workflow import FunctionAgent
@@ -44,14 +54,14 @@ if not WEAVIATE_URL:
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
-
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 class RagMe:
     """A class for managing RAG (Retrieval-Augmented Generation) operations with web content using a Vector Database."""
     
     def __init__(self):
-        self.collection_name = "RagMeDocs"
+        self.docs_collection_name = "RagMeDocs"
+        self.images_collection_name = "RagMeImages"
         self.weeviate_client, self.query_agent, self.ragme_agent = None, None, None
 
         self._create_weaviate_client()
@@ -71,9 +81,10 @@ class RagMe:
         return self.weeviate_client
     
     def _setup_weaviate(self):
-        if not self.weeviate_client.collections.exists(self.collection_name):
+        # Create the RagMeDocs collection
+        if not self.weeviate_client.collections.exists(self.docs_collection_name):
             self.weeviate_client.collections.create(
-                self.collection_name,
+                self.docs_collection_name,
                 description="A dataset with the contents of RagMe docs and website",
                 vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
                 properties=[
@@ -81,9 +92,32 @@ class RagMe:
                     Property(name="text", data_type=DataType.TEXT, description="the content of the webpage"),
                     Property(name="metadata", data_type=DataType.TEXT, description="additional metadata in JSON format"),
             ])
+        # Create the RagMeImages collection
+        if not self.weeviate_client.collections.exists(self.images_collection_name):
+            try:
+                self.weeviate_client.collections.create(
+                    self.images_collection_name,
+                    description="A dataset with the contents of RagMe images",
+                    vectorizer_config=Configure.Vectorizer.multi2vec_google(image_fields=["image"]),
+                    properties=[
+                        Property(name="image", data_type=DataType.BLOB, description="the base64 encoded image"),
+                        Property(name="metadata", data_type=DataType.TEXT, description="additional metadata in JSON format"),
+                    ]
+                )
+            except Exception as e:
+                print("multi2vec-google not available or not supporting images, falling back to text2vec-weaviate.")
+                self.weeviate_client.collections.create(
+                    self.images_collection_name,
+                    description="A dataset with the contents of RagMe images",
+                    vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
+                    properties=[
+                        Property(name="image", data_type=DataType.BLOB, description="the base64 encoded image"),
+                        Property(name="metadata", data_type=DataType.TEXT, description="additional metadata in JSON format"),
+                    ]
+                )
 
     def _create_query_agent(self):
-        return QueryAgent(client=self.weeviate_client, collections=[self.collection_name])
+        return QueryAgent(client=self.weeviate_client, collections=[self.docs_collection_name, self.images_collection_name])
 
     def _create_ragme_agent(self):
         llm = OpenAI(model="gpt-4o-mini")
@@ -103,13 +137,22 @@ class RagMe:
             """
             Reset and delete the RagMeDocs collection
             """
-            self.weeviate_client.collections.delete(self.collection_name)
+            self.weeviate_client.collections.delete(self.docs_collection_name)
 
         def list_ragme_collection(limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
             """
             List the contents of the RagMeDocs collection
             """
             return self.list_documents()
+
+        def write_images_to_ragme_collection(image_urls=list[str], metadata: Dict[str, Any] = None):
+            """
+            Useful for writing new content to the RagMeImages collection
+            Args:
+                image_urls (list[str]): A list of image URLs to write to the RagMeImages collection
+                metadata (Dict[str, Any], optional): Additional metadata to store with the content
+            """
+            self.write_images_to_weaviate(image_urls, metadata)
 
         def write_to_ragme_collection(urls=list[str]):
             """
@@ -131,18 +174,62 @@ class RagMe:
             return response.final_answer
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent],
+            tools=[write_to_ragme_collection, write_images_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent],
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
             as well as forwarding questions to a QueryAgent""",
         )
     
+    def _get_image_metadata(self, image_url: str) -> Dict[str, Any]:
+        """
+        Get the metadata of an image
+        """
+        try:
+            response = requests.get(image_url)
+            image = ExifImage(response.content)
+            metadata = {
+                "type": "image",
+                "url": image_url,
+                "exif": {}
+            }
+            for tag in image.list_all():
+                try:
+                    metadata["exif"][tag] = str(image.get(tag))
+                except:
+                    continue
+            return metadata
+        except Exception as e:
+            print(f"Error getting image metadata: {e}")
+            return {"type": "image", "url": image_url}
+    
     # public methods
 
     def cleanup(self):
         if self.weeviate_client:
             self.weeviate_client.close()
+
+    def write_images_to_weaviate(self, image_urls: list[str], metadata: Dict[str, Any] = None):
+        """
+        Write an image to the RagMeImages collection in Weaviate.
+        Args:
+            image_urls (list[str]): The URLs of the images to write to the RagMeImages collection
+        """
+        collection = self.weeviate_client.collections.get(self.images_collection_name)
+        with collection.batch.dynamic() as batch:
+            for image_url in image_urls:
+                if metadata is None:
+                    metadata = self._get_image_metadata(image_url)
+                
+                with open(image_url, "rb") as file:
+                    image_data = file.read()
+                    base64_encoding = base64.b64encode(image_data).decode("utf-8")
+                    data_properties = {
+                        "image": base64_encoding,
+                    }
+                    metadata_text = json.dumps(metadata, ensure_ascii=False)
+                    data_properties["metadata"] = metadata_text
+                    batch.add_data_object(data_properties, "Image")
 
     def write_webpages_to_weaviate(self, urls: list[str]):
         """
@@ -151,7 +238,7 @@ class RagMe:
             urls (list[str]): A list of URLs to write to the RagMeDocs collection
         """
         documents = SimpleWebPageReader(html_to_text=True).load_data(urls)
-        collection = self.weeviate_client.collections.get(self.collection_name)
+        collection = self.weeviate_client.collections.get(self.docs_collection_name)
         with collection.batch.dynamic() as batch:
             for doc in documents:
                 metadata_text = json.dumps({"type": "webpage", "url": doc.id_}, ensure_ascii=False)
@@ -172,7 +259,7 @@ class RagMe:
         # Convert metadata to string if provided
         metadata_text = json.dumps(metadata, ensure_ascii=False) if metadata else "{}"
         
-        collection = self.weeviate_client.collections.get(self.collection_name)
+        collection = self.weeviate_client.collections.get(self.docs_collection_name)
         with collection.batch.dynamic() as batch:
             batch.add_object(properties={
                 "url": json_data.get("filename", "filename not found"),
@@ -191,7 +278,7 @@ class RagMe:
         Returns:
             List[Dict[str, Any]]: List of documents with their properties
         """
-        collection = self.weeviate_client.collections.get(self.collection_name)
+        collection = self.weeviate_client.collections.get(self.docs_collection_name)
         
         # Query the collection
         result = collection.query.fetch_objects(
