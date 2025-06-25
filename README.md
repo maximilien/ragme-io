@@ -1,27 +1,27 @@
 # RAGme.ai
 
-A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) web sites and documents you care about and let you query them in an agentic fashion.
+A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) websites and documents you care about and let you query them in an agentic fashion.
 
 # Use cases
 
-1. Interractive personal RAG adding web sites and documents and using an LLM agent to query
-2. Collecting web sites or documents on a particular topic and RAGing and searching them
-3. Collecting posts from a blog and RAGing and searching them
-4. Collecting visited sites from a user's daily activities and RAGing and searching them
-5. Collecting documents from a user and RAGing and searching them
+1. Interactive personal RAG adding websites and documents and using an LLM agent to query
+2. Collecting websites or documents on a particular topic and RAG-ing and searching them
+3. Collecting posts from a blog and RAG-ing and searching them
+4. Collecting visited sites from a user's daily activities and RAG-ing and searching them
+5. Collecting documents from a user and RAG-ing and searching them
 
-RAGing and searching refers to adding documents into a Vector database using some appropriate embedding (process to RAG) and then using an LLM agent to query and use that database as source of knowledge.
+RAG-ing and searching refers to adding documents into a vector database using some appropriate embedding (process to RAG) and then using an LLM agent to query and use that database as a source of knowledge.
 
 # Getting started
 
 ## Requirements
 
-Install and / or update the following if needed
+Install and/or update the following if needed:
 
 1. Install [Python 3.12](https://www.python.org/downloads/) or later
 2. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) 
-3. Install [`gh`](https://cli.github.com/) from github
-4. Weeviate Cloud (Vector DB) cluster and collection named: `RagMeDocs`
+3. Install [`gh`](https://cli.github.com/) from GitHub
+4. Weaviate Cloud (Vector DB) cluster and collection named: `RagMeDocs`
 
 ## Get code, setup dependencies
 
@@ -29,34 +29,34 @@ Install and / or update the following if needed
 gh repo clone maximilien/ragme-ai
 ```
 
-Setup your virtual environment
+Setup your virtual environment:
 
 ```bash
 uv venv
 source .venv/bin/activate
 ```
 
-Install dependencies
+Install dependencies:
 
 ```bash
 uv sync
 ```
 
-## Weeviate Cloud
+## Weaviate Cloud
 
-Create an account and cluster at [Weeviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster create a collection named "RagMeDocs".
+Create an account and cluster at [Weaviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster, create a collection named "RagMeDocs".
 
-Once you have the cluster, Weeviate should give you a page with the cluster REST Endpoint and the API Key (select the Admin one).
+Once you have the cluster, Weaviate should give you a page with the cluster REST endpoint and the API key (select the Admin one).
 
 These will be your `WEAVIATE_URL` and `WEAVIATE_API_KEY` respectively.
 
 ## API keys
 
-The current version of RAGme.ai uses [OpenAI](https://auth.openai.com/log-in) as the LLM provider and [Weeviate](https://console.weaviate.cloud/) as the vector DB. 
+The current version of RAGme.ai uses [OpenAI](https://auth.openai.com/log-in) as the LLM provider and [Weaviate](https://console.weaviate.cloud/) as the vector DB. 
 
-You will need to have API keys for both. And for weeviate after creating a cluser and a collection you will need the API key and cluster URL.
+You will need to have API keys for both. And for Weaviate, after creating a cluster and a collection, you will need the API key and cluster URL.
 
-Create a `.env` file with the the keys and URL
+Create a `.env` file with the keys and URL:
 
 ```bash
 cat .env
@@ -67,7 +67,7 @@ WEAVIATE_URL=*****.weaviate.cloud
 
 Replace `*****` with appropriate values.
 
-## Run streamlit UI
+## Run Streamlit UI
 
 ```bash
 # Run with project root in PYTHONPATH
@@ -91,17 +91,17 @@ This should launch the RAGme.ai UI on your default browser or go to `http://loca
 ### Current affairs
 
 1. Go to [Google News](https://news.google.com/home?hl=en-US&gl=US&ceid=US:en) and add a few articles you care about
-2. Ask RAGme.ai to summarize or ask any question on the article
+2. Ask RAGme.ai to summarize or ask any question about the article
 
 ### Blogs 
 
-1. Ask `Crawl my <favorite.blog.url" up to 10 posts and add to my collection`
-2. Add RAGme.ai questions about the blog posts ingested
+1. Ask `Crawl my <favorite.blog.url> up to 10 posts and add to my collection`
+2. Ask RAGme.ai questions about the blog posts ingested
 
 ### Code
 
-1. Find your favorite OSS Github project and ask `Crawl my <favorite.oss.github.url" up to 10 deep and add to my collection`
-2. Add RAGme.ai questions about the project, e.g., give a quick user guide
+1. Find your favorite OSS GitHub project and ask `Crawl my <favorite.oss.github.url> up to 10 deep and add to my collection`
+2. Ask RAGme.ai questions about the project, e.g., give a quick user guide
 
 
 # Architecture
@@ -129,9 +129,9 @@ flowchart LR
 Built on top of existing [RAGme-ai](https://github.com/maximilien/ragme-ai)
 
 1. MCP server to load and RAG files: PDFs and docs
-2. agent to load pass these to RAGme
-3. agent to find web sites using browserbase and add to the RAG
-4. agent to create insights from today's documents
+2. Agent to load and pass these to RAGme
+3. Agent to find websites using browserbase and add to the RAG
+4. Agent to create insights from today's documents
 
 ```mermaid
 flowchart LR
@@ -154,24 +154,24 @@ flowchart LR
 # Limitations
 
 1. Uses the same collection for all users
-2. Tied to weeviate as vector database
-3. Tied to Llamaindex as agent and RAG
+2. Tied to Weaviate as vector database
+3. Tied to LlamaIndex as agent and RAG
 
 
 # Next steps
 
-1. Decouple the weeviate vector database dependency. Allow others like [OpenSearch](https://opensearch.org/)
-2. Decouple [Llamaindex](https://www.llamaindex.ai/) for parsing and RAGing of document. Allow others like [docling](https://github.com/docling-project)
-3. Decouple Llamaindex as the query agent
-4. Add security at minimum https
+1. Decouple the Weaviate vector database dependency. Allow others like [OpenSearch](https://opensearch.org/)
+2. Decouple [LlamaIndex](https://www.llamaindex.ai/) for parsing and RAG-ing of documents. Allow others like [docling](https://github.com/docling-project)
+3. Decouple LlamaIndex as the query agent
+4. Add security at minimum HTTPS
 5. Add ability to add images and videos
-5. Allow multiple users (SaaS)
+6. Allow multiple users (SaaS)
 
 
 # How can I help
 
 I welcome any PRs, especially when solving an open issue or fixing a new problem.
 
-Additionally, I would love to hear your feedback on new use cases or usages.
+Additionally, I would love to hear your feedback on new use cases or usage patterns.
 
 Created with ❤️ by @maximilien
