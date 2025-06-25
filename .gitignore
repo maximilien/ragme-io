@@ -184,3 +184,5 @@ ragme-ai.code-workspace
 
 # watch directory
 watch_directory/
+
+.DS_Store
