@@ -135,7 +135,8 @@ class RagMe:
             llm=llm,
             system_prompt="""You are a helpful assistant that can write the
             contents of urls to RagMeDocs collection,
-            as well as forwarding questions to a QueryAgent""",
+            as well as forwarding questions to a QueryAgent to answer 
+            questions about the contents of the RagMeDocs collection""",
         )
     
     # public methods
