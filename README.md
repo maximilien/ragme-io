@@ -2,17 +2,19 @@
 
 A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) websites and documents you care about and let you query them in an agentic fashion.
 
-# Use cases
+# Use Cases and Features
 
-1. Interactive personal RAG adding websites and documents and using an LLM agent to query
+1. Interactive personal RAG adding websites and documents (PDFs and DOCX) and using an LLM agent to query
 2. Collecting websites or documents on a particular topic and RAG-ing and searching them
 3. Collecting posts from a blog and RAG-ing and searching them
 4. Collecting visited sites from a user's daily activities and RAG-ing and searching them
 5. Collecting documents from a user and RAG-ing and searching them
+6. Automatically adding documents to your collection by copying to a watch directory
+7. Easily add Web pages to your collection with a Chrome extension
 
-RAG-ing and searching refers to adding documents into a vector database using some appropriate embedding (process to RAG) and then using an LLM agent to query and use that database as a source of knowledge.
+RAG-ing and searching refers to adding documents into a vector database using some appropriate embedding (creates a vector for document) and then using an LLM agent to query and use that vector database as a source of knowledge.
 
-# Getting started
+# Getting Started
 
 ## Requirements
 
@@ -103,7 +105,6 @@ This should launch the RAGme.ai UI on your default browser or go to `http://loca
 1. Find your favorite OSS GitHub project and ask `Crawl my <favorite.oss.github.url> up to 10 deep and add to my collection`
 2. Ask RAGme.ai questions about the project, e.g., give a quick user guide
 
-
 # Architecture
 
 ```mermaid
@@ -166,7 +167,9 @@ flowchart LR
 4. Add security at minimum HTTPS
 5. Add ability to add images and videos
 6. Allow multiple users (SaaS)
-
+7. Support other types of content: images, audio, and video
+8. Add ability to injest emails by forwarding to a xyz@ragme.io email
+9. Add ability to inject content from Slack
 
 # How can I help
 
