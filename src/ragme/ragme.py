@@ -133,10 +133,14 @@ class RagMe:
         return FunctionAgent(
             tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent],
             llm=llm,
-            system_prompt="""You are a helpful assistant that can write the
-            contents of urls to RagMeDocs collection,
-            as well as forwarding questions to a QueryAgent to answer 
-            questions about the contents of the RagMeDocs collection""",
+            system_prompt="""You are a helpful assistant that can write 
+            the contents of urls to RagMeDocs 
+            collection, as well as forwarding questions to a QueryAgent.
+            The QueryAgent will priortize the contents of the RagMeDocs collection 
+            to answer the question.
+            You can also ask questions about the RagMeDocs collection directly.
+            If the query is not about the RagMeDocs collection, you can ask the QueryAgent to answer the question.
+            """,
         )
     
     # public methods
