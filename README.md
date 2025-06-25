@@ -65,9 +65,57 @@ cat .env
 OPENAI_API_KEY=sk-proj-*****-**
 WEAVIATE_API_KEY=*****
 WEAVIATE_URL=*****.weaviate.cloud
+RAGME_API_URL=http://localhost:8021
+RAGME_MCP_URL=http://localhost:8022
 ```
 
 Replace `*****` with appropriate values.
+
+## Run RAGme.ai
+
+RAGme.ai consists of multiple services that work together:
+
+1. **API Server** (port 8021): Handles URL and JSON ingestion
+2. **MCP Server** (port 8022): Processes PDF and DOCX files  
+3. **Agent** (background): Monitors watch directory for new files
+4. **Streamlit UI** (port 8020): Web interface for interaction
+
+### Quick Start (All Services)
+
+Use the provided startup script to launch all services:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+This will start all services and you can access the UI at `http://localhost:8020`
+
+### Stop All Services
+
+To stop all running services:
+
+```bash
+./stop.sh
+```
+
+### Manual Start (Individual Services)
+
+If you prefer to start services individually:
+
+```bash
+# Start API server
+uv run uvicorn src.ragme.api:app --reload --host 0.0.0.0 --port 8021
+
+# Start MCP server (in another terminal)
+uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022
+
+# Start file monitoring agent (in another terminal)
+uv run python -m src.ragme.agent
+
+# Start Streamlit UI (in another terminal)
+PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port 8020
+```
 
 ## Run Streamlit UI
 
@@ -88,6 +136,32 @@ PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port
 
 This should launch the RAGme.ai UI on your default browser or go to `http://localhost:8020`
 
+## Chrome Extension
+
+A Chrome extension is included to easily add web pages to your collection:
+
+1. **Load the extension**:
+   - Open Chrome and go to `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select the `chrome_ext/` directory
+
+2. **Use the extension**:
+   - Navigate to any webpage you want to add to your collection
+   - Click the RAGme extension icon
+   - Click "Capture Page" to add the current page to your collection
+
+**Note**: The extension requires the API server to be running on `http://localhost:8021`
+
+## Watch Directory
+
+The system can automatically process PDF and DOCX files by monitoring a watch directory:
+
+1. **Add files**: Copy PDF or DOCX files to the `watch_directory/` folder
+2. **Automatic processing**: The agent will detect new files and add them to your collection
+3. **Supported formats**: PDF and DOCX files are automatically processed and indexed
+
+**Note**: The file monitoring agent must be running for this feature to work.
+
 ## Some example usage
 
 ### Current affairs
@@ -107,6 +181,8 @@ This should launch the RAGme.ai UI on your default browser or go to `http://loca
 
 # Architecture
 
+RAGme.ai uses a multi-service architecture with the following components:
+
 ```mermaid
 flowchart LR
     user((User)) -- "1 add URL" --> ragme-agent["RAGme agent 🤖"]
@@ -124,6 +200,28 @@ flowchart LR
     
     ragme-agent -- "8 final response" --> user((User))
 ```
+
+## Service Architecture
+
+```mermaid
+flowchart TB
+    ui[Streamlit UI<br/>Port 8020] --> api[API Server<br/>Port 8021]
+    chrome[Chrome Extension] --> api
+    agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
+    mcp --> api
+    api --> ragme[RAGme Core]
+    ragme --> weaviate[(Weaviate DB)]
+    ragme --> openai[OpenAI LLM]
+```
+
+### Components
+
+- **Streamlit UI** (port 8020): Web interface for user interaction
+- **API Server** (port 8021): REST API for URL and JSON ingestion
+- **MCP Server** (port 8022): Document processing for PDF and DOCX files
+- **File Monitor Agent**: Watches `watch_directory/` for new files
+- **Chrome Extension**: Browser extension for capturing web pages
+- **RAGme Core**: Main RAG processing logic using LlamaIndex and Weaviate
 
 ### MCP
 
@@ -168,8 +266,9 @@ flowchart LR
 5. Add ability to add images and videos
 6. Allow multiple users (SaaS)
 7. Support other types of content: images, audio, and video
-8. Add ability to injest emails by forwarding to a xyz@ragme.io email
-9. Add ability to inject content from Slack
+8. Add ability to ingest emails by forwarding to a xyz@ragme.io email
+9. Add ability to ingest content from Slack
+10. Add ability to ingest content from X / Twitter
 
 # How can I help
 
