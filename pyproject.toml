@@ -16,6 +16,7 @@ dependencies = [
     "pypdf2>=3.0.1",
     "pytest>=8.3.5",
     "python-docx>=1.2.0",
+    "python-multipart>=0.0.20",
     "requests>=2.32.3",
     "requests-mock>=1.12.1",
     "streamlit>=1.45.1",
