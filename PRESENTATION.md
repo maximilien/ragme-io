@@ -1,6 +1,15 @@
 # RAGme.ai: Personal RAG Agent for Web Content
 ## A Comprehensive Overview
 
+<!-- 
+To generate PDF or HTML from this presentation:
+npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-ai.pdf
+npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-ai.html
+
+For HTML with speaker notes:
+npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/Desktop/ragme-ai.html
+-->
+
 ---
 
 ## 🎯 What is RAGme.ai?
