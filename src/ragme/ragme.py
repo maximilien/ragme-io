@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import asyncio
 import json
 import logging
 import os
@@ -40,11 +41,14 @@ if not WEAVIATE_API_KEY:
 if not WEAVIATE_URL:
     raise ValueError("WEAVIATE_URL is not set")
 
-# Filter warnings
+# Filter warnings - more comprehensive suppression
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-based `config`.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
 
 
 class RagMe:
