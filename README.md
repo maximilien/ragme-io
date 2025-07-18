@@ -111,7 +111,7 @@ uv run uvicorn src.ragme.api:app --reload --host 0.0.0.0 --port 8021
 uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022
 
 # Start file monitoring agent (in another terminal)
-uv run python -m src.ragme.agent
+uv run python -m src.ragme.local_agent
 
 # Start Streamlit UI (in another terminal)
 PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port 8020
