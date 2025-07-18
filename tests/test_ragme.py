@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import warnings
+
+# Suppress Pydantic deprecation warnings from dependencies
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-based `config`.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
+
 import pytest
 import sys
 import os
