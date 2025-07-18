@@ -208,7 +208,7 @@ async function captureCurrentPage() {
 
 ### File Monitoring
 ```python
-# agent.py - Automatic file processing
+# local_agent.py - Automatic file processing
 class FileHandler(FileSystemEventHandler):
     def __init__(self, callback=None):
         self.supported_extensions = {'.pdf', '.docx'}
@@ -358,7 +358,7 @@ cp .env.example .env
 # Or manually
 uv run uvicorn src.ragme.api:app --port 8021 &
 uv run uvicorn src.ragme.mcp:app --port 8022 &
-uv run python -m src.ragme.agent &
+uv run python -m src.ragme.local_agent &
 uv run streamlit run src/ragme/ui.py --port 8020
 ```
 

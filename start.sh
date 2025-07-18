@@ -32,9 +32,9 @@ uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022 &
 echo $! >> .pid
 sleep 2
 
-# Start agent.py
-echo "Starting agent.py..."
-uv run python -m src.ragme.agent &
+# Start local_agent.py
+echo "Starting local_agent.py..."
+uv run python -m src.ragme.local_agent &
 echo $! >> .pid
 sleep 2
 
