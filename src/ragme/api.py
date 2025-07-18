@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
-import json
 import traceback
 from typing import List, Dict, Any, Optional
 

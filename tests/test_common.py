@@ -10,7 +10,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Suppor
 
 import sys
 import os
-import pytest
 import requests
 import requests_mock
 

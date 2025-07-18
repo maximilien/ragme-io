@@ -18,7 +18,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.ragme.api import app
-from llama_index.readers.web import SimpleWebPageReader
 
 @pytest.fixture
 def client():

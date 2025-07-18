@@ -3,30 +3,19 @@
 
 import asyncio
 import json
-import logging
 import os
 import warnings
 from typing import List, Dict, Any
-from urllib.parse import urljoin, urlparse
 
-import requests
-from bs4 import BeautifulSoup
-from llama_index.core.llms import ChatMessage
-from llama_index.core.tools import FunctionTool
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 from llama_index.readers.web import SimpleWebPageReader
-from pydantic import BaseModel, Field
 import weaviate
 from weaviate.auth import Auth
 from weaviate.agents.query import QueryAgent
 from weaviate.classes.config import Configure, Property, DataType
 
 from src.ragme.common import crawl_webpage
-
-import dotenv
-
-dotenv.load_dotenv()
 
 # Get environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
