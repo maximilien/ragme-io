@@ -8,7 +8,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
 
-import pytest
 import sys
 import os
 

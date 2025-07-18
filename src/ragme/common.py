@@ -1,13 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
-import json
-import logging
-import os
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-
-import dotenv
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
