@@ -16,6 +16,7 @@ from weaviate.agents.query import QueryAgent
 from weaviate.classes.config import Configure, Property, DataType
 
 from src.ragme.common import crawl_webpage
+from src.ragme.ragme_agent import RagMeAgent
 
 # Get environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -51,7 +52,7 @@ class RagMe:
         self._setup_weaviate()
         
         self.query_agent = self._create_query_agent()
-        self.ragme_agent = self._create_ragme_agent()
+        self.ragme_agent = RagMeAgent(self)
     
     # private methods
 
@@ -77,64 +78,6 @@ class RagMe:
 
     def _create_query_agent(self):
         return QueryAgent(client=self.weeviate_client, collections=[self.collection_name])
-
-    def _create_ragme_agent(self):
-        llm = OpenAI(model="gpt-4o-mini")
-
-        def find_urls_crawling_webpage(start_url: str, max_pages: int = 10) -> list[str]:
-            """
-            Crawl a webpage and find all web pages under it.
-            Args:
-                start_url (str): The URL to start crawling from
-                max_pages (int): The maximum number of pages to crawl
-            Returns:
-                list[str]: A list of URLs found
-            """
-            return crawl_webpage(start_url, max_pages)
-                
-        def delete_ragme_collection():
-            """
-            Reset and delete the RagMeDocs collection
-            """
-            self.weeviate_client.collections.delete(self.collection_name)
-
-        def list_ragme_collection(limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
-            """
-            List the contents of the RagMeDocs collection
-            """
-            return self.list_documents()
-
-        def write_to_ragme_collection(urls=list[str]):
-            """
-            Useful for writing new content to the RagMeDocs collection
-            Args:
-                urls (list[str]): A list of URLs to write to the RagMeDocs collection
-            """
-            self.write_webpages_to_weaviate(urls)
-
-        def query_agent(query: str) -> str:
-            """
-            Useful for asking questions about RagMe docs and website
-            Args:
-                query (str): The query to ask the QueryAgent
-            Returns:
-                str: The response from the QueryAgent
-            """
-            response = self.query_agent.run(query)
-            return response.final_answer
-
-        return FunctionAgent(
-            tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent],
-            llm=llm,
-            system_prompt="""You are a helpful assistant that can write 
-            the contents of urls to RagMeDocs 
-            collection, as well as forwarding questions to a QueryAgent.
-            The QueryAgent will priortize the contents of the RagMeDocs collection 
-            to answer the question.
-            You can also ask questions about the RagMeDocs collection directly.
-            If the query is not about the RagMeDocs collection, you can ask the QueryAgent to answer the question.
-            """,
-        )
     
     # public methods
 
