@@ -21,6 +21,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Personal**: Focuses on your specific content and interests
 - **Agentic**: Uses LLM agents for intelligent interaction
 - **Multi-modal**: Supports web pages, PDFs, and DOCX documents
+- **Vector Database Agnostic**: Supports multiple vector databases (Weaviate, Pinecone, etc.)
 
 ---
 
@@ -42,6 +43,12 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - Get summaries and insights
 - Cross-reference information across sources
 
+### 4. **Vector Database Flexibility** ⭐ **NEW!**
+- **Agnostic Architecture**: Easy to switch between vector databases
+- **Weaviate Support**: Current default implementation
+- **Extensible**: Simple to add Pinecone, Chroma, or other databases
+- **Future-Proof**: Adapts to new vector database technologies
+
 ---
 
 ## 🏗️ Architecture Overview
@@ -55,7 +62,7 @@ flowchart TB
     agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
     mcp --> api
     api --> ragme[RAGme Core]
-    ragme --> weaviate[(Weaviate DB)]
+    ragme --> vector_db[(Vector DB<br/>Agnostic)]
     ragme --> openai[OpenAI LLM]
 ```
 
@@ -68,6 +75,7 @@ flowchart TB
 | **MCP Server** | 8022 | Document processing (PDF/DOCX) |
 | **File Monitor** | - | Watches directory for new files |
 | **Chrome Extension** | - | Browser-based content capture |
+| **Vector DB Layer** | - | Abstracted database interface |
 
 ---
 
@@ -82,12 +90,17 @@ flowchart TB
 ### AI & ML Stack
 - **OpenAI GPT-4o-mini**: Primary LLM for reasoning
 - **LlamaIndex**: Document processing and RAG framework
-- **Weaviate**: Vector database for embeddings
+- **Vector Database Abstraction**: Support for multiple vector databases
 
 ### Document Processing
 - **PyPDF2**: PDF text extraction
 - **python-docx**: DOCX document processing
 - **BeautifulSoup**: HTML parsing for web content
+
+### Vector Database Support
+- **Weaviate**: Current default implementation
+- **Extensible**: Easy to add Pinecone, Chroma, etc.
+- **Abstracted Interface**: Clean separation of concerns
 
 ---
 
@@ -98,8 +111,6 @@ flowchart TB
 # Required software
 - Python 3.12+
 - uv (Python package manager)
-- gh (GitHub CLI)
-- Weaviate Cloud account
 ```
 
 ### Environment Configuration
