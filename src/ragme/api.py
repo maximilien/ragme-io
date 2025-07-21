@@ -2,6 +2,7 @@
 # Copyright (c) 2025 dr.max
 
 import traceback
+from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -10,10 +11,21 @@ from pydantic import BaseModel
 
 from .ragme import RagMe
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for FastAPI application."""
+    # Startup
+    yield
+    # Shutdown
+    ragme.cleanup()
+
+
 app = FastAPI(
     title="RagMe API",
     description="API for RAG operations with web content using a Vector Database",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -131,11 +143,6 @@ async def list_documents(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup when the application shuts down."""
-    ragme.cleanup()
 
 if __name__ == "__main__":
     import uvicorn
