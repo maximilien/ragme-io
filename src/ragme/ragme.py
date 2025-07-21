@@ -46,6 +46,7 @@ class RagMe:
             collection_name: Name of the collection to use
         """
         self.collection_name = collection_name
+        self.db_type = db_type  # Store the db_type for reporting
         
         # Initialize vector database
         if vector_db is None:

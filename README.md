@@ -323,3 +323,27 @@ response = await ragme.run("What is this about?")
 ```
 
 See `examples/milvus_example.py` for a complete example.
+
+## Milvus Integration Demo
+
+You can try out RagMe with Milvus as the vector database backend using the provided demo script:
+
+**File:** `examples/milvus_integration_demo.py`
+
+### Requirements
+- `pymilvus` must be installed:  
+  `pip install "pymilvus[model]"`
+- No Milvus server required: Milvus Lite will be used locally by default
+
+### How to Run
+```bash
+python examples/milvus_integration_demo.py
+```
+
+This script demonstrates:
+- Creating a Milvus client
+- Creating a collection
+- Inserting and querying data
+- Integrating RagMe with Milvus
+
+> **Note:** This is a demo/integration script, not a test. Pytest will not collect or run this file.

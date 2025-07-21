@@ -56,7 +56,7 @@ class TestRagMeAgent:
         assert agent.agent is not None
         # The agent should be a FunctionAgent with tools
         assert hasattr(agent.agent, 'tools')
-        assert len(agent.agent.tools) == 5  # 5 tools: write, delete, list, crawl, query
+        assert len(agent.agent.tools) == 6  # 6 tools: write, delete, list, crawl, query, db info
     
     def test_run_method(self):
         """Test the run method of RagMeAgent."""
@@ -93,7 +93,7 @@ class TestRagMeAgent:
         tools = agent.agent.tools
         
         # Verify we have the expected number of tools
-        assert len(tools) == 5  # write, delete, list, crawl, query
+        assert len(tools) == 6  # write, delete, list, crawl, query, db info
         
         # Test that the tools can access RagMe methods by calling them directly
         # We'll test the list_ragme_collection function by finding it in the agent's _create_agent method

@@ -20,6 +20,12 @@ class VectorDatabase(ABC):
         """Initialize the vector database with a collection name."""
         self.collection_name = collection_name
     
+    @property
+    @abstractmethod
+    def db_type(self) -> str:
+        """Return the type/name of the vector database."""
+        pass
+    
     @abstractmethod
     def setup(self):
         """Set up the database and create collections if they don't exist."""
@@ -173,6 +179,10 @@ class WeaviateVectorDatabase(VectorDatabase):
             finally:
                 self.client = None
 
+    @property
+    def db_type(self) -> str:
+        return "weaviate"
+
 
 class MilvusVectorDatabase(VectorDatabase):
     """Milvus implementation of the vector database interface."""
@@ -187,45 +197,53 @@ class MilvusVectorDatabase(VectorDatabase):
         from pymilvus import MilvusClient
         milvus_uri = os.getenv("MILVUS_URI", "milvus_demo.db")
         milvus_token = os.getenv("MILVUS_TOKEN", None)
+        
+        # For local Milvus Lite, use the file path directly
         if milvus_token:
             self.client = MilvusClient(uri=milvus_uri, token=milvus_token)
         else:
-            self.client = MilvusClient(milvus_uri)
+            self.client = MilvusClient(uri=milvus_uri)
 
     def setup(self):
-        # Assume 768-dim vectors for now; adjust as needed
-        dim = 768
-        if self.client.has_collection(collection_name=self.collection_name):
-            return
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            dimension=dim,
-        )
+        """Set up Milvus collection if it doesn't exist."""
+        # Create collection if it doesn't exist
+        if not self.client.has_collection(self.collection_name):
+            # Use the correct API for MilvusClient
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                dimension=1536,  # Vector dimension
+                primary_field_name="id",
+                vector_field_name="vector"
+            )
 
     def write_documents(self, documents: List[Dict[str, Any]]):
+        """Write documents to Milvus."""
         # Each document should have 'url', 'text', 'metadata', and 'vector' (list of floats)
-        # If 'vector' is not present, raise error for now
         data = []
         for i, doc in enumerate(documents):
             if "vector" not in doc:
                 raise ValueError("Milvus requires a 'vector' field in each document.")
             data.append({
                 "id": i,
-                "vector": doc["vector"],
                 "url": doc.get("url", ""),
                 "text": doc.get("text", ""),
-                "metadata": json.dumps(doc.get("metadata", {}), ensure_ascii=False)
+                "metadata": json.dumps(doc.get("metadata", {}), ensure_ascii=False),
+                "vector": doc["vector"]
             })
-        self.client.insert(collection_name=self.collection_name, data=data)
+        self.client.insert(self.collection_name, data)
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """List documents from Milvus."""
         # Query all documents, paginated
-        res = self.client.query(
-            collection_name=self.collection_name,
+        results = self.client.query(
+            self.collection_name,
             output_fields=["id", "url", "text", "metadata"],
+            limit=limit,
+            offset=offset
         )
+        
         docs = []
-        for doc in res["data"][:limit]:
+        for doc in results:
             try:
                 metadata = json.loads(doc.get("metadata", "{}"))
             except Exception:
@@ -239,13 +257,19 @@ class MilvusVectorDatabase(VectorDatabase):
         return docs
 
     def create_query_agent(self):
+        """Create a query agent for Milvus."""
         # Placeholder: Milvus does not have a built-in query agent like Weaviate
         # You would implement your own search logic here
         return self
 
     def cleanup(self):
+        """Clean up Milvus client."""
         # No explicit cleanup needed for MilvusClient
         self.client = None
+
+    @property
+    def db_type(self) -> str:
+        return "milvus"
 
 # Factory function to create vector database instances
 
