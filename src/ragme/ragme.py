@@ -8,25 +8,20 @@ import warnings
 from typing import List, Dict, Any
 
 from llama_index.readers.web import SimpleWebPageReader
-import weaviate
-from weaviate.auth import Auth
-from weaviate.classes.config import Configure, Property, DataType
-from weaviate.agents.query import QueryAgent
+
+import dotenv
 
 from src.ragme.ragme_agent import RagMeAgent
+from src.ragme.vector_db import create_vector_database, VectorDatabase
 
 # Get environment variables
+dotenv.load_dotenv()
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
-WEAVIATE_URL = os.getenv("WEAVIATE_URL")
 
 # Check if environment variables are set
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is not set")
-if not WEAVIATE_API_KEY:
-    raise ValueError("WEAVIATE_API_KEY is not set")
-if not WEAVIATE_URL:
-    raise ValueError("WEAVIATE_URL is not set")
 
 # Filter warnings - more comprehensive suppression
 warnings.filterwarnings("ignore")
@@ -41,65 +36,59 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Suppor
 class RagMe:
     """A class for managing RAG (Retrieval-Augmented Generation) operations with web content using a Vector Database."""
     
-    def __init__(self):
-        self.collection_name = "RagMeDocs"
-        self.weeviate_client, self.query_agent, self.ragme_agent = None, None, None
-
-        self._create_weaviate_client()
-        self._setup_weaviate()
+    def __init__(self, vector_db: VectorDatabase = None, db_type: str = "weaviate", collection_name: str = "RagMeDocs"):
+        """
+        Initialize RagMe with a vector database.
         
-        self.query_agent = self._create_query_agent()
+        Args:
+            vector_db: Vector database instance (if None, will create one based on db_type)
+            db_type: Type of vector database to use if vector_db is None
+            collection_name: Name of the collection to use
+        """
+        self.collection_name = collection_name
+        
+        # Initialize vector database
+        if vector_db is None:
+            self.vector_db = create_vector_database(db_type, collection_name)
+        else:
+            self.vector_db = vector_db
+        
+        # Set up the database
+        self.vector_db.setup()
+        
+        # Initialize agents
+        self.query_agent = self.vector_db.create_query_agent()
         self.ragme_agent = RagMeAgent(self)
-    
-    # private methods
-
-    def _create_weaviate_client(self):
-        if not self.weeviate_client:
-            self.weeviate_client = weaviate.connect_to_weaviate_cloud(
-                cluster_url=WEAVIATE_URL,
-                auth_credentials=Auth.api_key(WEAVIATE_API_KEY),
-            )
-        return self.weeviate_client
-    
-    def _setup_weaviate(self):
-        if not self.weeviate_client.collections.exists(self.collection_name):
-            self.weeviate_client.collections.create(
-                self.collection_name,
-                description="A dataset with the contents of RagMe docs and website",
-                vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
-                properties=[
-                    Property(name="url", data_type=DataType.TEXT, description="the source URL of the webpage"),
-                    Property(name="text", data_type=DataType.TEXT, description="the content of the webpage"),
-                    Property(name="metadata", data_type=DataType.TEXT, description="additional metadata in JSON format"),
-            ])
-
-    def _create_query_agent(self):
-        return QueryAgent(client=self.weeviate_client, collections=[self.collection_name])
     
     # public methods
 
     def cleanup(self):
-        if self.weeviate_client:
-            self.weeviate_client.close()
+        """Clean up resources."""
+        if self.vector_db:
+            self.vector_db.cleanup()
 
     def write_webpages_to_weaviate(self, urls: list[str]):
         """
-        Write the contents of a list of URLs to the RagMeDocs collection in Weaviate.
+        Write the contents of a list of URLs to the vector database.
         Args:
-            urls (list[str]): A list of URLs to write to the RagMeDocs collection
+            urls (list[str]): A list of URLs to write to the vector database
         """
         documents = SimpleWebPageReader(html_to_text=True).load_data(urls)
-        collection = self.weeviate_client.collections.get(self.collection_name)
-        with collection.batch.dynamic() as batch:
-            for doc in documents:
-                metadata_text = json.dumps({"type": "webpage", "url": doc.id_}, ensure_ascii=False)
-                batch.add_object(properties={"url": doc.id_,
-                                             "metadata": metadata_text,
-                                             "text": doc.text})
+        
+        # Convert documents to the format expected by the vector database
+        docs_to_write = []
+        for doc in documents:
+            docs_to_write.append({
+                "url": doc.id_,
+                "text": doc.text,
+                "metadata": {"type": "webpage", "url": doc.id_}
+            })
+        
+        self.vector_db.write_documents(docs_to_write)
     
     def write_json_to_weaviate(self, json_data: Dict[str, Any], metadata: Dict[str, Any] = None):
         """
-        Write JSON content to the RagMeDocs collection in Weaviate.
+        Write JSON content to the vector database.
         Args:
             json_data (Dict[str, Any]): The JSON data to write
             metadata (Dict[str, Any], optional): Additional metadata to store with the content
@@ -107,20 +96,22 @@ class RagMe:
         # Convert JSON data to string for storage
         json_text = json.dumps(json_data, ensure_ascii=False)
         
-        # Convert metadata to string if provided
-        metadata_text = json.dumps(metadata, ensure_ascii=False) if metadata else "{}"
+        # Prepare metadata
+        if metadata is None:
+            metadata = {}
         
-        collection = self.weeviate_client.collections.get(self.collection_name)
-        with collection.batch.dynamic() as batch:
-            batch.add_object(properties={
-                "url": json_data.get("filename", "filename not found"),
-                "text": json_text,
-                "metadata": metadata_text
-            })
+        # Create document to write
+        doc_to_write = {
+            "url": json_data.get("filename", "filename not found"),
+            "text": json_text,
+            "metadata": metadata
+        }
+        
+        self.vector_db.write_documents([doc_to_write])
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
         """
-        List documents in the Weaviate collection.
+        List documents in the vector database.
         
         Args:
             limit (int): Maximum number of documents to return
@@ -129,34 +120,7 @@ class RagMe:
         Returns:
             List[Dict[str, Any]]: List of documents with their properties
         """
-        collection = self.weeviate_client.collections.get(self.collection_name)
-        
-        # Query the collection
-        result = collection.query.fetch_objects(
-            limit=limit,
-            offset=offset,
-            include_vector=False  # Don't include vector data in response
-        )
-        
-        # Process the results
-        documents = []
-        for obj in result.objects:
-            doc = {
-                "id": obj.uuid,
-                "url": obj.properties.get("url", ""),
-                "text": obj.properties.get("text", ""),
-                "metadata": obj.properties.get("metadata", "{}")
-            }
-            
-            # Try to parse metadata if it's a JSON string
-            try:
-                doc["metadata"] = json.loads(doc["metadata"])
-            except json.JSONDecodeError:
-                pass
-                
-            documents.append(doc)
-            
-        return documents
+        return self.vector_db.list_documents(limit, offset)
 
     async def run(self, query: str):
         response = await self.ragme_agent.run(
@@ -185,7 +149,7 @@ if __name__ == "__main__":
         print(f"Processing {len(urls)} URLs")
         urls = [url.strip() for url in urls]
         ragme.write_webpages_to_weaviate(urls)
-        print("Done writing to Weaviate")
+        print("Done writing to vector database")
         
         while True:
             print("What questions do you have about the URLs just saved?")

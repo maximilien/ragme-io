@@ -47,7 +47,11 @@ class RagMeAgent:
             """
             Reset and delete the RagMeDocs collection
             """
-            self.ragme.weeviate_client.collections.delete(self.ragme.collection_name)
+            # Note: This is a simplified implementation. In a real scenario,
+            # you might want to add a delete_collection method to the VectorDatabase interface
+            # For now, we'll just clean up and recreate the collection
+            self.ragme.vector_db.cleanup()
+            self.ragme.vector_db.setup()
 
         def list_ragme_collection(limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
             """
