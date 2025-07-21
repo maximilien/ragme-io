@@ -99,8 +99,10 @@ flowchart TB
 
 ### Vector Database Support
 - **Weaviate**: Current default implementation
+- **Milvus**: High-performance vector database with local and cloud options
 - **Extensible**: Easy to add Pinecone, Chroma, etc.
 - **Abstracted Interface**: Clean separation of concerns
+- **Modular Architecture**: Each database in separate files for maintainability
 
 ---
 
@@ -259,7 +261,7 @@ flowchart LR
 
 ### Current Limitations
 - ✅ Single collection for all users
-- ✅ Tied to Weaviate as vector database
+- ✅ ~~Tied to Weaviate as vector database~~ **Fixed!** Now supports multiple vector databases
 - ✅ Tied to LlamaIndex for RAG operations
 - ✅ No HTTPS by default
 
@@ -273,7 +275,7 @@ flowchart LR
 ## 🚀 Future Roadmap
 
 ### Phase 1: Infrastructure
-- [ ] Decouple Weaviate dependency (OpenSearch support)
+- [x] ~~Decouple Weaviate dependency~~ **Completed!** Now supports Weaviate, Milvus, and extensible for others
 - [ ] Decouple LlamaIndex (docling integration)
 - [ ] Add HTTPS security
 

@@ -43,7 +43,7 @@ Explain the problem and include additional details to help maintainers reproduce
   * What's the name and version of the OS you're using?
   * Are you running RagMe AI in a virtual machine?
   * What are your environment variables?
-  * Which vector database are you using? (Weaviate, Pinecone, etc.)
+  * Which vector database are you using? (Weaviate, Milvus, etc.)
 
 ### Suggesting Enhancements
 
@@ -89,14 +89,24 @@ ragme-ai/
 │   ├── ragme.py            # Main RagMe class
 │   ├── ragme_agent.py      # RagMeAgent class
 │   ├── local_agent.py      # File monitoring agent
-│   ├── vector_db.py        # Vector database abstraction
+│   ├── vector_db.py        # Vector database compatibility layer
+│   ├── vector_db_base.py   # Abstract base class
+│   ├── vector_db_weaviate.py # Weaviate implementation
+│   ├── vector_db_milvus.py # Milvus implementation
+│   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
 │   ├── ui.py               # Streamlit UI
 │   └── common.py           # Common utilities
 ├── tests/                  # 🧪 Test suite
+│   ├── test_vector_db_base.py
+│   ├── test_vector_db_weaviate.py
+│   ├── test_vector_db_milvus.py
+│   ├── test_vector_db_factory.py
+│   └── test_vector_db.py   # Compatibility layer
 ├── examples/               # 📖 Usage examples
-└── chrome_ext/             # 🌐 Chrome extension
+├── chrome_ext/             # 🌐 Chrome extension
+└── watch_directory/        # 📁 Monitored directory
 ```
 
 ### Vector Database Development
@@ -104,9 +114,40 @@ ragme-ai/
 When working with vector databases:
 
 1. **Follow the abstraction pattern**: All vector database code should implement the `VectorDatabase` interface
-2. **Add tests**: Include comprehensive tests for new vector database implementations
-3. **Update factory function**: Add new database types to `create_vector_database()`
-4. **Documentation**: Update [VECTOR_DB_ABSTRACTION.md](VECTOR_DB_ABSTRACTION.md) with new implementations
+2. **Create separate files**: New implementations should be in separate files (e.g., `vector_db_pinecone.py`)
+3. **Add tests**: Include comprehensive tests in separate test files (e.g., `test_vector_db_pinecone.py`)
+4. **Update factory function**: Add new database types to `create_vector_database()` in `vector_db_factory.py`
+5. **Documentation**: Update [VECTOR_DB_ABSTRACTION.md](VECTOR_DB_ABSTRACTION.md) with new implementations
+6. **Update compatibility layer**: Add imports to `vector_db.py` for backward compatibility
+
+### Adding New Vector Database Support
+
+To add support for a new vector database:
+
+1. **Create implementation file**: `src/ragme/vector_db_[name].py`
+2. **Create test file**: `tests/test_vector_db_[name].py`
+3. **Update factory**: Add new type to `create_vector_database()` in `vector_db_factory.py`
+4. **Update compatibility layer**: Add import to `vector_db.py`
+5. **Update documentation**: Add new database to `VECTOR_DB_ABSTRACTION.md`
+6. **Add environment variables**: Document required environment variables
+
+Example for adding Pinecone support:
+
+```python
+# src/ragme/vector_db_pinecone.py
+from .vector_db_base import VectorDatabase
+
+class PineconeVectorDatabase(VectorDatabase):
+    def __init__(self, collection_name: str = "RagMeDocs"):
+        super().__init__(collection_name)
+        # Initialize Pinecone client
+        
+    @property
+    def db_type(self) -> str:
+        return "pinecone"
+        
+    # Implement all required methods...
+```
 
 ## Style Guides
 
@@ -117,6 +158,7 @@ When working with vector databases:
 * Use docstrings for all public modules, functions, classes, and methods
 * Use spaces around operators and after commas
 * Follow PEP 8 guidelines
+* Include warning filters for clean output in test files
 
 ### JavaScript Style Guide
 
@@ -150,6 +192,7 @@ This section lists the labels we use to help us track and manage issues and pull
 * `invalid` - Issues that can't be reproduced or are invalid
 * `question` - Further information is requested
 * `wontfix` - Issues that won't be fixed
+* `vector-db` - Issues related to vector database implementations
 
 ## Development Process
 
@@ -167,6 +210,22 @@ Before submitting a pull request, please ensure that:
 2. The code is properly formatted
 3. Documentation is updated
 4. New tests are added for new functionality
+5. Warning filters are included for clean test output
+
+### Test Organization
+
+The test suite follows the modular structure:
+
+- **Base tests**: `test_vector_db_base.py` - Tests for abstract base class
+- **Implementation tests**: `test_vector_db_[name].py` - Tests for specific implementations
+- **Factory tests**: `test_vector_db_factory.py` - Tests for factory function
+- **Compatibility tests**: `test_vector_db.py` - Tests for compatibility layer
+
+Each test file should:
+- Include appropriate warning filters
+- Use mocking to avoid external dependencies
+- Test both success and error cases
+- Include proper cleanup in teardown methods
 
 ## License
 

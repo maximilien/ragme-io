@@ -31,7 +31,7 @@ The main test job runs the complete test suite:
 
 #### Test Coverage
 
-The CI runs **61 tests** covering:
+The CI runs **72 tests** covering:
 
 - ✅ API endpoints (`test_api.py`)
 - ✅ JSON processing (`test_add_json.py`)
@@ -39,7 +39,7 @@ The CI runs **61 tests** covering:
 - ✅ File monitoring (`test_local_agent.py`)
 - ✅ Core RAG functionality (`test_ragme.py`)
 - ✅ Agent functionality (`test_ragme_agent.py`)
-- ✅ Vector database abstraction (`test_vector_db.py`)
+- ✅ Vector database abstraction (`test_vector_db.py`, `test_vector_db_base.py`, `test_vector_db_weaviate.py`, `test_vector_db_milvus.py`, `test_vector_db_factory.py`)
 
 ### Artifacts
 
@@ -86,8 +86,18 @@ tests/
 ├── test_local_agent.py   # File monitoring tests
 ├── test_ragme.py         # Core RAG tests
 ├── test_ragme_agent.py   # Agent tests
-└── test_vector_db.py     # Vector database tests
+├── test_vector_db.py     # Vector database compatibility layer
+├── test_vector_db_base.py # Abstract base class tests
+├── test_vector_db_weaviate.py # Weaviate implementation tests
+├── test_vector_db_milvus.py # Milvus implementation tests
+└── test_vector_db_factory.py # Factory function tests
 ```
+
+Each test file focuses on its specific component, making it easy to:
+- Run tests for specific vector database implementations
+- Add new tests when adding new database support
+- Maintain clean separation of test concerns
+- Debug issues in specific components
 
 ## 🔧 CI Configuration
 
@@ -127,7 +137,7 @@ cache:
 
 ### Test Metrics
 
-- **Total Tests**: 61
+- **Total Tests**: 72
 - **Coverage**: Core functionality and edge cases
 - **Execution Time**: ~1.5-2 minutes per Python version
 - **Reliability**: High - tests are isolated and mocked
