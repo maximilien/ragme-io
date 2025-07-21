@@ -78,8 +78,19 @@ class RagMeAgent:
             response = self.ragme.query_agent.run(query)
             return response.final_answer
 
+        def get_vector_db_info() -> str:
+            """
+            Report which vector database is being used and its configuration.
+            Returns:
+                str: Information about the current vector database
+            """
+            db = self.ragme.vector_db
+            db_type = getattr(db, 'db_type', type(db).__name__)
+            config = f"Collection: {getattr(db, 'collection_name', 'unknown')}"
+            return f"RagMe is currently using the '{db_type}' vector database. {config}."
+
         return FunctionAgent(
-            tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent],
+            tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent, get_vector_db_info],
             llm=self.llm,
             system_prompt="""You are a helpful assistant that can write 
             the contents of urls to RagMeDocs 
@@ -88,6 +99,7 @@ class RagMeAgent:
             to answer the question.
             You can also ask questions about the RagMeDocs collection directly.
             If the query is not about the RagMeDocs collection, you can ask the QueryAgent to answer the question.
+            You can also answer which vector database is being used if asked.
             """,
         )
     

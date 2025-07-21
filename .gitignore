@@ -187,3 +187,4 @@ watch_directory/
 
 # macOS
 .DS_Store
+milvus_demo.db
