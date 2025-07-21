@@ -13,7 +13,10 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-from src.ragme.api import app
+
+# Patch weaviate.connect_to_weaviate_cloud before importing the app
+with patch("weaviate.connect_to_weaviate_cloud", return_value=MagicMock()):
+    from src.ragme.api import app
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

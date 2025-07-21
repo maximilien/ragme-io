@@ -7,18 +7,17 @@ import os
 import warnings
 from typing import List, Dict, Any
 
-from llama_index.core.agent.workflow import FunctionAgent
-from llama_index.llms.openai import OpenAI
 from llama_index.readers.web import SimpleWebPageReader
+import dotenv
 import weaviate
 from weaviate.auth import Auth
 from weaviate.agents.query import QueryAgent
 from weaviate.classes.config import Configure, Property, DataType
 
-from src.ragme.common import crawl_webpage
 from src.ragme.ragme_agent import RagMeAgent
 
-# Get environment variables
+# Load environment var
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL")

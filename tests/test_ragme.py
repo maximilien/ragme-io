@@ -22,9 +22,9 @@ def test_ragme_init():
     with patch('src.ragme.ragme.weaviate.connect_to_weaviate_cloud') as mock_connect, \
          patch('src.ragme.ragme.weaviate.auth.Auth.api_key') as mock_api_key, \
          patch('src.ragme.ragme.weaviate') as mock_weaviate, \
-         patch('src.ragme.ragme.OpenAI') as mock_openai, \
-         patch('src.ragme.ragme.QueryAgent') as mock_query_agent, \
-         patch('src.ragme.ragme.FunctionAgent') as mock_function_agent:
+         patch('llama_index.llms.openai.OpenAI') as mock_openai, \
+         patch('weaviate.agents.query.QueryAgent') as mock_query_agent, \
+         patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent:
         # Setup mocks
         mock_client = MagicMock()
         mock_connect.return_value = mock_client
@@ -44,9 +44,9 @@ def test_write_webpages_to_weaviate():
     with patch('src.ragme.ragme.SimpleWebPageReader') as mock_reader, \
          patch('weaviate.connect_to_weaviate_cloud') as mock_connect, \
          patch('weaviate.auth.Auth.api_key') as mock_api_key, \
-         patch('src.ragme.ragme.OpenAI') as mock_openai, \
-         patch('src.ragme.ragme.QueryAgent') as mock_query_agent, \
-         patch('src.ragme.ragme.FunctionAgent') as mock_function_agent:
+         patch('llama_index.llms.openai.OpenAI') as mock_openai, \
+         patch('weaviate.agents.query.QueryAgent') as mock_query_agent, \
+         patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent:
         # Setup mocks
         mock_client = MagicMock()
         mock_connect.return_value = mock_client
