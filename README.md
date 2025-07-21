@@ -270,3 +270,56 @@ Additionally, I would love to hear your feedback on new use cases or usage patte
 📖 **For detailed contribution guidelines, see [CONTRIBUTING.md](docs/CONTRIBUTING.md)**
 
 Created with ❤️ by @maximilien
+
+## Vector Database Support
+
+RagMe supports multiple vector database backends:
+
+### Weaviate (Default)
+- Cloud-based vector database
+- Automatic vectorization
+- Built-in query agents
+
+### Milvus
+- Local or cloud vector database
+- High-performance vector search
+- Support for both Milvus Lite (local) and Milvus Server
+
+#### Configuring Milvus
+
+Set the following environment variables:
+
+```bash
+# Choose Milvus as the vector database
+VECTOR_DB_TYPE=milvus
+
+# For local Milvus Lite (recommended for development)
+MILVUS_URI=milvus_demo.db
+
+# For remote Milvus server
+MILVUS_URI=http://localhost:19530
+MILVUS_TOKEN=root:Milvus
+```
+
+#### Example Usage with Milvus
+
+```python
+import os
+from src.ragme import RagMe
+
+# Configure for Milvus
+os.environ["VECTOR_DB_TYPE"] = "milvus"
+os.environ["MILVUS_URI"] = "milvus_demo.db"
+
+# Initialize RagMe
+ragme = RagMe(db_type="milvus")
+
+# Add web pages
+urls = ["https://example.com"]
+ragme.write_webpages_to_weaviate(urls)
+
+# Query the database
+response = await ragme.run("What is this about?")
+```
+
+See `examples/milvus_example.py` for a complete example.

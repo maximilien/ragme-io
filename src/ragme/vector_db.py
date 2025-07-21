@@ -174,24 +174,96 @@ class WeaviateVectorDatabase(VectorDatabase):
                 self.client = None
 
 
+class MilvusVectorDatabase(VectorDatabase):
+    """Milvus implementation of the vector database interface."""
+    def __init__(self, collection_name: str = "RagMeDocs"):
+        super().__init__(collection_name)
+        self.client = None
+        self.collection_name = collection_name
+        self._create_client()
+
+    def _create_client(self):
+        import os
+        from pymilvus import MilvusClient
+        milvus_uri = os.getenv("MILVUS_URI", "milvus_demo.db")
+        milvus_token = os.getenv("MILVUS_TOKEN", None)
+        if milvus_token:
+            self.client = MilvusClient(uri=milvus_uri, token=milvus_token)
+        else:
+            self.client = MilvusClient(milvus_uri)
+
+    def setup(self):
+        # Assume 768-dim vectors for now; adjust as needed
+        dim = 768
+        if self.client.has_collection(collection_name=self.collection_name):
+            return
+        self.client.create_collection(
+            collection_name=self.collection_name,
+            dimension=dim,
+        )
+
+    def write_documents(self, documents: List[Dict[str, Any]]):
+        # Each document should have 'url', 'text', 'metadata', and 'vector' (list of floats)
+        # If 'vector' is not present, raise error for now
+        data = []
+        for i, doc in enumerate(documents):
+            if "vector" not in doc:
+                raise ValueError("Milvus requires a 'vector' field in each document.")
+            data.append({
+                "id": i,
+                "vector": doc["vector"],
+                "url": doc.get("url", ""),
+                "text": doc.get("text", ""),
+                "metadata": json.dumps(doc.get("metadata", {}), ensure_ascii=False)
+            })
+        self.client.insert(collection_name=self.collection_name, data=data)
+
+    def list_documents(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        # Query all documents, paginated
+        res = self.client.query(
+            collection_name=self.collection_name,
+            output_fields=["id", "url", "text", "metadata"],
+        )
+        docs = []
+        for doc in res["data"][:limit]:
+            try:
+                metadata = json.loads(doc.get("metadata", "{}"))
+            except Exception:
+                metadata = {}
+            docs.append({
+                "id": doc.get("id"),
+                "url": doc.get("url", ""),
+                "text": doc.get("text", ""),
+                "metadata": metadata
+            })
+        return docs
+
+    def create_query_agent(self):
+        # Placeholder: Milvus does not have a built-in query agent like Weaviate
+        # You would implement your own search logic here
+        return self
+
+    def cleanup(self):
+        # No explicit cleanup needed for MilvusClient
+        self.client = None
+
 # Factory function to create vector database instances
-def create_vector_database(db_type: str = "weaviate", collection_name: str = "RagMeDocs") -> VectorDatabase:
+
+def create_vector_database(db_type: str = None, collection_name: str = "RagMeDocs") -> VectorDatabase:
     """
     Factory function to create vector database instances.
-    
     Args:
-        db_type: Type of vector database ("weaviate", "pinecone", "chroma", etc.)
+        db_type: Type of vector database ("weaviate", "milvus", etc.)
         collection_name: Name of the collection to use
-        
     Returns:
         VectorDatabase instance
     """
+    import os
+    if db_type is None:
+        db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
     if db_type.lower() == "weaviate":
         return WeaviateVectorDatabase(collection_name)
-    # Add other database types here as they are implemented
-    # elif db_type.lower() == "pinecone":
-    #     return PineconeVectorDatabase(collection_name)
-    # elif db_type.lower() == "chroma":
-    #     return ChromaVectorDatabase(collection_name)
+    elif db_type.lower() == "milvus":
+        return MilvusVectorDatabase(collection_name)
     else:
         raise ValueError(f"Unsupported vector database type: {db_type}") 
