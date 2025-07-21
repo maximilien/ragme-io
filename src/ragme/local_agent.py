@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import atexit
 import json
 import logging
 import os
+import signal
+import sys
 import time
 import traceback
+import warnings
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -13,6 +17,16 @@ import dotenv
 import requests
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+
+# Suppress Pydantic deprecation and schema warnings from dependencies
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*PydanticJsonSchemaWarning.*")
+warnings.filterwarnings("ignore", message=".*model_fields.*")
+warnings.filterwarnings("ignore", message=".*not JSON serializable.*")
+
+# Suppress ResourceWarnings from dependencies
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*Enable tracemalloc.*")
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +41,31 @@ dotenv.load_dotenv()
 # Get MCP server URL from environment variables
 RAGME_API_URL = os.getenv('RAGME_API_URL')
 RAGME_MCP_URL = os.getenv('RAGME_MCP_URL')
+
+# Global reference to monitor for cleanup
+_monitor = None
+
+# Cleanup function
+def cleanup():
+    """Clean up resources when the application shuts down."""
+    global _monitor
+    try:
+        if _monitor:
+            _monitor.stop()
+    except Exception as e:
+        logging.error(f"Error during local agent cleanup: {e}")
+
+# Register cleanup handlers
+atexit.register(cleanup)
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals."""
+    cleanup()
+    # Don't call sys.exit(0) as it can cause issues with asyncio
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 class FileHandler(FileSystemEventHandler):
     def __init__(self, callback: Optional[Callable] = None):
@@ -221,4 +260,13 @@ if __name__ == "__main__":
         directory="./watch_directory",  # Directory to monitor
         callback=local_agent.process_file
     )
-    monitor.start() 
+    
+    # Set global reference for cleanup
+    _monitor = monitor
+    
+    try:
+        monitor.start()
+    except KeyboardInterrupt:
+        print("\nShutting down gracefully...")
+    finally:
+        cleanup() 

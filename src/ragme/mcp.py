@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import atexit
 import os
+import signal
 import tempfile
+import warnings
 from typing import Optional, Dict, Any
 
 import docx
@@ -10,7 +13,44 @@ import PyPDF2
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 
+# Suppress Pydantic deprecation and schema warnings from dependencies
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*PydanticJsonSchemaWarning.*")
+warnings.filterwarnings("ignore", message=".*model_fields.*")
+warnings.filterwarnings("ignore", message=".*not JSON serializable.*")
+
+# Suppress ResourceWarnings from dependencies
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*Enable tracemalloc.*")
+
 app = FastAPI(title="RagMe MCP Server")
+
+# Cleanup function
+def cleanup():
+    """Clean up resources when the application shuts down."""
+    try:
+        # Clean up any temporary files that might still exist
+        temp_dir = tempfile.gettempdir()
+        for filename in os.listdir(temp_dir):
+            if filename.startswith('tmp') and (filename.endswith('.pdf') or filename.endswith('.docx')):
+                try:
+                    os.unlink(os.path.join(temp_dir, filename))
+                except:
+                    pass
+    except Exception as e:
+        print(f"Error during MCP cleanup: {e}")
+
+# Register cleanup handlers
+atexit.register(cleanup)
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals."""
+    cleanup()
+    # Don't call sys.exit(0) as it causes asyncio errors
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 class ToolResponse(BaseModel):
     success: bool

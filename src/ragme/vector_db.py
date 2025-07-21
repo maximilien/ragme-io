@@ -154,7 +154,24 @@ class WeaviateVectorDatabase(VectorDatabase):
     def cleanup(self):
         """Clean up Weaviate client."""
         if self.client:
-            self.client.close()
+            try:
+                # Close any open connections
+                if hasattr(self.client, 'close'):
+                    self.client.close()
+                # Also try to close the underlying connection if it exists
+                if hasattr(self.client, '_connection') and self.client._connection:
+                    if hasattr(self.client._connection, 'close'):
+                        try:
+                            self.client._connection.close()
+                        except TypeError:
+                            # Some connection objects don't take arguments
+                            pass
+            except Exception as e:
+                # Log the error but don't raise it to avoid breaking shutdown
+                import warnings
+                warnings.warn(f"Error during Weaviate cleanup: {e}")
+            finally:
+                self.client = None
 
 
 # Factory function to create vector database instances

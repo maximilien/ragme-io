@@ -2,14 +2,38 @@
 # Copyright (c) 2025 dr.max
 
 import asyncio
+import atexit
 import timeit
+import warnings
 
 import streamlit as st
 
 from src.ragme import RagMe
 
+# Suppress Pydantic deprecation and schema warnings from dependencies
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*PydanticJsonSchemaWarning.*")
+warnings.filterwarnings("ignore", message=".*model_fields.*")
+warnings.filterwarnings("ignore", message=".*not JSON serializable.*")
+
+# Suppress ResourceWarnings from dependencies
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*Enable tracemalloc.*")
+
 # Initialize RagMe
 ragme = RagMe()
+
+# Cleanup function
+def cleanup():
+    """Clean up resources when the application shuts down."""
+    try:
+        if ragme:
+            ragme.cleanup()
+    except Exception as e:
+        st.error(f"Error during cleanup: {e}")
+
+# Register cleanup handlers
+atexit.register(cleanup)
 
 # Set page configuration
 st.set_page_config(
