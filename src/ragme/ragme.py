@@ -36,16 +36,21 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Suppor
 class RagMe:
     """A class for managing RAG (Retrieval-Augmented Generation) operations with web content using a Vector Database."""
     
-    def __init__(self, vector_db: VectorDatabase = None, db_type: str = "weaviate", collection_name: str = "RagMeDocs"):
+    def __init__(self, vector_db: VectorDatabase = None, db_type: str = None, collection_name: str = "RagMeDocs"):
         """
         Initialize RagMe with a vector database.
         
         Args:
             vector_db: Vector database instance (if None, will create one based on db_type)
-            db_type: Type of vector database to use if vector_db is None
+            db_type: Type of vector database to use if vector_db is None (defaults to VECTOR_DB_TYPE env var or "weaviate")
             collection_name: Name of the collection to use
         """
         self.collection_name = collection_name
+        
+        # Get db_type from environment if not provided
+        if db_type is None:
+            db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
+        
         self.db_type = db_type  # Store the db_type for reporting
         
         # Initialize vector database
