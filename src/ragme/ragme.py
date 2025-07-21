@@ -8,16 +8,14 @@ import warnings
 from typing import List, Dict, Any
 
 from llama_index.readers.web import SimpleWebPageReader
-import dotenv
 import weaviate
 from weaviate.auth import Auth
-from weaviate.agents.query import QueryAgent
 from weaviate.classes.config import Configure, Property, DataType
+from weaviate.agents.query import QueryAgent
 
 from src.ragme.ragme_agent import RagMeAgent
 
-# Load environment var
-
+# Get environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL")
