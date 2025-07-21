@@ -2,6 +2,14 @@
 
 Thank you for your interest in contributing to RagMe AI! This document provides guidelines and instructions for contributing to this project.
 
+## 📚 Documentation Structure
+
+Before contributing, please familiarize yourself with our documentation:
+
+- **[📖 Documentation Index](README.md)** - Overview of all documentation
+- **[🔧 Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md)** - Understanding the database layer
+- **[📋 Project Overview](PRESENTATION.md)** - Complete project overview
+
 ## Code of Conduct
 
 This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
@@ -35,6 +43,7 @@ Explain the problem and include additional details to help maintainers reproduce
   * What's the name and version of the OS you're using?
   * Are you running RagMe AI in a virtual machine?
   * What are your environment variables?
+  * Which vector database are you using? (Weaviate, Pinecone, etc.)
 
 ### Suggesting Enhancements
 
@@ -65,6 +74,40 @@ Enhancement suggestions are tracked as GitHub issues. Create an issue and provid
 * Document new code based on the Documentation Style Guide
 * End all files with a newline
 
+## 🏗️ Development Setup
+
+### Project Structure
+
+```
+ragme-ai/
+├── docs/                    # 📚 Documentation
+│   ├── README.md           # Documentation index
+│   ├── VECTOR_DB_ABSTRACTION.md
+│   ├── CONTRIBUTING.md     # This file
+│   └── PRESENTATION.md
+├── src/ragme/              # 🐍 Source code
+│   ├── ragme.py            # Main RagMe class
+│   ├── ragme_agent.py      # RagMeAgent class
+│   ├── local_agent.py      # File monitoring agent
+│   ├── vector_db.py        # Vector database abstraction
+│   ├── api.py              # FastAPI REST API
+│   ├── mcp.py              # Model Context Protocol
+│   ├── ui.py               # Streamlit UI
+│   └── common.py           # Common utilities
+├── tests/                  # 🧪 Test suite
+├── examples/               # 📖 Usage examples
+└── chrome_ext/             # 🌐 Chrome extension
+```
+
+### Vector Database Development
+
+When working with vector databases:
+
+1. **Follow the abstraction pattern**: All vector database code should implement the `VectorDatabase` interface
+2. **Add tests**: Include comprehensive tests for new vector database implementations
+3. **Update factory function**: Add new database types to `create_vector_database()`
+4. **Documentation**: Update [VECTOR_DB_ABSTRACTION.md](VECTOR_DB_ABSTRACTION.md) with new implementations
+
 ## Style Guides
 
 ### Python Style Guide
@@ -90,6 +133,8 @@ Enhancement suggestions are tracked as GitHub issues. Create an issue and provid
   * Reference classes with `ClassName`
   * Reference instance methods with `ClassName#methodName`
   * Reference class methods with `ClassName.methodName`
+* Update documentation in the `docs/` directory
+* Keep the main `README.md` focused on quick start and overview
 
 ## Additional Notes
 
