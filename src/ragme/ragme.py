@@ -89,16 +89,27 @@ class RagMe:
             urls (list[str]): A list of URLs to write to the vector database
         """
         documents = SimpleWebPageReader(html_to_text=True).load_data(urls)
-        
-        # Convert documents to the format expected by the vector database
         docs_to_write = []
-        for doc in documents:
-            docs_to_write.append({
-                "url": doc.id_,
-                "text": doc.text,
-                "metadata": {"type": "webpage", "url": doc.id_}
-            })
-        
+        db_type = os.getenv("VECTOR_DB_TYPE", "weaviate").lower()
+        if db_type == "milvus":
+            from pymilvus import model
+            embedding_fn = model.DefaultEmbeddingFunction()
+            texts = [doc.text for doc in documents]
+            vectors = embedding_fn.encode_documents(texts)
+            for doc, vector in zip(documents, vectors):
+                docs_to_write.append({
+                    "url": doc.id_,
+                    "text": doc.text,
+                    "metadata": {"type": "webpage", "url": doc.id_},
+                    "vector": vector.tolist() if hasattr(vector, 'tolist') else list(vector)
+                })
+        else:
+            for doc in documents:
+                docs_to_write.append({
+                    "url": doc.id_,
+                    "text": doc.text,
+                    "metadata": {"type": "webpage", "url": doc.id_}
+                })
         self.vector_db.write_documents(docs_to_write)
     
     def write_json_to_weaviate(self, json_data: Dict[str, Any], metadata: Dict[str, Any] = None):
