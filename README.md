@@ -20,7 +20,7 @@ Install and/or update the following if needed:
 1. Install [Python 3.12](https://www.python.org/downloads/) or later
 2. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) 
 3. Install [`gh`](https://cli.github.com/) from GitHub
-4. Weaviate Cloud (Vector DB) cluster and collection named: `RagMeDocs`
+4. Vector Database setup (Weaviate Cloud or Milvus)
 
 ### Get code, setup dependencies
 
@@ -41,7 +41,9 @@ Install dependencies:
 uv sync
 ```
 
-### Weaviate Cloud
+### Vector Database Setup
+
+#### Option 1: Weaviate Cloud (Default)
 
 Create an account and cluster at [Weaviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster, create a collection named "RagMeDocs".
 
@@ -49,19 +51,32 @@ Once you have the cluster, Weaviate should give you a page with the cluster REST
 
 These will be your `WEAVIATE_URL` and `WEAVIATE_API_KEY` respectively.
 
+#### Option 2: Milvus
+
+For local development, you can use Milvus Lite which requires no server setup:
+
+```bash
+# Install Milvus support
+pip install "pymilvus[model]"
+```
+
 ### API keys
 
-The current version of RAGme.ai uses [OpenAI](https://auth.openai.com/log-in) as the LLM provider and [Weaviate](https://console.weaviate.cloud/) as the vector DB. 
+The current version of RAGme.ai uses [OpenAI](https://auth.openai.com/log-in) as the LLM provider and supports multiple vector databases.
 
-You will need to have API keys for both. And for Weaviate, after creating a cluster and a collection, you will need the API key and cluster URL.
+You will need to have API keys for OpenAI and your chosen vector database.
 
-Create a `.env` file with the keys and URL:
+Create a `.env` file with the keys and configuration:
 
 ```bash
 cat .env
 OPENAI_API_KEY=sk-proj-*****-**
+VECTOR_DB_TYPE=weaviate  # or "milvus"
 WEAVIATE_API_KEY=*****
 WEAVIATE_URL=*****.weaviate.cloud
+# For Milvus (optional):
+# MILVUS_URI=milvus_demo.db
+# MILVUS_TOKEN=root:Milvus
 RAGME_API_URL=http://localhost:8021
 RAGME_MCP_URL=http://localhost:8022
 ```
@@ -181,11 +196,11 @@ flowchart LR
 
     ragme-agent -- "2 parse URL" --> llama-index-parse["🦙LlamaIndex parse 📄"]
     ragme-agent -- "3 chunk" --> llama-index-chunk["🦙LlamaIndex chunk 📑"]
-    llama-index-parse --> vector-db[(DB)]
-    llama-index-chunk --> vector-db[(DB)]
+    llama-index-parse --> vector-db[(Vector DB)]
+    llama-index-chunk --> vector-db[(Vector DB)]
 
     user((User)) -- "4 query" --> ragme-agent["RAGme agent 🤖"]
-    ragme-agent -- "5 find best document for query" --> vector-db[(DB)]
+    ragme-agent -- "5 find best document for query" --> vector-db[(Vector DB)]
     
     ragme-agent -- "6 prompt llm with docs for response" --> llm["LLM 🤖"]
     llm -- "7 create a response" --> ragme-agent
@@ -202,8 +217,14 @@ flowchart TB
     agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
     mcp --> api
     api --> ragme[RAGme Core]
-    ragme --> weaviate[(Weaviate DB)]
+    ragme --> vector-db[(Vector DB)]
     ragme --> openai[OpenAI LLM]
+    
+    subgraph "Vector Database Layer"
+        vector-db --> weaviate[(Weaviate)]
+        vector-db --> milvus[(Milvus)]
+        vector-db --> future[(Future DBs)]
+    end
 ```
 
 ### Components
@@ -213,7 +234,8 @@ flowchart TB
 - **MCP Server** (port 8022): Document processing for PDF and DOCX files
 - **File Monitor Agent**: Watches `watch_directory/` for new files
 - **Chrome Extension**: Browser extension for capturing web pages
-- **RAGme Core**: Main RAG processing logic using LlamaIndex and Weaviate
+- **RAGme Core**: Main RAG processing logic using LlamaIndex and vector database abstraction
+- **Vector Database Layer**: Modular support for multiple vector databases (Weaviate, Milvus, etc.)
 
 ### MCP
 
@@ -273,7 +295,7 @@ Created with ❤️ by @maximilien
 
 ## Vector Database Support
 
-RagMe supports multiple vector database backends:
+RagMe supports multiple vector database backends with a modular architecture:
 
 ### Weaviate (Default)
 - Cloud-based vector database
@@ -322,28 +344,25 @@ ragme.write_webpages_to_weaviate(urls)
 response = await ragme.run("What is this about?")
 ```
 
-See `examples/milvus_example.py` for a complete example.
+See `examples/vector_db_usage.py` for a complete example.
 
-## Milvus Integration Demo
+## Project Structure
 
-You can try out RagMe with Milvus as the vector database backend using the provided demo script:
+The vector database implementation is organized into modular files:
 
-**File:** `examples/milvus_integration_demo.py`
-
-### Requirements
-- `pymilvus` must be installed:  
-  `pip install "pymilvus[model]"`
-- No Milvus server required: Milvus Lite will be used locally by default
-
-### How to Run
-```bash
-python examples/milvus_integration_demo.py
+```
+src/ragme/
+├── vector_db.py              # Compatibility layer (imports from modules)
+├── vector_db_base.py         # Abstract base class
+├── vector_db_weaviate.py     # Weaviate implementation
+├── vector_db_milvus.py       # Milvus implementation
+└── vector_db_factory.py      # Factory function
 ```
 
-This script demonstrates:
-- Creating a Milvus client
-- Creating a collection
-- Inserting and querying data
-- Integrating RagMe with Milvus
+This modular structure makes it easy to:
+- Add new vector database implementations
+- Maintain clean separation of concerns
+- Test each implementation independently
+- Switch between databases without code changes
 
-> **Note:** This is a demo/integration script, not a test. Pytest will not collect or run this file.
+For detailed information about the vector database abstraction, see [VECTOR_DB_ABSTRACTION.md](docs/VECTOR_DB_ABSTRACTION.md).

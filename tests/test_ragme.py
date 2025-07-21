@@ -23,8 +23,7 @@ from unittest.mock import patch, MagicMock
 from src.ragme.ragme import RagMe
 
 def test_ragme_init():
-    with patch('src.ragme.vector_db.create_vector_database') as mock_create_db, \
-         patch('src.ragme.vector_db.WeaviateVectorDatabase') as mock_weaviate_db, \
+    with patch('src.ragme.ragme.create_vector_database') as mock_create_db, \
          patch('llama_index.llms.openai.OpenAI') as mock_openai, \
          patch('weaviate.agents.query.QueryAgent') as mock_query_agent, \
          patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent, \
@@ -32,10 +31,13 @@ def test_ragme_init():
         # Setup mocks
         mock_db_instance = MagicMock()
         mock_create_db.return_value = mock_db_instance
-        mock_weaviate_db.return_value = mock_db_instance
         mock_query_agent.return_value = MagicMock()
         mock_function_agent.return_value = MagicMock()
         mock_openai.return_value = MagicMock()
+
+        # Mock the vector database methods
+        mock_db_instance.setup = MagicMock()
+        mock_db_instance.create_query_agent = MagicMock(return_value=MagicMock())
 
         ragme = RagMe()
         assert ragme.collection_name == "RagMeDocs"
@@ -45,8 +47,7 @@ def test_ragme_init():
 
 def test_write_webpages_to_weaviate():
     with patch('src.ragme.ragme.SimpleWebPageReader') as mock_reader, \
-         patch('src.ragme.vector_db.create_vector_database') as mock_create_db, \
-         patch('src.ragme.vector_db.WeaviateVectorDatabase') as mock_weaviate_db, \
+         patch('src.ragme.ragme.create_vector_database') as mock_create_db, \
          patch('llama_index.llms.openai.OpenAI') as mock_openai, \
          patch('weaviate.agents.query.QueryAgent') as mock_query_agent, \
          patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent, \
@@ -54,10 +55,13 @@ def test_write_webpages_to_weaviate():
         # Setup mocks
         mock_db_instance = MagicMock()
         mock_create_db.return_value = mock_db_instance
-        mock_weaviate_db.return_value = mock_db_instance
         mock_query_agent.return_value = MagicMock()
         mock_function_agent.return_value = MagicMock()
         mock_openai.return_value = MagicMock()
+
+        # Mock the vector database methods
+        mock_db_instance.setup = MagicMock()
+        mock_db_instance.create_query_agent = MagicMock(return_value=MagicMock())
 
         # Mock the reader
         mock_instance = mock_reader.return_value

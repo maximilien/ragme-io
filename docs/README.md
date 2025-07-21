@@ -24,12 +24,21 @@ ragme-ai/
 │   ├── ragme.py            # Main RagMe class
 │   ├── ragme_agent.py      # RagMeAgent class
 │   ├── local_agent.py      # File monitoring agent
-│   ├── vector_db.py        # Vector database abstraction
+│   ├── vector_db.py        # Vector database compatibility layer
+│   ├── vector_db_base.py   # Abstract base class
+│   ├── vector_db_weaviate.py # Weaviate implementation
+│   ├── vector_db_milvus.py # Milvus implementation
+│   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
 │   ├── ui.py               # Streamlit UI
 │   └── common.py           # Common utilities
 ├── tests/                  # 🧪 Test suite
+│   ├── test_vector_db_base.py
+│   ├── test_vector_db_weaviate.py
+│   ├── test_vector_db_milvus.py
+│   ├── test_vector_db_factory.py
+│   └── test_vector_db.py   # Compatibility layer
 ├── examples/               # 📖 Usage examples
 ├── chrome_ext/             # 🌐 Chrome extension
 └── watch_directory/        # 📁 Monitored directory
@@ -47,7 +56,7 @@ ragme-ai/
 
 RagMe is built with a modular, vector database agnostic architecture:
 
-- **Vector Database Abstraction**: Support for multiple vector databases (Weaviate, Pinecone, etc.)
+- **Vector Database Abstraction**: Support for multiple vector databases (Weaviate, Milvus, etc.)
 - **REST API**: FastAPI-based API for programmatic access
 - **File Monitoring**: Automatic processing of PDF and DOCX files
 - **Web UI**: Streamlit interface for easy interaction
@@ -77,10 +86,31 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 The project includes comprehensive testing:
 
-- **61 tests** covering all major functionality
+- **72 tests** covering all major functionality
+- **Modular test organization** with separate test files for each component
 - **Automated CI/CD** with GitHub Actions
 - **Multi-Python version support** (3.10, 3.11, 3.12)
 - **Mocked dependencies** for reliable testing
+- **Vector database abstraction tests** with full coverage
+
+### Test Structure
+
+The test suite is organized to match the modular code structure:
+
+```
+tests/
+├── test_vector_db_base.py      # Tests for abstract base class
+├── test_vector_db_weaviate.py  # Tests for Weaviate implementation
+├── test_vector_db_milvus.py    # Tests for Milvus implementation
+├── test_vector_db_factory.py   # Tests for factory function
+└── test_vector_db.py           # Compatibility layer (imports from above)
+```
+
+Each test file focuses on its specific component, making it easy to:
+- Run tests for specific vector database implementations
+- Add new tests when adding new database support
+- Maintain clean separation of test concerns
+- Debug issues in specific components
 
 See [CI_CD.md](CI_CD.md) for detailed testing information.
 
