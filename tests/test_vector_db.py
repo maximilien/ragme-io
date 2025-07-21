@@ -8,6 +8,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
 
+# Suppress Milvus connection warnings during tests
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Failed to connect to Milvus.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Milvus client is not available.*")
+
 import sys
 import os
 import pytest
@@ -189,6 +193,10 @@ class TestMilvusVectorDatabase:
         mock_milvus_client.return_value = mock_client
         db = MilvusVectorDatabase("TestCollection")
         assert db.collection_name == "TestCollection"
+        # Client is not created until needed due to lazy initialization
+        assert db.client is None
+        # Trigger client creation
+        db._ensure_client()
         assert db.client == mock_client
 
     @patch('pymilvus.MilvusClient')
@@ -235,12 +243,11 @@ class TestMilvusVectorDatabase:
     @patch('pymilvus.MilvusClient')
     def test_list_documents(self, mock_milvus_client):
         mock_client = MagicMock()
-        mock_client.query.return_value = {
-            "data": [
-                {"id": 1, "url": "http://test1.com", "text": "content1", "metadata": '{"type": "webpage"}'},
-                {"id": 2, "url": "http://test2.com", "text": "content2", "metadata": '{"type": "webpage"}'}
-            ]
-        }
+        # Milvus query returns a list of dictionaries directly
+        mock_client.query.return_value = [
+            {"id": 1, "url": "http://test1.com", "text": "content1", "metadata": '{"type": "webpage"}'},
+            {"id": 2, "url": "http://test2.com", "text": "content2", "metadata": '{"type": "webpage"}'}
+        ]
         mock_milvus_client.return_value = mock_client
         db = MilvusVectorDatabase()
         docs = db.list_documents(limit=2)

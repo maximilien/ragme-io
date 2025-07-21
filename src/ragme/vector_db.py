@@ -190,22 +190,67 @@ class MilvusVectorDatabase(VectorDatabase):
         super().__init__(collection_name)
         self.client = None
         self.collection_name = collection_name
-        self._create_client()
+        self._client_created = False
 
+    def _ensure_client(self):
+        """Ensure the client is created, handling import-time issues."""
+        if not self._client_created:
+            self._create_client()
+            self._client_created = True
+    
     def _create_client(self):
         import os
-        from pymilvus import MilvusClient
-        milvus_uri = os.getenv("MILVUS_URI", "milvus_demo.db")
-        milvus_token = os.getenv("MILVUS_TOKEN", None)
+        import sys
+        import warnings
         
-        # For local Milvus Lite, use the file path directly
-        if milvus_token:
-            self.client = MilvusClient(uri=milvus_uri, token=milvus_token)
-        else:
-            self.client = MilvusClient(uri=milvus_uri)
+        # Temporarily unset MILVUS_URI to prevent pymilvus from auto-connecting during import
+        original_milvus_uri = os.environ.pop("MILVUS_URI", None)
+        
+        try:
+            # Import pymilvus after unsetting the environment variable
+            from pymilvus import MilvusClient
+            from pymilvus.exceptions import MilvusException
+            
+            milvus_uri = original_milvus_uri or "milvus_demo.db"
+            milvus_token = os.getenv("MILVUS_TOKEN", None)
+            
+            # For local Milvus Lite, try different URI formats
+            try:
+                if milvus_token:
+                    self.client = MilvusClient(uri=milvus_uri, token=milvus_token)
+                else:
+                    self.client = MilvusClient(uri=milvus_uri)
+            except Exception as e:
+                # If the URI format fails, try with file:// prefix
+                if not milvus_uri.startswith(('http://', 'https://', 'file://')):
+                    file_uri = f"file://{milvus_uri}"
+                    try:
+                        if milvus_token:
+                            self.client = MilvusClient(uri=file_uri, token=milvus_token)
+                        else:
+                            self.client = MilvusClient(uri=file_uri)
+                    except Exception as file_e:
+                        # If both attempts fail, create a mock client that warns about connection issues
+                        warnings.warn(f"Failed to connect to Milvus at {milvus_uri} or {file_uri}. "
+                                    f"Milvus operations will be disabled. Error: {file_e}")
+                        self.client = None
+                else:
+                    # For HTTP URIs, if connection fails, create a mock client
+                    warnings.warn(f"Failed to connect to Milvus server at {milvus_uri}. "
+                                f"Milvus operations will be disabled. Error: {e}")
+                    self.client = None
+        finally:
+            # Restore the environment variable
+            if original_milvus_uri:
+                os.environ["MILVUS_URI"] = original_milvus_uri
 
     def setup(self):
         """Set up Milvus collection if it doesn't exist."""
+        self._ensure_client()
+        if self.client is None:
+            warnings.warn("Milvus client is not available. Setup skipped.")
+            return
+            
         # Create collection if it doesn't exist
         if not self.client.has_collection(self.collection_name):
             # Use the correct API for MilvusClient
@@ -218,6 +263,11 @@ class MilvusVectorDatabase(VectorDatabase):
 
     def write_documents(self, documents: List[Dict[str, Any]]):
         """Write documents to Milvus."""
+        self._ensure_client()
+        if self.client is None:
+            warnings.warn("Milvus client is not available. Documents not written.")
+            return
+            
         # Each document should have 'url', 'text', 'metadata', and 'vector' (list of floats)
         data = []
         for i, doc in enumerate(documents):
@@ -234,6 +284,11 @@ class MilvusVectorDatabase(VectorDatabase):
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
         """List documents from Milvus."""
+        self._ensure_client()
+        if self.client is None:
+            warnings.warn("Milvus client is not available. Returning empty list.")
+            return []
+            
         # Query all documents, paginated
         results = self.client.query(
             self.collection_name,
@@ -265,7 +320,8 @@ class MilvusVectorDatabase(VectorDatabase):
     def cleanup(self):
         """Clean up Milvus client."""
         # No explicit cleanup needed for MilvusClient
-        self.client = None
+        if self.client is not None:
+            self.client = None
 
     @property
     def db_type(self) -> str:

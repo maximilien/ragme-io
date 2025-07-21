@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Load environment variables from .env file
+set -a
+[ -f .env ] && . .env
+set +a
+
 # Function to check if a port is in use
 check_port() {
     local port=$1

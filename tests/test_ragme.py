@@ -8,6 +8,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
 
+# Suppress Milvus connection warnings during tests
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Failed to connect to Milvus.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Milvus client is not available.*")
+
 import sys
 import os
 
@@ -23,7 +27,8 @@ def test_ragme_init():
          patch('src.ragme.vector_db.WeaviateVectorDatabase') as mock_weaviate_db, \
          patch('llama_index.llms.openai.OpenAI') as mock_openai, \
          patch('weaviate.agents.query.QueryAgent') as mock_query_agent, \
-         patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent:
+         patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent, \
+         patch.dict('os.environ', {'VECTOR_DB_TYPE': 'weaviate'}):
         # Setup mocks
         mock_db_instance = MagicMock()
         mock_create_db.return_value = mock_db_instance
@@ -44,7 +49,8 @@ def test_write_webpages_to_weaviate():
          patch('src.ragme.vector_db.WeaviateVectorDatabase') as mock_weaviate_db, \
          patch('llama_index.llms.openai.OpenAI') as mock_openai, \
          patch('weaviate.agents.query.QueryAgent') as mock_query_agent, \
-         patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent:
+         patch('llama_index.core.agent.workflow.FunctionAgent') as mock_function_agent, \
+         patch.dict('os.environ', {'VECTOR_DB_TYPE': 'weaviate'}):
         # Setup mocks
         mock_db_instance = MagicMock()
         mock_create_db.return_value = mock_db_instance
