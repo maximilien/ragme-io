@@ -2,6 +2,7 @@
 # Copyright (c) 2025 dr.max
 
 import traceback
+import warnings
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional
 
@@ -10,6 +11,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .ragme import RagMe
+
+# Suppress Pydantic deprecation and schema warnings from dependencies
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*PydanticJsonSchemaWarning.*")
+warnings.filterwarnings("ignore", message=".*model_fields.*")
+warnings.filterwarnings("ignore", message=".*not JSON serializable.*")
+
+# Suppress ResourceWarnings from dependencies
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*Enable tracemalloc.*")
 
 
 @asynccontextmanager

@@ -64,8 +64,23 @@ class RagMe:
 
     def cleanup(self):
         """Clean up resources."""
-        if self.vector_db:
-            self.vector_db.cleanup()
+        try:
+            # Clean up vector database
+            if hasattr(self, 'vector_db') and self.vector_db:
+                self.vector_db.cleanup()
+                self.vector_db = None
+            
+            # Clean up agents
+            if hasattr(self, 'query_agent') and self.query_agent:
+                self.query_agent = None
+            
+            if hasattr(self, 'ragme_agent') and self.ragme_agent:
+                self.ragme_agent = None
+                
+        except Exception as e:
+            # Log the error but don't raise it to avoid breaking shutdown
+            import warnings
+            warnings.warn(f"Error during RagMe cleanup: {e}")
 
     def write_webpages_to_weaviate(self, urls: list[str]):
         """
@@ -123,9 +138,7 @@ class RagMe:
         return self.vector_db.list_documents(limit, offset)
 
     async def run(self, query: str):
-        response = await self.ragme_agent.run(
-            user_msg=query
-        )
+        response = await self.ragme_agent.run(query)
         return str(response)
 
 if __name__ == "__main__":
