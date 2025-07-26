@@ -146,6 +146,50 @@ class WeaviateVectorDatabase(VectorDatabase):
 
         return documents
 
+    def delete_document(self, document_id: str) -> bool:
+        """Delete a document from Weaviate by ID."""
+        try:
+            collection = self.client.collections.get(self.collection_name)
+            collection.data.delete_by_id(document_id)
+            return True
+        except Exception as e:
+            warnings.warn(f"Failed to delete document {document_id}: {e}")
+            return False
+
+    def find_document_by_url(self, url: str) -> dict[str, Any] | None:
+        """Find a document by its URL."""
+        try:
+            collection = self.client.collections.get(self.collection_name)
+
+            # Query for documents with the specific URL
+            result = collection.query.fetch_objects(
+                limit=1,
+                where={"path": ["url"], "operator": "Equal", "valueString": url},
+                include_vector=False,
+            )
+
+            if result.objects:
+                obj = result.objects[0]
+                doc = {
+                    "id": obj.uuid,
+                    "url": obj.properties.get("url", ""),
+                    "text": obj.properties.get("text", ""),
+                    "metadata": obj.properties.get("metadata", "{}"),
+                }
+
+                # Try to parse metadata if it's a JSON string
+                try:
+                    doc["metadata"] = json.loads(doc["metadata"])
+                except json.JSONDecodeError:
+                    pass
+
+                return doc
+
+            return None
+        except Exception as e:
+            warnings.warn(f"Failed to find document by URL {url}: {e}")
+            return None
+
     def create_query_agent(self):
         """Create a Weaviate query agent."""
         from weaviate.agents.query import QueryAgent

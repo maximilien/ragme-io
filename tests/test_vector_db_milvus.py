@@ -23,6 +23,10 @@ warnings.filterwarnings(
 warnings.filterwarnings(
     "ignore", category=UserWarning, message=".*Milvus client is not available.*"
 )
+# Suppress vector generation failure warnings during tests
+warnings.filterwarnings(
+    "ignore", category=UserWarning, message=".*Failed to generate vector for document.*"
+)
 
 import os
 import sys
@@ -101,7 +105,33 @@ class TestMilvusVectorDatabase:
         assert mock_client.insert.called
 
     @patch("pymilvus.MilvusClient")
-    def test_write_documents_missing_vector(self, mock_milvus_client):
+    @patch("openai.OpenAI")
+    def test_write_documents_missing_vector(self, mock_openai, mock_milvus_client):
+        mock_client = MagicMock()
+        mock_milvus_client.return_value = mock_client
+
+        # Mock OpenAI client and embeddings response
+        mock_openai_instance = MagicMock()
+        mock_openai.return_value = mock_openai_instance
+        mock_openai_instance.embeddings.create.return_value.data = [
+            MagicMock(embedding=[0.1] * 1536)
+        ]
+
+        db = MilvusVectorDatabase()
+        documents = [
+            {
+                "url": "http://test1.com",
+                "text": "test content 1",
+                "metadata": {"type": "webpage"},
+            }
+        ]
+        # With automatic vector generation, this should work without raising an error
+        # The vector will be generated automatically
+        db.write_documents(documents)
+        assert mock_client.insert.called
+
+    @patch("pymilvus.MilvusClient")
+    def test_write_documents_missing_vector_generation_fails(self, mock_milvus_client):
         mock_client = MagicMock()
         mock_milvus_client.return_value = mock_client
         db = MilvusVectorDatabase()
@@ -112,10 +142,13 @@ class TestMilvusVectorDatabase:
                 "metadata": {"type": "webpage"},
             }
         ]
-        with pytest.raises(
-            ValueError, match="Milvus requires a 'vector' field in each document."
-        ):
+        # Mock the OpenAI client to raise an exception
+        with patch("openai.OpenAI") as mock_openai:
+            mock_openai.side_effect = Exception("API key invalid")
+            # Should continue without inserting documents since vector generation failed
             db.write_documents(documents)
+            # Since vector generation failed, no documents should be inserted
+            mock_client.insert.assert_not_called()
 
     @patch("pymilvus.MilvusClient")
     def test_list_documents(self, mock_milvus_client):

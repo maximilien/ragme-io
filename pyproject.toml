@@ -74,3 +74,11 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+addopts = "--disable-warnings"
+filterwarnings = [
+    "ignore::DeprecationWarning:pydantic.*:",
+    "ignore::UserWarning:src.ragme.vector_db_milvus:",
+    "ignore:Support for class-based `config` is deprecated:DeprecationWarning:pydantic.*:",
+]

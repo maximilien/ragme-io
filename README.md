@@ -2,6 +2,24 @@
 
 A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) websites and documents you care about and let you query them in an agentic fashion.
 
+## 🆕 Latest Updates
+
+### ✨ New Features (Latest Release)
+
+- **📄 Smart Document Chunking**: Large documents are automatically split into manageable chunks while preserving readability
+- **🎯 Enhanced Document Management**: Grouped document display with chunk counts and improved deletion functionality
+- **📊 Interactive Visualizations**: D3.js-powered charts with click-to-scroll functionality and responsive resizing
+- **🔄 Real-time Refresh**: Improved document list and visualization synchronization
+- **🗑️ Bulk Document Operations**: Delete entire chunked documents with a single click
+- **📱 Responsive Design**: Better mobile and desktop experience with collapsible sidebars
+
+### 🔧 Technical Improvements
+
+- **Automatic Chunking**: Documents exceeding token limits are intelligently chunked at sentence boundaries
+- **Unified Processing**: Consistent chunking across all input methods (upload, watch directory, API)
+- **Enhanced Metadata**: Rich document metadata including chunk information and original filenames
+- **Improved Performance**: Better handling of large documents and optimized visualization updates
+
 ## 📚 Documentation
 
 📖 **Complete documentation is available in the [docs/](docs/) directory:**
@@ -20,7 +38,8 @@ Install and/or update the following if needed:
 1. Install [Python 3.12](https://www.python.org/downloads/) or later
 2. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) 
 3. Install [`gh`](https://cli.github.com/) from GitHub
-4. Vector Database setup (Weaviate Cloud or Milvus)
+4. Install [Node.js 18+](https://nodejs.org/) (for new frontend)
+5. Vector Database setup (Milvus Lite by default, or Weaviate Cloud)
 
 ### Get code, setup dependencies
 
@@ -47,11 +66,37 @@ uv sync --extra dev
 
 ### Vector Database Setup
 
-#### Option 1: Milvus (Default - Local Development)
+#### Option 1: Milvus Lite (Default - Local Development) ⭐ **RECOMMENDED**
 
-For local development, Milvus Lite is used by default and requires no server setup. The system will automatically create a local database file.
+For local development, **Milvus Lite is now the default** and requires no server setup. The system will automatically create a local database file.
 
-#### Option 2: Weaviate Cloud
+```bash
+# Default configuration (no setup required)
+VECTOR_DB_TYPE=milvus
+MILVUS_URI=milvus_demo.db
+```
+
+#### Option 2: Local Weaviate (Podman)
+
+For local development with Weaviate, you can run Weaviate locally using Podman:
+
+```bash
+# Start local Weaviate
+./tools/weaviate-local.sh start
+
+# Check status
+./tools/weaviate-local.sh status
+
+# View logs
+./tools/weaviate-local.sh logs
+
+# Stop when done
+./tools/weaviate-local.sh stop
+```
+
+This provides a full Weaviate experience locally without requiring cloud credentials.
+
+#### Option 3: Weaviate Cloud
 
 Create an account and cluster at [Weaviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster, create a collection named "RagMeDocs".
 
@@ -73,8 +118,12 @@ cp env.example .env
 
 # Edit .env with your values:
 OPENAI_API_KEY=sk-proj-*****-**
-VECTOR_DB_TYPE=milvus  # Default for local development
+VECTOR_DB_TYPE=milvus  # Default for local development (recommended)
+# VECTOR_DB_TYPE=weaviate-local  # For local Weaviate (Podman)
 # VECTOR_DB_TYPE=weaviate  # For cloud Weaviate
+
+# For Local Weaviate (only if VECTOR_DB_TYPE=weaviate-local):
+# WEAVIATE_LOCAL_URL=http://localhost:8080
 
 # For Weaviate Cloud (only if VECTOR_DB_TYPE=weaviate):
 # WEAVIATE_API_KEY=*****
@@ -96,7 +145,8 @@ RAGme.ai consists of multiple services that work together:
 1. **API Server** (port 8021): Handles URL and JSON ingestion
 2. **MCP Server** (port 8022): Processes PDF and DOCX files  
 3. **Agent** (background): Monitors watch directory for new files
-4. **Streamlit UI** (port 8020): Web interface for interaction
+4. **New Frontend** (port 3020): Modern web interface with three-pane layout ⭐ **DEFAULT**
+5. **Legacy Streamlit UI** (port 8020): Original web interface for interaction
 
 ### Quick Start (All Services)
 
@@ -107,7 +157,7 @@ chmod +x start.sh
 ./start.sh
 ```
 
-This will start all services and you can access the UI at `http://localhost:8020`
+This will start all services and you can access the **new frontend** at `http://localhost:3020`
 
 ### Process Management
 
@@ -145,6 +195,59 @@ This will show you:
 - Service URLs when all are running
 - PID information for debugging
 
+#### Start with Legacy UI
+
+To start with the legacy Streamlit UI instead of the new frontend:
+
+```bash
+./start.sh legacy-ui
+```
+
+### Debugging and Log Monitoring
+
+The `./tools/tail-logs.sh` script provides real-time log monitoring and debugging capabilities:
+
+#### Monitor All Service Logs
+
+To tail logs from all running services:
+
+```bash
+./tools/tail-logs.sh all
+```
+
+#### Monitor Individual Service Logs
+
+To monitor specific services:
+
+```bash
+./tools/tail-logs.sh api        # Monitor API logs (port 8021)
+./tools/tail-logs.sh mcp        # Monitor MCP logs (port 8022)
+./tools/tail-logs.sh agent      # Monitor Agent logs
+./tools/tail-logs.sh frontend   # Monitor Frontend logs (port 3020)
+./tools/tail-logs.sh legacy-ui  # Monitor Legacy UI logs (port 8020)
+```
+
+#### Check Service Status
+
+To check which services are running:
+
+```bash
+./tools/tail-logs.sh status
+```
+
+#### View Recent Logs
+
+To see recent system logs related to RAGme:
+
+```bash
+./tools/tail-logs.sh recent
+```
+
+This will show:
+- Recent system logs containing 'ragme', 'uvicorn', 'streamlit', or 'node'
+- Recent application logs from RAGme processes
+- Useful for debugging vector database and other issues
+
 For detailed process management documentation, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).
 
 ### Manual Start (Individual Services)
@@ -160,6 +263,12 @@ uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022
 
 # Start file monitoring agent (in another terminal)
 uv run python -m src.ragme.local_agent
+
+# Start new frontend (in another terminal)
+cd frontend
+npm install
+npm run build
+npm start
 
 # Start Streamlit UI (in another terminal)
 PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port 8020
@@ -178,6 +287,34 @@ PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port
 RAG-ing and searching refers to adding documents into a vector database using some appropriate embedding (creates a vector for document) and then using an LLM agent to query and use that vector database as a source of knowledge.
 
 ## 🛠️ Components
+
+### New Frontend UI ⭐ **DEFAULT**
+
+A modern, responsive web interface with three-pane layout:
+
+- **Left Sidebar**: Chat history (collapsible)
+- **Center**: Main chat area with input
+- **Right Sidebar**: Recent documents with D3.js visualization (resizable)
+
+**Features**:
+- **Real-time chat** with markdown support and copy functionality
+- **Smart document management** with automatic chunking and grouped display
+- **Interactive visualizations** with D3.js charts (bar, pie, network graphs)
+- **Click-to-scroll functionality** - click on visualization nodes to scroll to documents
+- **Responsive design** with collapsible sidebars and smooth animations
+- **Content addition** via URLs, file uploads, or JSON data
+- **WebSocket communication** for real-time updates
+- **Document deletion** from both list and detail views
+- **Visualization refresh** with document list synchronization
+
+**Advanced Features**:
+- **Automatic chunking**: Large documents are intelligently split at sentence boundaries
+- **Chunked document grouping**: Multiple chunks appear as single documents with chunk counts
+- **Bulk operations**: Delete entire chunked documents with one click
+- **Enhanced metadata display**: Shows document types, dates, and chunk information
+- **Network graph visualization**: Interactive document relationship mapping
+
+**Access**: `http://localhost:3020` (default when running `./start.sh`)
 
 ### Chrome Extension
 
@@ -201,7 +338,9 @@ The system can automatically process PDF and DOCX files by monitoring a watch di
 
 1. **Add files**: Copy PDF or DOCX files to the `watch_directory/` folder
 2. **Automatic processing**: The agent will detect new files and add them to your collection
-3. **Supported formats**: PDF and DOCX files are automatically processed and indexed
+3. **Smart chunking**: Large documents are automatically split into manageable chunks
+4. **Supported formats**: PDF and DOCX files are automatically processed and indexed
+5. **Consistent behavior**: Same chunking logic as manual uploads
 
 **Note**: The file monitoring agent must be running for this feature to work.
 
@@ -248,7 +387,8 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    ui[Streamlit UI<br/>Port 8020] --> api[API Server<br/>Port 8021]
+    new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
+    legacy-ui[Legacy Streamlit UI<br/>Port 8020] --> api
     chrome[Chrome Extension] --> api
     agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
     mcp --> api
@@ -257,21 +397,23 @@ flowchart TB
     ragme --> openai[OpenAI LLM]
     
     subgraph "Vector Database Layer"
-        vector-db --> weaviate[(Weaviate)]
-        vector-db --> milvus[(Milvus)]
+        vector-db --> milvus[(Milvus Lite<br/>Default)]
+        vector-db --> weaviate-local[(Local Weaviate<br/>Podman)]
+        vector-db --> weaviate-cloud[(Weaviate Cloud)]
         vector-db --> future[(Future DBs)]
     end
 ```
 
 ### Components
 
-- **Streamlit UI** (port 8020): Web interface for user interaction
+- **New Frontend** (port 3020): Modern web interface with three-pane layout ⭐ **DEFAULT**
+- **Legacy Streamlit UI** (port 8020): Original web interface for user interaction
 - **API Server** (port 8021): REST API for URL and JSON ingestion
 - **MCP Server** (port 8022): Document processing for PDF and DOCX files
 - **File Monitor Agent**: Watches `watch_directory/` for new files
 - **Chrome Extension**: Browser extension for capturing web pages
 - **RAGme Core**: Main RAG processing logic using LlamaIndex and vector database abstraction
-- **Vector Database Layer**: Modular support for multiple vector databases (Weaviate, Milvus, etc.)
+- **Vector Database Layer**: Modular support for multiple vector databases (Milvus, Weaviate, etc.)
 
 ### MCP
 
@@ -303,21 +445,24 @@ flowchart LR
 ## 🚧 Current Limitations
 
 1. Uses the same collection for all users
-2. ~~Tied to Weaviate as vector database~~ ✅ **Fixed!** Now supports multiple vector databases
+2. ~~Tied to Weaviate as vector database~~ ✅ **Fixed!** Now supports multiple vector databases with Milvus as default
 3. Tied to LlamaIndex as agent and RAG
 
 ## 🔮 Next Steps
 
 1. ✅ ~~Decouple the Weaviate vector database dependency~~ - **Completed!** See [Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)
-2. Decouple [LlamaIndex](https://www.llamaindex.ai/) for parsing and RAG-ing of documents. Allow others like [docling](https://github.com/docling-project)
-3. Decouple LlamaIndex as the query agent
-4. Add security at minimum HTTPS
-5. Add ability to add images and videos
-6. Allow multiple users (SaaS)
-7. Support other types of content: images, audio, and video
-8. Add ability to ingest emails by forwarding to a xyz@ragme.io email
-9. Add ability to ingest content from Slack
-10. Add ability to ingest content from X / Twitter
+2. ✅ ~~Add modern frontend UI~~ - **Completed!** New three-pane interface with real-time features
+3. ✅ ~~Add local Weaviate support~~ - **Completed!** Podman-based local deployment
+4. ✅ ~~Add debugging and monitoring tools~~ - **Completed!** Comprehensive log monitoring
+5. Decouple [LlamaIndex](https://www.llamaindex.ai/) for parsing and RAG-ing of documents. Allow others like [docling](https://github.com/docling-project)
+6. Decouple LlamaIndex as the query agent
+7. Add security at minimum HTTPS
+8. Add ability to add images and videos
+9. Allow multiple users (SaaS)
+10. Support other types of content: images, audio, and video
+11. Add ability to ingest emails by forwarding to a xyz@ragme.io email
+12. Add ability to ingest content from Slack
+13. Add ability to ingest content from X / Twitter
 
 ## 🛠️ Development
 
@@ -329,7 +474,7 @@ We maintain high code quality standards using automated linting and formatting:
 
 ```bash
 # Run linting checks (required before submitting PRs)
-./lint.sh
+./tools/lint.sh
 
 # Auto-fix linting issues where possible
 uv run ruff check --fix src/ tests/
@@ -350,7 +495,7 @@ uv run ruff format src/ tests/ examples/
 Before submitting a pull request, ensure:
 
 1. ✅ **All tests pass**: `./test.sh`
-2. ✅ **All linting checks pass**: `./lint.sh`
+2. ✅ **All linting checks pass**: `./tools/lint.sh`
 3. ✅ **Code is properly formatted**: `uv run ruff format src/ tests/ examples/`
 4. ✅ **No unused imports or variables**
 5. ✅ **Proper exception handling** (using `raise ... from e` pattern)
@@ -372,8 +517,11 @@ uv run pytest --cov=src/ragme tests/
 ### Process Management
 
 ```bash
-# Start all services
+# Start all services (new frontend by default)
 ./start.sh
+
+# Start with legacy UI
+./start.sh legacy-ui
 
 # Stop all services
 ./stop.sh
@@ -399,22 +547,18 @@ Created with ❤️ by @maximilien
 
 RagMe supports multiple vector database backends with a modular architecture:
 
-### Weaviate (Default)
-- Cloud-based vector database
-- Automatic vectorization
-- Built-in query agents
-
-### Milvus
-- Local or cloud vector database
-- High-performance vector search
-- Support for both Milvus Lite (local) and Milvus Server
+### Milvus (Default) ⭐ **RECOMMENDED**
+- **Milvus Lite**: Local development with no server setup required
+- **High-performance**: Vector search and similarity matching
+- **Easy setup**: Automatic local database file creation
+- **Production ready**: Can scale to Milvus Server for production
 
 #### Configuring Milvus
 
 Set the following environment variables:
 
 ```bash
-# Choose Milvus as the vector database
+# Choose Milvus as the vector database (default)
 VECTOR_DB_TYPE=milvus
 
 # For local Milvus Lite (recommended for development)
@@ -425,13 +569,64 @@ MILVUS_URI=http://localhost:19530
 MILVUS_TOKEN=root:Milvus
 ```
 
+### Weaviate
+- **Cloud-based**: Managed vector database service
+- **Local support**: Podman-based local deployment
+- **Automatic vectorization**: Built-in embedding capabilities
+- **Query agents**: Advanced query capabilities
+
+#### Configuring Local Weaviate
+
+Set the following environment variables:
+
+```bash
+# Choose local Weaviate as the vector database
+VECTOR_DB_TYPE=weaviate-local
+
+# Local Weaviate URL (default)
+WEAVIATE_LOCAL_URL=http://localhost:8080
+```
+
+Then start local Weaviate:
+
+```bash
+# Start local Weaviate
+./tools/weaviate-local.sh start
+
+# Check if it's ready
+./tools/weaviate-local.sh status
+```
+
+#### Example Usage with Local Weaviate
+
+```python
+import os
+from src.ragme import RagMe
+
+# Configure for local Weaviate
+os.environ["VECTOR_DB_TYPE"] = "weaviate-local"
+os.environ["WEAVIATE_LOCAL_URL"] = "http://localhost:8080"
+
+# Initialize RagMe
+ragme = RagMe(db_type="weaviate-local")
+
+# Add web pages
+urls = ["https://example.com"]
+ragme.write_webpages_to_weaviate(urls)
+
+# Query the database
+response = await ragme.run("What is this about?")
+```
+
+See `examples/weaviate_local_example.py` for a complete example.
+
 #### Example Usage with Milvus
 
 ```python
 import os
 from src.ragme import RagMe
 
-# Configure for Milvus
+# Configure for Milvus (default)
 os.environ["VECTOR_DB_TYPE"] = "milvus"
 os.environ["MILVUS_URI"] = "milvus_demo.db"
 
@@ -456,9 +651,20 @@ The vector database implementation is organized into modular files:
 src/ragme/
 ├── vector_db.py              # Compatibility layer (imports from modules)
 ├── vector_db_base.py         # Abstract base class
-├── vector_db_weaviate.py     # Weaviate implementation
+├── vector_db_weaviate.py     # Weaviate Cloud implementation
+├── vector_db_weaviate_local.py # Local Weaviate implementation
 ├── vector_db_milvus.py       # Milvus implementation
 └── vector_db_factory.py      # Factory function
+
+# Local Weaviate Management
+├── tools/
+│   ├── weaviate-local.sh      # Local Weaviate management script
+│   ├── tail-logs.sh           # Log monitoring and debugging script
+│   ├── lint.sh                # Code linting script
+│   └── podman-compose.weaviate.yml # Podman Compose for local Weaviate
+└── examples/
+    ├── weaviate_local_example.py # Local Weaviate usage example
+    └── milvus_example.py     # Milvus usage example
 ```
 
 This modular structure makes it easy to:

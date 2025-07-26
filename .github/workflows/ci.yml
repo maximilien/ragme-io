@@ -40,8 +40,8 @@ jobs:
         
     - name: Run linting
       run: |
-        chmod +x lint.sh
-        ./lint.sh
+        chmod +x tools/lint.sh
+        ./tools/lint.sh
 
   test:
     runs-on: ubuntu-latest

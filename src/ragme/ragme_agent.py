@@ -63,13 +63,94 @@ class RagMeAgent:
             self.ragme.vector_db.cleanup()
             self.ragme.vector_db.setup()
 
+        def delete_document(doc_id: str) -> str:
+            """
+            Delete a specific document from the RagMeDocs collection by ID.
+            Args:
+                doc_id (str): The document ID to delete
+            Returns:
+                str: Success or error message
+            """
+            try:
+                success = self.ragme.delete_document(doc_id)
+                if success:
+                    return f"Document {doc_id} deleted successfully"
+                else:
+                    return f"Document {doc_id} not found or could not be deleted"
+            except Exception as e:
+                return f"Error deleting document {doc_id}: {str(e)}"
+
+        def delete_all_documents() -> str:
+            """
+            Delete all documents from the RagMeDocs collection.
+            Returns:
+                str: Success message with count of deleted documents
+            """
+            try:
+                # Get all documents first
+                documents = self.ragme.list_documents(limit=1000, offset=0)
+                deleted_count = 0
+
+                for doc in documents:
+                    doc_id = doc.get("id")
+                    if doc_id:
+                        success = self.ragme.delete_document(doc_id)
+                        if success:
+                            deleted_count += 1
+
+                return f"Successfully deleted {deleted_count} documents from the collection"
+            except Exception as e:
+                return f"Error deleting documents: {str(e)}"
+
+        def get_document_details(doc_id: int) -> dict[str, Any]:
+            """
+            Get detailed information about a specific document by ID.
+            Args:
+                doc_id (int): The document ID/index
+            Returns:
+                dict: Detailed document information including full content
+            """
+            documents = self.ragme.list_documents(
+                limit=1000, offset=0
+            )  # Get all to find by ID
+            if doc_id < 0 or doc_id >= len(documents):
+                return {"error": f"Document ID {doc_id} not found"}
+
+            doc = documents[doc_id]
+            return {
+                "id": doc_id,
+                "url": doc.get("url", "Unknown"),
+                "type": doc.get("metadata", {}).get("type", "Unknown"),
+                "date_added": doc.get("metadata", {}).get("date_added", "Unknown"),
+                "content": doc.get("text", ""),
+                "metadata": doc.get("metadata", {}),
+            }
+
         def list_ragme_collection(
             limit: int = 10, offset: int = 0
         ) -> list[dict[str, Any]]:
             """
-            List the contents of the RagMeDocs collection
+            List the contents of the RagMeDocs collection with essential information only.
+            Returns a summary of documents without full text content for fast listing.
             """
-            return self.ragme.list_documents()
+            documents = self.ragme.list_documents(limit=limit, offset=offset)
+
+            # Return only essential information for fast listing
+            summary_docs = []
+            for i, doc in enumerate(documents):
+                summary_doc = {
+                    "id": i + offset,  # Index for reference
+                    "url": doc.get("url", "Unknown"),
+                    "type": doc.get("metadata", {}).get("type", "Unknown"),
+                    "date_added": doc.get("metadata", {}).get("date_added", "Unknown"),
+                    "content_length": len(doc.get("text", "")),
+                    "content_preview": doc.get("text", "")[:100] + "..."
+                    if len(doc.get("text", "")) > 100
+                    else doc.get("text", ""),
+                }
+                summary_docs.append(summary_doc)
+
+            return summary_docs
 
         def write_to_ragme_collection(urls=list[str]):
             """
@@ -87,8 +168,41 @@ class RagMeAgent:
             Returns:
                 str: The response from the QueryAgent
             """
-            response = self.ragme.query_agent.run(query)
-            return response.final_answer
+            try:
+                # Try to use the QueryAgent first
+                response = self.ragme.query_agent.run(query)
+                return response
+            except Exception as e:
+                # Fallback: use direct vector search if QueryAgent fails
+                try:
+                    # Get documents from the collection
+                    documents = self.ragme.list_documents(limit=10, offset=0)
+
+                    # Simple keyword matching for now
+                    relevant_docs = []
+                    query_lower = query.lower()
+
+                    for doc in documents:
+                        text = doc.get("text", "").lower()
+                        if any(word in text for word in query_lower.split()):
+                            relevant_docs.append(doc)
+
+                    if relevant_docs:
+                        # Return the most relevant document's content
+                        most_relevant = relevant_docs[0]
+                        content = most_relevant.get("text", "")
+                        url = most_relevant.get("url", "")
+
+                        # Truncate content if too long
+                        if len(content) > 1000:
+                            content = content[:1000] + "..."
+
+                        return f"Based on the stored documents, here's what I found:\n\nURL: {url}\n\nContent: {content}"
+                    else:
+                        return f"I couldn't find any relevant information about '{query}' in the stored documents. The QueryAgent also encountered an error: {str(e)}"
+
+                except Exception as fallback_error:
+                    return f"Error querying the agent: {str(e)}. Fallback also failed: {str(fallback_error)}"
 
         def get_vector_db_info() -> str:
             """
@@ -107,6 +221,8 @@ class RagMeAgent:
             tools=[
                 write_to_ragme_collection,
                 delete_ragme_collection,
+                delete_document,
+                delete_all_documents,
                 list_ragme_collection,
                 find_urls_crawling_webpage,
                 query_agent,
@@ -116,11 +232,19 @@ class RagMeAgent:
             system_prompt="""You are a helpful assistant that can write
             the contents of urls to RagMeDocs
             collection, as well as forwarding questions to a QueryAgent.
-            The QueryAgent will priortize the contents of the RagMeDocs collection
-            to answer the question.
-            You can also ask questions about the RagMeDocs collection directly.
+
+            IMPORTANT: When users ask questions about content that might be in the RagMeDocs collection,
+            you should ALWAYS use the query_agent function to search through the stored documents first.
+            The QueryAgent will search through the contents of the RagMeDocs collection to find relevant information.
+
+            You can also ask questions about the RagMeDocs collection directly using list_ragme_collection.
             If the query is not about the RagMeDocs collection, you can ask the QueryAgent to answer the question.
             You can also answer which vector database is being used if asked.
+
+            You can also delete documents from the collection:
+            - Use delete_document(doc_id) to delete a specific document by its ID
+            - Use delete_all_documents() to delete all documents from the collection
+            - When users ask to "delete docs" or similar, you can use these functions to help them
             """,
         )
 

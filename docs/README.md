@@ -12,6 +12,13 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Process Management](PROCESS_MANAGEMENT.md)** - Service lifecycle management and troubleshooting
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
+### 🆕 Latest Features Documentation
+- **Smart Document Chunking**: Automatic splitting of large documents at sentence boundaries
+- **Enhanced UI**: Interactive visualizations with click-to-scroll functionality
+- **Improved Document Management**: Grouped chunked documents with bulk operations
+- **Real-time Synchronization**: Better refresh and update mechanisms
+- **Responsive Design**: Enhanced mobile and desktop experience
+
 ### Project Structure
 ```
 ragme-ai/
@@ -20,7 +27,9 @@ ragme-ai/
 │   ├── VECTOR_DB_ABSTRACTION.md
 │   ├── CONTRIBUTING.md
 │   ├── PRESENTATION.md
-│   └── CI_CD.md            # CI/CD documentation
+│   ├── CI_CD.md            # CI/CD documentation
+│   ├── PROCESS_MANAGEMENT.md # Process management
+│   └── TROUBLESHOOTING.md  # Troubleshooting guide
 ├── src/ragme/              # 🐍 Source code
 │   ├── __init__.py
 │   ├── ragme.py            # Main RagMe class
@@ -28,13 +37,24 @@ ragme-ai/
 │   ├── local_agent.py      # File monitoring agent
 │   ├── vector_db.py        # Vector database compatibility layer
 │   ├── vector_db_base.py   # Abstract base class
-│   ├── vector_db_weaviate.py # Weaviate implementation
-│   ├── vector_db_milvus.py # Milvus implementation
+│   ├── vector_db_weaviate.py # Weaviate Cloud implementation
+│   ├── vector_db_weaviate_local.py # Local Weaviate implementation
+│   ├── vector_db_milvus.py # Milvus implementation (default)
 │   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
-│   ├── ui.py               # Streamlit UI
+│   ├── ui.py               # Legacy Streamlit UI
+│   ├── socket_manager.py   # WebSocket management
 │   └── common.py           # Common utilities
+├── frontend/               # 🌐 New frontend (TypeScript/Express)
+│   ├── src/
+│   │   └── index.ts        # Main server file
+│   ├── public/
+│   │   ├── index.html      # Main HTML file
+│   │   ├── styles.css      # CSS styles
+│   │   └── app.js          # Frontend JavaScript
+│   ├── package.json
+│   └── tsconfig.json
 ├── tests/                  # 🧪 Test suite
 │   ├── test_vector_db_base.py
 │   ├── test_vector_db_weaviate.py
@@ -43,6 +63,11 @@ ragme-ai/
 │   └── test_vector_db.py   # Compatibility layer
 ├── examples/               # 📖 Usage examples
 ├── chrome_ext/             # 🌐 Chrome extension
+├── tools/                  # 🛠️ Development tools
+│   ├── weaviate-local.sh   # Local Weaviate management
+│   ├── tail-logs.sh        # Log monitoring
+│   ├── lint.sh             # Code linting
+│   └── podman-compose.weaviate.yml
 └── watch_directory/        # 📁 Monitored directory
 ```
 
@@ -58,10 +83,11 @@ ragme-ai/
 
 RagMe is built with a modular, vector database agnostic architecture:
 
-- **Vector Database Abstraction**: Support for multiple vector databases (Weaviate, Milvus, etc.)
+- **Vector Database Abstraction**: Support for multiple vector databases (Milvus, Weaviate, etc.)
 - **REST API**: FastAPI-based API for programmatic access
 - **File Monitoring**: Automatic processing of PDF and DOCX files
-- **Web UI**: Streamlit interface for easy interaction
+- **New Frontend**: Modern TypeScript/Express interface with three-pane layout ⭐ **DEFAULT**
+- **Legacy UI**: Streamlit interface for easy interaction
 - **Chrome Extension**: Browser integration for web content
 - **CI/CD Pipeline**: Automated testing across multiple Python versions
 
@@ -76,6 +102,7 @@ RagMe is built with a modular, vector database agnostic architecture:
 ### For Users
 - [Presentation](PRESENTATION.md) - Complete project overview with examples
 - [Process Management](PROCESS_MANAGEMENT.md) - Service lifecycle management
+- [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
 - Main [README.md](../README.md) - Installation and basic usage
 
 ## 🤝 Contributing
@@ -85,6 +112,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - Testing requirements
 - Pull request process
 - Development setup
+- Frontend development
 
 ## 🧪 Testing and Code Quality
 
@@ -98,6 +126,8 @@ The project includes comprehensive testing and code quality enforcement:
 - **Multi-Python version support** (3.10, 3.11, 3.12)
 - **Mocked dependencies** for reliable testing
 - **Vector database abstraction tests** with full coverage
+- **Integration testing** for all services
+- **Frontend testing** with TypeScript compilation
 
 ### Code Quality
 
@@ -107,6 +137,7 @@ The project includes comprehensive testing and code quality enforcement:
 - **Exception handling** standards (B904 compliance)
 - **Import organization** and sorting
 - **CI enforcement** - all linting checks must pass before merging
+- **Frontend linting** with ESLint and Prettier
 
 ### Test Structure
 
@@ -128,6 +159,31 @@ Each test file focuses on its specific component, making it easy to:
 - Debug issues in specific components
 
 See [CI_CD.md](CI_CD.md) for detailed testing information.
+
+## 🚀 Key Features
+
+### Vector Database Support
+- **Milvus Lite**: Default for local development (no server setup)
+- **Local Weaviate**: Podman-based local deployment
+- **Weaviate Cloud**: Managed vector database service
+- **Extensible**: Easy to add new vector databases
+
+### User Interfaces
+- **New Frontend**: Modern three-pane layout with real-time features ⭐ **DEFAULT**
+- **Legacy UI**: Streamlit-based interface for traditional interaction
+- **Chrome Extension**: Browser integration for web content capture
+
+### Process Management
+- **Comprehensive scripts**: Start, stop, restart, and status checking
+- **Service monitoring**: Real-time log monitoring and debugging
+- **Error handling**: Graceful error handling and recovery
+- **Port management**: Automatic port conflict resolution
+
+### Development Tools
+- **Linting**: Automated code quality enforcement
+- **Testing**: Comprehensive test suite with mocking
+- **Documentation**: Complete documentation with examples
+- **CI/CD**: Automated testing and quality checks
 
 ## 📄 License
 

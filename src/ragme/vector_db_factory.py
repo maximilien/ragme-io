@@ -4,6 +4,7 @@
 from .vector_db_base import VectorDatabase
 from .vector_db_milvus import MilvusVectorDatabase
 from .vector_db_weaviate import WeaviateVectorDatabase
+from .vector_db_weaviate_local import WeaviateLocalVectorDatabase
 
 
 def create_vector_database(
@@ -29,17 +30,29 @@ def create_vector_database(
 
         if not weaviate_api_key or not weaviate_url:
             print(
-                "⚠️  Weaviate credentials not found. Falling back to Milvus for local development."
+                "⚠️  Weaviate Cloud credentials not found. Falling back to Milvus for local development."
             )
             print(
-                "   To use Weaviate, set WEAVIATE_API_KEY and WEAVIATE_URL environment variables."
+                "   To use Weaviate Cloud, set WEAVIATE_API_KEY and WEAVIATE_URL environment variables."
             )
+            print("   To use local Weaviate, set VECTOR_DB_TYPE=weaviate-local")
             return MilvusVectorDatabase(collection_name)
 
         try:
             return WeaviateVectorDatabase(collection_name)
         except Exception as e:
-            print(f"⚠️  Failed to connect to Weaviate: {e}")
+            print(f"⚠️  Failed to connect to Weaviate Cloud: {e}")
+            print("   Falling back to Milvus for local development.")
+            return MilvusVectorDatabase(collection_name)
+
+    elif db_type.lower() == "weaviate-local":
+        try:
+            return WeaviateLocalVectorDatabase(collection_name)
+        except Exception as e:
+            print(f"⚠️  Failed to connect to local Weaviate: {e}")
+            print(
+                "   Make sure local Weaviate is running (see tools/podman-compose.weaviate.yml)"
+            )
             print("   Falling back to Milvus for local development.")
             return MilvusVectorDatabase(collection_name)
 

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 RAGme.ai Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header with hamburger menu -->
+        <header class="header">
+            <div class="header-left">
+                <button class="hamburger-menu" id="hamburgerMenu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="title">🤖 RAGme.ai Assistant</h1>
+            </div>
+            <div class="header-center">
+                <div class="vector-db-info" id="vectorDbInfo" style="display: none;">
+                    <span class="vector-db-label">Vector DB:</span>
+                    <span class="vector-db-type" id="vectorDbType">-</span>
+                    <span class="vector-db-separator">|</span>
+                    <span class="vector-db-label">Collection:</span>
+                    <span class="vector-db-collection" id="vectorDbCollection">-</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="add-content-btn" id="addContentBtn">
+                    <i class="fas fa-plus"></i>
+                    Add Content
+                </button>
+            </div>
+        </header>
+
+        <!-- Main content area -->
+        <div class="main-content">
+            <!-- Chat history sidebar (20% width, collapsible) -->
+            <div class="chat-history-sidebar" id="chatHistorySidebar">
+                <div class="sidebar-header">
+                    <h3>Chat History</h3>
+                    <button class="collapse-btn" id="collapseSidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
+                <div class="chat-history-list" id="chatHistoryList">
+                    <!-- Chat history items will be populated here -->
+                </div>
+            </div>
+
+            <!-- Main chat area (middle section) -->
+            <div class="chat-main-area">
+                <!-- Restore sidebar button (hidden by default) -->
+                <button class="restore-sidebar-btn" id="restoreSidebarBtn" style="display: none;">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <!-- Restore documents button (hidden by default) -->
+                <button class="restore-docs-btn" id="restoreDocumentsBtn" style="display: none;">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Messages will be populated here -->
+                </div>
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            id="chatInput" 
+                            placeholder="Ask me about your documents or tell me URLs to RAG..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-button" id="sendButton">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resizable divider -->
+            <div class="resize-divider" id="resizeDivider">
+                <div class="resize-handle">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+            </div>
+
+            <!-- Recent Documents sidebar (resizable) -->
+            <div class="documents-sidebar" id="documentsSidebar">
+                <div class="sidebar-header">
+                    <h3>Recent Documents</h3>
+                    <div class="sidebar-header-actions">
+                        <button class="refresh-btn" id="refreshDocuments" title="Refresh documents">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="collapse-btn" id="collapseDocuments">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="documents-content" id="documentsContent">
+                    <!-- Documents visualization container -->
+                    <div class="documents-visualization" id="documentsVisualization">
+                        <div class="visualization-header">
+                            <h4>Documents Overview</h4>
+                            <div class="visualization-controls">
+                                <select class="visualization-type-selector" id="visualizationTypeSelector">
+                                    <option value="graph">Network Graph</option>
+                                    <option value="bar">Bar Chart</option>
+                                    <option value="pie">Pie Chart</option>
+                                </select>
+                                <button class="visualization-toggle-btn" id="visualizationToggleBtn">
+                                    <i class="fas fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="visualization-content" id="visualizationContent">
+                            <div class="visualization-placeholder">
+                                <i class="fas fa-file-alt"></i>
+                                <p>Documents Visualization</p>
+                                <p class="visualization-description">
+                                    This area displays your documents and their relationships using D3.js visualization.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Resize handle for visualization -->
+                    <div class="visualization-resize-handle" id="visualizationResizeHandle">
+                        <div class="resize-indicator">
+                            <i class="fas fa-grip-lines"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Documents list container -->
+                    <div class="documents-list-container" id="documentsListContainer">
+                        <!-- Document cards will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hamburger menu dropdown OUTSIDE app-container -->
+    <div class="menu-dropdown" id="menuDropdown">
+        <div class="menu-item" id="newChat">
+            <i class="fas fa-plus"></i>
+            New Chat
+        </div>
+        <div class="menu-item" id="clearCurrentChat">
+            <i class="fas fa-eraser"></i>
+            Clear Current Chat
+        </div>
+        <div class="menu-item" id="clearHistory">
+            <i class="fas fa-trash"></i>
+            Clear All History
+        </div>
+        <div class="menu-item" id="clearEverything">
+            <i class="fas fa-broom"></i>
+            Clear Everything
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="settings">
+            <i class="fas fa-cog"></i>
+            Settings
+        </div>
+    </div>
+
+    <!-- Add Content Modal -->
+    <div class="modal-overlay" id="addContentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Content</h3>
+                <button class="modal-close" id="closeAddContent">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="content-tabs">
+                    <button class="tab-btn active" data-tab="urls">URLs</button>
+                    <button class="tab-btn" data-tab="files">Files</button>
+                    <button class="tab-btn" data-tab="json">JSON</button>
+                </div>
+                
+                <div class="tab-content active" id="urlsTab">
+                    <div class="form-group">
+                        <label for="urlInput">Enter URLs (one per line):</label>
+                        <textarea id="urlInput" placeholder="https://example.com&#10;https://example.org" rows="5"></textarea>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="filesTab">
+                    <div class="form-group">
+                        <label for="fileInput">Select files to upload:</label>
+                        <div class="file-upload-area" id="fileUploadArea">
+                            <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.md,.json,.csv" style="display: none;">
+                            <div class="file-upload-placeholder">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Click to select files or drag and drop</p>
+                                <p class="file-types">Supported: PDF, DOCX, TXT, MD, JSON, CSV</p>
+                            </div>
+                        </div>
+                        <div class="file-list" id="fileList">
+                            <!-- Selected files will be listed here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="jsonTab">
+                    <div class="form-group">
+                        <label for="jsonInput">Enter JSON data:</label>
+                        <textarea id="jsonInput" placeholder='{"key": "value"}' rows="5"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="metadataInput">Metadata (optional):</label>
+                        <textarea id="metadataInput" placeholder='{"source": "manual", "category": "example"}' rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelAddContent">Cancel</button>
+                <button class="btn btn-primary" id="submitAddContent">Add Content</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close" id="closeSettings">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label for="maxDocuments">Max Documents:</label>
+                    <input type="number" id="maxDocuments" value="20" min="1" max="100">
+                    <small>Maximum number of documents to display (1-100)</small>
+                </div>
+                <div class="setting-item">
+                    <label for="showVectorDbInfo">
+                        <input type="checkbox" id="showVectorDbInfo" checked>
+                        Show Vector DB and Collections
+                    </label>
+                    <small>Display vector database type and collection information in the header</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
+                <button class="btn btn-primary" id="saveSettings">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Details Modal -->
+    <div class="modal-overlay" id="documentDetailsModal">
+        <div class="modal-content document-details-modal">
+            <div class="modal-header">
+                <h3 id="documentDetailsTitle">Document Details</h3>
+                <div class="modal-header-actions">
+                    <button class="document-delete-btn" id="deleteDocumentFromDetails" title="Delete Document">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="modal-close" id="closeDocumentDetails">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body" id="documentDetailsBody">
+                <!-- Document details will be populated here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeDocumentDetailsBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 

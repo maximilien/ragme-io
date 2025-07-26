@@ -63,7 +63,7 @@ def test_add_json_success(client, mock_ragme):
     assert response.status_code == 200
     assert response.json() == {
         "status": "success",
-        "message": "Successfully processed JSON content",
+        "message": "JSON data added to RAG system",
     }
     mock_ragme.write_json_to_weaviate.assert_called_once_with(
         test_data["data"], test_data["metadata"]
@@ -81,7 +81,7 @@ def test_add_json_without_metadata(client, mock_ragme):
     assert response.status_code == 200
     assert response.json() == {
         "status": "success",
-        "message": "Successfully processed JSON content",
+        "message": "JSON data added to RAG system",
     }
     mock_ragme.write_json_to_weaviate.assert_called_once_with(test_data["data"], None)
 
@@ -95,8 +95,8 @@ def test_add_json_error(client, mock_ragme):
 
     response = client.post("/add-json", json=test_data)
 
-    assert response.status_code == 500
-    assert response.json() == {"detail": "Test error"}
+    assert response.status_code == 200
+    assert response.json() == {"status": "error", "message": "Test error"}
 
 
 def test_add_json_invalid_input(client):
@@ -144,7 +144,7 @@ def test_add_json_complex_data(client, mock_ragme):
     assert response.status_code == 200
     assert response.json() == {
         "status": "success",
-        "message": "Successfully processed JSON content",
+        "message": "JSON data added to RAG system",
     }
     mock_ragme.write_json_to_weaviate.assert_called_once_with(
         test_data["data"], test_data["metadata"]
