@@ -76,6 +76,21 @@ Enhancement suggestions are tracked as GitHub issues. Create an issue and provid
 
 ## 🏗️ Development Setup
 
+### Installing Development Dependencies
+
+Before contributing, install the development dependencies:
+
+```bash
+# Install development dependencies (includes ruff, pytest, etc.)
+uv sync --extra dev
+```
+
+This installs:
+- **ruff**: For linting and code formatting
+- **pytest**: For running tests
+- **pytest-cov**: For test coverage
+- **requests-mock**: For mocking HTTP requests in tests
+
 ### Project Structure
 
 ```
@@ -160,6 +175,90 @@ class PineconeVectorDatabase(VectorDatabase):
 * Follow PEP 8 guidelines
 * Include warning filters for clean output in test files
 
+### Code Quality and Linting
+
+We use **Ruff** for linting and code formatting to maintain high code quality standards.
+
+#### Linting Requirements
+
+**All code must pass linting checks before submission.** This is enforced in our CI pipeline.
+
+#### Running Linting
+
+```bash
+# Run all linting checks (required before PRs)
+./lint.sh
+
+# Run linting on specific directories
+uv run ruff check src/
+uv run ruff check tests/
+uv run ruff check examples/
+
+# Auto-fix linting issues where possible
+uv run ruff check --fix src/ tests/
+
+# Format code
+uv run ruff format src/ tests/ examples/
+```
+
+#### Key Linting Rules
+
+We enforce the following rules strictly:
+
+- **B904**: Use `raise ... from e` for exception chaining
+- **W291**: No trailing whitespace
+- **W293**: No blank lines with whitespace
+- **F841**: No unused variables
+- **E722**: No bare `except` clauses (use `except Exception:`)
+- **I001**: Proper import sorting and formatting
+- **UP006**: Use modern type annotations (`list[str]` instead of `List[str]`)
+
+#### Pre-commit Checklist
+
+Before submitting any pull request, ensure:
+
+1. ✅ **All tests pass**: `./test.sh`
+2. ✅ **All linting checks pass**: `./lint.sh`
+3. ✅ **Code is properly formatted**: `uv run ruff format src/ tests/ examples/`
+4. ✅ **No unused imports or variables** (F841)
+5. ✅ **Proper exception handling** (B904 - use `raise ... from e`)
+6. ✅ **No trailing whitespace** (W291)
+7. ✅ **No blank lines with whitespace** (W293)
+8. ✅ **Consistent code style** throughout
+
+#### Linting Configuration
+
+The project uses `pyproject.toml` for linting configuration:
+
+```toml
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "B028",  # no explicit stacklevel keyword argument found
+    "C901",  # too complex
+]
+```
+
+#### Ignored Rules
+
+Some rules are intentionally ignored:
+- **B028**: No explicit stacklevel keyword argument found (suppressed for cleaner code)
+- **E501**: Line too long (handled by formatter)
+- **C901**: Too complex (allowed for complex business logic)
+
 ### JavaScript Style Guide
 
 * Use 2 spaces for indentation rather than tabs
@@ -202,15 +301,19 @@ This section lists the labels we use to help us track and manage issues and pull
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## Testing
+## Testing and Code Quality
 
 Before submitting a pull request, please ensure that:
 
-1. All tests pass (`./tests.sh`)
-2. The code is properly formatted
-3. Documentation is updated
-4. New tests are added for new functionality
-5. Warning filters are included for clean test output
+1. **All unit tests pass** (`./test.sh`)
+2. **All linting checks pass** (`./lint.sh`) - **REQUIRED**
+3. **Code is properly formatted** (`uv run ruff format src/ tests/ examples/`)
+4. **Documentation is updated** for any new features or changes
+5. **New tests are added** for new functionality
+6. **Warning filters are included** for clean test output
+7. **No linting errors** in source files
+8. **Consistent code style** throughout the codebase
+9. **Integration tests pass** (`./test-integration.sh`) - **For major changes**
 
 ### Test Organization
 

@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+
 
 def crawl_webpage(start_url: str, max_pages: int = 10) -> list[str]:
     """
@@ -27,16 +29,19 @@ def crawl_webpage(start_url: str, max_pages: int = 10) -> list[str]:
 
         try:
             response = requests.get(current_url)
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, "html.parser")
             visited_urls.add(current_url)
             found_urls.append(current_url)
 
-            for a in soup.find_all('a', href=True):
-                href = a['href']
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
                 full_url = urljoin(current_url, href)
-                if urlparse(full_url).netloc == urlparse(start_url).netloc and full_url not in visited_urls:
+                if (
+                    urlparse(full_url).netloc == urlparse(start_url).netloc
+                    and full_url not in visited_urls
+                ):
                     urls_to_visit.append(full_url)
         except Exception as e:
             print(f"Error crawling {current_url}: {e}")
 
-    return found_urls 
+    return found_urls

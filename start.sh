@@ -82,4 +82,13 @@ PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port
 echo $! >> .pid
 
 echo "All RAGme processes started successfully!"
-echo "Use ./stop.sh to stop all RAGme processes" 
+echo ""
+echo "Process Management Commands:"
+echo "  ./stop.sh        # Stop all processes"
+echo "  ./stop.sh restart # Restart all processes"
+echo "  ./stop.sh status  # Show process status"
+echo ""
+echo "Access your RAGme services:"
+echo "  • UI: http://localhost:8020"
+echo "  • API: http://localhost:8021"
+echo "  • MCP: http://localhost:8022" 
