@@ -188,3 +188,10 @@ watch_directory/
 # macOS
 .DS_Store
 milvus_demo.db
+
+# Database lock files
+*.db.lock
+*.lock
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm

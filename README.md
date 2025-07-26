@@ -38,27 +38,26 @@ source .venv/bin/activate
 Install dependencies:
 
 ```bash
+# Install production dependencies
 uv sync
+
+# Install development dependencies (includes ruff, pytest, etc.)
+uv sync --extra dev
 ```
 
 ### Vector Database Setup
 
-#### Option 1: Weaviate Cloud (Default)
+#### Option 1: Milvus (Default - Local Development)
+
+For local development, Milvus Lite is used by default and requires no server setup. The system will automatically create a local database file.
+
+#### Option 2: Weaviate Cloud
 
 Create an account and cluster at [Weaviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster, create a collection named "RagMeDocs".
 
 Once you have the cluster, Weaviate should give you a page with the cluster REST endpoint and the API key (select the Admin one).
 
 These will be your `WEAVIATE_URL` and `WEAVIATE_API_KEY` respectively.
-
-#### Option 2: Milvus
-
-For local development, you can use Milvus Lite which requires no server setup:
-
-```bash
-# Install Milvus support
-pip install "pymilvus[model]"
-```
 
 ### API keys
 
@@ -69,14 +68,21 @@ You will need to have API keys for OpenAI and your chosen vector database.
 Create a `.env` file with the keys and configuration:
 
 ```bash
-cat .env
+# Copy the example configuration
+cp env.example .env
+
+# Edit .env with your values:
 OPENAI_API_KEY=sk-proj-*****-**
-VECTOR_DB_TYPE=weaviate  # or "milvus"
-WEAVIATE_API_KEY=*****
-WEAVIATE_URL=*****.weaviate.cloud
-# For Milvus (optional):
+VECTOR_DB_TYPE=milvus  # Default for local development
+# VECTOR_DB_TYPE=weaviate  # For cloud Weaviate
+
+# For Weaviate Cloud (only if VECTOR_DB_TYPE=weaviate):
+# WEAVIATE_API_KEY=*****
+# WEAVIATE_URL=*****.weaviate.cloud
+
+# For Milvus (optional, uses defaults if not set):
 # MILVUS_URI=milvus_demo.db
-# MILVUS_TOKEN=root:Milvus
+
 RAGME_API_URL=http://localhost:8021
 RAGME_MCP_URL=http://localhost:8022
 ```
@@ -103,13 +109,43 @@ chmod +x start.sh
 
 This will start all services and you can access the UI at `http://localhost:8020`
 
-### Stop All Services
+### Process Management
+
+The `./stop.sh` script now provides comprehensive process management capabilities:
+
+#### Stop All Services
 
 To stop all running services:
 
 ```bash
 ./stop.sh
+# or
+./stop.sh stop
 ```
+
+#### Restart All Services
+
+To restart all services (stop and start):
+
+```bash
+./stop.sh restart
+```
+
+#### Check Service Status
+
+To check the status of all services:
+
+```bash
+./stop.sh status
+```
+
+This will show you:
+- Which processes are running
+- Port status for each service
+- Service URLs when all are running
+- PID information for debugging
+
+For detailed process management documentation, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).
 
 ### Manual Start (Individual Services)
 
@@ -282,6 +318,72 @@ flowchart LR
 8. Add ability to ingest emails by forwarding to a xyz@ragme.io email
 9. Add ability to ingest content from Slack
 10. Add ability to ingest content from X / Twitter
+
+## 🛠️ Development
+
+### Code Quality
+
+We maintain high code quality standards using automated linting and formatting:
+
+#### Running Linting and Formatting
+
+```bash
+# Run linting checks (required before submitting PRs)
+./lint.sh
+
+# Auto-fix linting issues where possible
+uv run ruff check --fix src/ tests/
+
+# Format code
+uv run ruff format src/ tests/ examples/
+```
+
+#### Linting Requirements
+
+- **All code must pass linting checks** before submission
+- **No linting errors** are allowed in source files
+- **Consistent formatting** is enforced across the codebase
+- **Type hints** are required for all function parameters and return values
+
+#### Pre-commit Checklist
+
+Before submitting a pull request, ensure:
+
+1. ✅ **All tests pass**: `./test.sh`
+2. ✅ **All linting checks pass**: `./lint.sh`
+3. ✅ **Code is properly formatted**: `uv run ruff format src/ tests/ examples/`
+4. ✅ **No unused imports or variables**
+5. ✅ **Proper exception handling** (using `raise ... from e` pattern)
+6. ✅ **Consistent code style** throughout
+
+### Testing
+
+```bash
+# Run unit tests
+./test.sh
+
+# Run tests with coverage
+uv run pytest --cov=src/ragme tests/
+
+# Run integration tests (requires services to be running)
+./test-integration.sh
+```
+
+### Process Management
+
+```bash
+# Start all services
+./start.sh
+
+# Stop all services
+./stop.sh
+
+# Restart all services
+./stop.sh restart
+
+# Check service status
+./stop.sh status
+```
 
 ## 🤝 How can I help
 

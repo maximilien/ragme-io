@@ -9,6 +9,8 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to the project
 - **[Presentation](PRESENTATION.md)** - Project overview and technical details
 - **[CI/CD Pipeline](CI_CD.md)** - Continuous Integration and testing setup
+- **[Process Management](PROCESS_MANAGEMENT.md)** - Service lifecycle management and troubleshooting
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### Project Structure
 ```
@@ -69,9 +71,11 @@ RagMe is built with a modular, vector database agnostic architecture:
 - [Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md) - Understanding the database layer
 - [Contributing Guidelines](CONTRIBUTING.md) - Development workflow and standards
 - [CI/CD Pipeline](CI_CD.md) - Testing and continuous integration
+- [Process Management](PROCESS_MANAGEMENT.md) - Service management and troubleshooting
 
 ### For Users
 - [Presentation](PRESENTATION.md) - Complete project overview with examples
+- [Process Management](PROCESS_MANAGEMENT.md) - Service lifecycle management
 - Main [README.md](../README.md) - Installation and basic usage
 
 ## 🤝 Contributing
@@ -82,9 +86,11 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - Pull request process
 - Development setup
 
-## 🧪 Testing
+## 🧪 Testing and Code Quality
 
-The project includes comprehensive testing:
+The project includes comprehensive testing and code quality enforcement:
+
+### Testing
 
 - **72 tests** covering all major functionality
 - **Modular test organization** with separate test files for each component
@@ -92,6 +98,15 @@ The project includes comprehensive testing:
 - **Multi-Python version support** (3.10, 3.11, 3.12)
 - **Mocked dependencies** for reliable testing
 - **Vector database abstraction tests** with full coverage
+
+### Code Quality
+
+- **Automated linting** with Ruff for code quality enforcement
+- **Consistent formatting** across the entire codebase
+- **Type hints** required for all functions and methods
+- **Exception handling** standards (B904 compliance)
+- **Import organization** and sorting
+- **CI enforcement** - all linting checks must pass before merging
 
 ### Test Structure
 

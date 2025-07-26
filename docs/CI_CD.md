@@ -19,14 +19,26 @@ The CI pipeline runs automatically on:
 
 ### Jobs
 
+#### Lint Job
+
+The lint job runs code quality checks before testing:
+
+- **Platform**: Ubuntu Latest
+- **Python Version**: 3.10
+- **Dependencies**: Uses `uv` for fast dependency management
+- **Lint Command**: Runs `./lint.sh` script
+- **Purpose**: Ensures code quality and consistency
+- **Failure**: Blocks test job if linting fails
+
 #### Test Job
 
 The main test job runs the complete test suite:
 
+- **Dependencies**: Requires lint job to pass first
 - **Matrix Strategy**: Tests against Python 3.10, 3.11, and 3.12
 - **Platform**: Ubuntu Latest
 - **Dependencies**: Uses `uv` for fast dependency management
-- **Test Command**: Runs `./tests.sh` script
+- **Test Command**: Runs `./test.sh` script
 - **Caching**: Caches virtual environment and dependencies for faster builds
 
 #### Test Coverage
@@ -54,8 +66,8 @@ The CI pipeline uploads test artifacts:
 ### Running Tests Locally
 
 ```bash
-# Run all tests
-./tests.sh
+# Run unit tests
+./test.sh
 
 # Run specific test file
 uv run pytest tests/test_api.py
@@ -65,11 +77,32 @@ uv run pytest -v
 
 # Run with coverage
 uv run pytest --cov=src/ragme
+
+# Run integration tests (requires services to be running)
+./test-integration.sh
+```
+
+### Running Linting Locally
+
+```bash
+# Run all linting checks
+./lint.sh
+
+# Run linting on specific directories
+uv run ruff check src/
+uv run ruff check tests/
+uv run ruff check examples/
+
+# Auto-fix linting issues
+uv run ruff check --fix src/ tests/
+
+# Format code
+uv run ruff format src/ tests/ examples/
 ```
 
 ### Test Script
 
-The `./tests.sh` script:
+The `./test.sh` script:
 
 1. **Sets up environment**: Ensures proper Python path
 2. **Runs pytest**: Executes all test files
@@ -78,6 +111,7 @@ The `./tests.sh` script:
 
 ### Test Structure
 
+#### Unit Tests
 ```
 tests/
 ├── test_add_json.py      # JSON processing tests
@@ -93,6 +127,36 @@ tests/
 └── test_vector_db_factory.py # Factory function tests
 ```
 
+#### Integration Tests
+
+The project includes comprehensive integration testing via `test-integration.sh`:
+
+**What it tests:**
+1. **Service Status** - All services (API, MCP, UI) are running and accessible
+2. **Vector Database** - Connection and basic operations
+3. **MCP Server** - Health check and document processing
+4. **RagMe API** - Endpoints and functionality
+5. **Local Agent** - File monitoring and processing
+6. **RagMe Agent** - Query processing and responses
+7. **Streamlit UI** - Web interface accessibility
+8. **File Monitoring** - PDF/DOCX file processing (optional)
+
+**How to run:**
+```bash
+# Start services first
+./start.sh
+
+# Run integration tests
+./test-integration.sh
+```
+
+**Integration test features:**
+- **Colored output** for easy reading
+- **Comprehensive checks** of all system components
+- **Automatic cleanup** of test files
+- **Detailed error reporting** for troubleshooting
+- **Service health validation** before testing
+
 Each test file focuses on its specific component, making it easy to:
 - Run tests for specific vector database implementations
 - Add new tests when adding new database support
@@ -107,7 +171,11 @@ The CI uses the same dependency management as local development:
 
 - **Package Manager**: `uv` for fast Python package management
 - **Lock File**: `uv.lock` for reproducible builds
-- **Test Dependencies**: `requirements-test.txt`
+- **Development Dependencies**: Installed via `uv sync --extra dev`
+  - **ruff**: For linting and code formatting
+  - **pytest**: For running tests
+  - **pytest-cov**: For test coverage
+  - **requests-mock**: For mocking HTTP requests
 
 ### Environment
 
@@ -165,19 +233,23 @@ uv run pip list
 
 ## 🔮 Future Enhancements
 
+### Implemented Features
+
+1. ✅ **Linting**: Ruff-based linting and formatting checks
+2. ✅ **Code Quality**: Automated code style enforcement
+3. ✅ **Formatting**: Consistent code formatting across the codebase
+
 ### Planned Additions
 
-1. **Linting**: Add pylint and flake8 checks
-2. **Security**: Add bandit and safety checks
-3. **Coverage Reports**: Generate and upload coverage reports
-4. **Performance Tests**: Add performance benchmarking
-5. **Integration Tests**: Add end-to-end testing
+1. **Security**: Add bandit and safety checks
+2. **Coverage Reports**: Generate and upload coverage reports
+3. **Performance Tests**: Add performance benchmarking
+4. **Integration Tests**: Add end-to-end testing
 
 ### Code Quality
 
 - **Type Checking**: Add mypy for static type checking
 - **Documentation**: Add docstring coverage checks
-- **Formatting**: Add black and isort for code formatting
 
 ## 📚 Related Documentation
 

@@ -4,12 +4,21 @@
 import warnings
 
 # Suppress Pydantic deprecation warnings from dependencies
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-based `config`.*")
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*class-based `config`.*"
+)
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*"
+)
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=".*Support for class-based `config`.*",
+)
 
-import sys
 import os
+import sys
+
 import requests
 import requests_mock
 
@@ -17,6 +26,7 @@ import requests_mock
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.ragme.common import crawl_webpage
+
 
 def test_crawl_webpage():
     """Test the crawl_webpage function with mocked responses."""
@@ -54,12 +64,13 @@ def test_crawl_webpage():
 
         # Test crawling with max_pages=3
         urls = crawl_webpage(base_url, max_pages=3)
-        
+
         # Should find exactly 3 pages
         assert len(urls) == 3
         assert f"{base_url}" in urls
         assert f"{base_url}/page2" in urls
         assert f"{base_url}/page3" in urls
+
 
 def test_crawl_webpage_with_error():
     """Test the crawl_webpage function handling errors."""
@@ -81,10 +92,11 @@ def test_crawl_webpage_with_error():
 
         # Test crawling with error handling
         urls = crawl_webpage(base_url, max_pages=2)
-        
+
         # Should only find the main page
         assert len(urls) == 1
         assert f"{base_url}" in urls
+
 
 def test_crawl_webpage_external_links():
     """Test that crawl_webpage only follows links within the same domain."""
@@ -112,9 +124,8 @@ def test_crawl_webpage_external_links():
 
         # Test crawling
         urls = crawl_webpage(base_url, max_pages=2)
-        
+
         # Should only find pages from example.com
         assert len(urls) == 2
         assert f"{base_url}" in urls
         assert f"{base_url}/page2" in urls
- 

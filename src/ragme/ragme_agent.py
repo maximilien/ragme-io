@@ -2,7 +2,7 @@
 # Copyright (c) 2025 dr.max
 
 import warnings
-from typing import List, Dict, Any
+from typing import Any
 
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
@@ -10,29 +10,39 @@ from llama_index.llms.openai import OpenAI
 from src.ragme.common import crawl_webpage
 
 # Suppress Pydantic deprecation warnings from dependencies
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*class-based `config`.*")
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*")
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Support for class-based `config`.*")
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*class-based `config`.*"
+)
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*"
+)
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=".*Support for class-based `config`.*",
+)
 
 
 class RagMeAgent:
     """A class for managing RAG agent operations with web content and document collections."""
-    
+
     def __init__(self, ragme_instance):
         """
         Initialize the RagMeAgent with a reference to the main RagMe instance.
-        
+
         Args:
             ragme_instance: The RagMe instance that provides access to Weaviate client and methods
         """
         self.ragme = ragme_instance
         self.llm = OpenAI(model="gpt-4o-mini")
         self.agent = self._create_agent()
-    
+
     def _create_agent(self):
         """Create and return a FunctionAgent with RAG-specific tools."""
-        
-        def find_urls_crawling_webpage(start_url: str, max_pages: int = 10) -> list[str]:
+
+        def find_urls_crawling_webpage(
+            start_url: str, max_pages: int = 10
+        ) -> list[str]:
             """
             Crawl a webpage and find all web pages under it.
             Args:
@@ -42,7 +52,7 @@ class RagMeAgent:
                 list[str]: A list of URLs found
             """
             return crawl_webpage(start_url, max_pages)
-                
+
         def delete_ragme_collection():
             """
             Reset and delete the RagMeDocs collection
@@ -53,7 +63,9 @@ class RagMeAgent:
             self.ragme.vector_db.cleanup()
             self.ragme.vector_db.setup()
 
-        def list_ragme_collection(limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        def list_ragme_collection(
+            limit: int = 10, offset: int = 0
+        ) -> list[dict[str, Any]]:
             """
             List the contents of the RagMeDocs collection
             """
@@ -67,7 +79,7 @@ class RagMeAgent:
             """
             self.ragme.write_webpages_to_weaviate(urls)
 
-        def query_agent(query: str) -> str:
+        def query_agent(query: str):
             """
             Useful for asking questions about RagMe docs and website
             Args:
@@ -85,32 +97,41 @@ class RagMeAgent:
                 str: Information about the current vector database
             """
             db = self.ragme.vector_db
-            db_type = getattr(db, 'db_type', type(db).__name__)
+            db_type = getattr(db, "db_type", type(db).__name__)
             config = f"Collection: {getattr(db, 'collection_name', 'unknown')}"
-            return f"RagMe is currently using the '{db_type}' vector database. {config}."
+            return (
+                f"RagMe is currently using the '{db_type}' vector database. {config}."
+            )
 
         return FunctionAgent(
-            tools=[write_to_ragme_collection, delete_ragme_collection, list_ragme_collection, find_urls_crawling_webpage, query_agent, get_vector_db_info],
+            tools=[
+                write_to_ragme_collection,
+                delete_ragme_collection,
+                list_ragme_collection,
+                find_urls_crawling_webpage,
+                query_agent,
+                get_vector_db_info,
+            ],
             llm=self.llm,
-            system_prompt="""You are a helpful assistant that can write 
-            the contents of urls to RagMeDocs 
+            system_prompt="""You are a helpful assistant that can write
+            the contents of urls to RagMeDocs
             collection, as well as forwarding questions to a QueryAgent.
-            The QueryAgent will priortize the contents of the RagMeDocs collection 
+            The QueryAgent will priortize the contents of the RagMeDocs collection
             to answer the question.
             You can also ask questions about the RagMeDocs collection directly.
             If the query is not about the RagMeDocs collection, you can ask the QueryAgent to answer the question.
             You can also answer which vector database is being used if asked.
             """,
         )
-    
+
     def run(self, query: str):
         """
         Run a query through the RAG agent.
-        
+
         Args:
             query (str): The query to process
-            
+
         Returns:
             The response from the agent
         """
-        return self.agent.run(query) 
+        return self.agent.run(query)
