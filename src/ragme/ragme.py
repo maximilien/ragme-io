@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import warnings
+from datetime import datetime
 from typing import Any
 
 import dotenv
@@ -122,7 +123,11 @@ class RagMe:
                     {
                         "url": doc.id_,
                         "text": doc.text,
-                        "metadata": {"type": "webpage", "url": doc.id_},
+                        "metadata": {
+                            "type": "webpage",
+                            "url": doc.id_,
+                            "date_added": datetime.now().isoformat(),
+                        },
                         "vector": vector.tolist()
                         if hasattr(vector, "tolist")
                         else list(vector),
@@ -134,7 +139,11 @@ class RagMe:
                     {
                         "url": doc.id_,
                         "text": doc.text,
-                        "metadata": {"type": "webpage", "url": doc.id_},
+                        "metadata": {
+                            "type": "webpage",
+                            "url": doc.id_,
+                            "date_added": datetime.now().isoformat(),
+                        },
                     }
                 )
         self.vector_db.write_documents(docs_to_write)
@@ -156,6 +165,9 @@ class RagMe:
         if metadata is None:
             metadata = {}
 
+        # Add date_added to metadata
+        metadata["date_added"] = datetime.now().isoformat()
+
         # Create document to write
         doc_to_write = {
             "url": json_data.get("filename", "filename not found"),
@@ -170,13 +182,25 @@ class RagMe:
         List documents in the vector database.
 
         Args:
-            limit (int): Maximum number of documents to return
-            offset (int): Number of documents to skip
+            limit: Maximum number of documents to return
+            offset: Number of documents to skip
 
         Returns:
-            List[Dict[str, Any]]: List of documents with their properties
+            list: List of documents with their metadata
         """
         return self.vector_db.list_documents(limit, offset)
+
+    def delete_document(self, document_id: str) -> bool:
+        """
+        Delete a document from the vector database by ID.
+
+        Args:
+            document_id: ID of the document to delete
+
+        Returns:
+            bool: True if document was deleted successfully, False if not found
+        """
+        return self.vector_db.delete_document(document_id)
 
     async def run(self, query: str):
         response = await self.ragme_agent.run(query)

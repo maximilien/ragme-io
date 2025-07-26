@@ -50,6 +50,43 @@ RAGME_MCP_URL = os.getenv("RAGME_MCP_URL")
 _monitor = None
 
 
+def chunkText(text: str, chunk_size: int = 1000) -> list[str]:
+    """
+    Split text into chunks of specified size.
+
+    Args:
+        text: The text to chunk
+        chunk_size: Maximum size of each chunk in characters
+
+    Returns:
+        List of text chunks
+    """
+    if len(text) <= chunk_size:
+        return [text]
+
+    chunks = []
+    start = 0
+
+    while start < len(text):
+        end = start + chunk_size
+
+        # Try to break at a sentence boundary
+        if end < len(text):
+            # Look for sentence endings (., !, ?) followed by whitespace
+            for i in range(end, max(start + chunk_size // 2, start), -1):
+                if text[i] in ".!?" and i + 1 < len(text) and text[i + 1].isspace():
+                    end = i + 1
+                    break
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+
+        start = end
+
+    return chunks
+
+
 # Cleanup function
 def cleanup():
     """Clean up resources when the application shuts down."""
@@ -66,9 +103,10 @@ atexit.register(cleanup)
 
 
 def signal_handler(signum, frame):
-    """Handle shutdown signals."""
+    """Handle shutdown signals gracefully."""
+    print("\nReceived shutdown signal. Cleaning up...")
     cleanup()
-    # Don't call sys.exit(0) as it can cause issues with asyncio
+    exit(0)
 
 
 # Register signal handlers
@@ -261,14 +299,62 @@ class RagMeLocalAgent:
             print(
                 f"Adding to RAG: {json.dumps(data, indent=2)}"
             )  # Pretty print error response
-            # Wrap the data in a 'data' field as expected by the API
-            response = requests.post(f"{self.api_url}/add-json", json=data)
+
+            # Extract text and metadata
+            text = data["data"]["text"]
+            metadata = data["metadata"]
+
+            # Chunk the text if it's large
+            chunks = chunkText(text, chunk_size=1000)
+
+            if len(chunks) == 1:
+                # Single chunk - send as regular document
+                document_data = {
+                    "data": {
+                        "documents": [
+                            {
+                                "text": chunks[0],
+                                "url": f"file://{metadata.get('filename', 'unknown')}",
+                                "metadata": metadata,
+                            }
+                        ]
+                    }
+                }
+            else:
+                # Multiple chunks - create a single document with all chunks
+                combined_text = "\n\n--- Chunk ---\n\n".join(chunks)
+                chunked_metadata = {
+                    **metadata,
+                    "total_chunks": len(chunks),
+                    "is_chunked": True,
+                    "chunk_sizes": [len(chunk) for chunk in chunks],
+                    "original_filename": metadata.get("filename", "unknown"),
+                }
+
+                document_data = {
+                    "data": {
+                        "documents": [
+                            {
+                                "text": combined_text,
+                                "url": f"file://{metadata.get('filename', 'unknown')}",
+                                "metadata": chunked_metadata,
+                            }
+                        ]
+                    }
+                }
+
+            print(f"Chunked into {len(chunks)} chunks, sending to API...")
+
+            # Send to API
+            response = requests.post(f"{self.api_url}/add-json", json=document_data)
 
             if response.status_code == 200:
                 result = response.json()
                 print(json.dumps(result, indent=2))  # DEBUG
                 if result.get("status") == "success":
-                    logging.info("Successfully added data to RAG")
+                    logging.info(
+                        f"Successfully added data to RAG ({len(chunks)} chunks)"
+                    )
                     return True
                 else:
                     logging.error(

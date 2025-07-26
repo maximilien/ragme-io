@@ -2,6 +2,7 @@
 # Copyright (c) 2025 dr.max
 
 import json
+import os
 import warnings
 from typing import Any
 
@@ -37,7 +38,6 @@ class MilvusVectorDatabase(VectorDatabase):
             self._client_created = True
 
     def _create_client(self):
-        import os
         import warnings
 
         # Temporarily unset MILVUS_URI to prevent pymilvus from auto-connecting during import
@@ -108,21 +108,58 @@ class MilvusVectorDatabase(VectorDatabase):
             warnings.warn("Milvus client is not available. Documents not written.")
             return
 
-        # Each document should have 'url', 'text', 'metadata', and 'vector' (list of floats)
+        # Each document should have 'url', 'text', 'metadata', and optionally 'vector'
         data = []
         for i, doc in enumerate(documents):
-            if "vector" not in doc:
-                raise ValueError("Milvus requires a 'vector' field in each document.")
-            data.append(
-                {
-                    "id": i,
-                    "url": doc.get("url", ""),
-                    "text": doc.get("text", ""),
-                    "metadata": json.dumps(doc.get("metadata", {}), ensure_ascii=False),
-                    "vector": doc["vector"],
-                }
-            )
-        self.client.insert(self.collection_name, data)
+            # Generate vector if not provided
+            if "vector" not in doc or doc["vector"] is None:
+                try:
+                    # Use OpenAI embeddings to generate vector
+                    from openai import OpenAI
+
+                    # Get OpenAI API key from environment
+                    api_key = os.getenv("OPENAI_API_KEY")
+                    if not api_key:
+                        raise ValueError(
+                            "OPENAI_API_KEY environment variable is required for vector generation"
+                        )
+
+                    client = OpenAI(api_key=api_key)
+
+                    # Generate embedding for the text content
+                    text_content = doc.get("text", "")
+                    if not text_content:
+                        # Skip documents with empty text
+                        continue
+
+                    response = client.embeddings.create(
+                        model="text-embedding-3-small", input=text_content
+                    )
+
+                    # Extract the vector
+                    vector = response.data[0].embedding
+                    doc["vector"] = vector
+
+                except Exception as e:
+                    warnings.warn(f"Failed to generate vector for document {i}: {e}")
+                    continue
+
+            # Only add documents that have a valid vector
+            if "vector" in doc and doc["vector"] is not None:
+                data.append(
+                    {
+                        "id": i,  # Use integer index instead of UUID
+                        "url": doc.get("url", ""),
+                        "text": doc.get("text", ""),
+                        "metadata": json.dumps(
+                            doc.get("metadata", {}), ensure_ascii=False
+                        ),
+                        "vector": doc["vector"],
+                    }
+                )
+
+        if data:
+            self.client.insert(self.collection_name, data)
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """List documents from Milvus."""
@@ -154,6 +191,56 @@ class MilvusVectorDatabase(VectorDatabase):
                 }
             )
         return docs
+
+    def delete_document(self, document_id: str) -> bool:
+        """Delete a document from Milvus by ID."""
+        self._ensure_client()
+        if self.client is None:
+            warnings.warn("Milvus client is not available. Cannot delete document.")
+            return False
+
+        try:
+            # Delete the document by ID
+            self.client.delete(self.collection_name, pks=[document_id])
+            return True
+        except Exception as e:
+            warnings.warn(f"Failed to delete document {document_id}: {e}")
+            return False
+
+    def find_document_by_url(self, url: str) -> dict[str, Any] | None:
+        """Find a document by its URL."""
+        self._ensure_client()
+        if self.client is None:
+            warnings.warn("Milvus client is not available. Cannot find document.")
+            return None
+
+        try:
+            # Query for documents with the specific URL
+            results = self.client.query(
+                self.collection_name,
+                filter=f'url == "{url}"',
+                output_fields=["id", "url", "text", "metadata"],
+                limit=1,
+            )
+
+            if results:
+                doc = results[0]
+                try:
+                    metadata = json.loads(doc.get("metadata", "{}"))
+                except Exception:
+                    metadata = {}
+
+                return {
+                    "id": doc.get("id"),
+                    "url": doc.get("url", ""),
+                    "text": doc.get("text", ""),
+                    "metadata": metadata,
+                }
+
+            return None
+        except Exception as e:
+            warnings.warn(f"Failed to find document by URL {url}: {e}")
+            return None
 
     def create_query_agent(self):
         """Create a query agent for Milvus."""

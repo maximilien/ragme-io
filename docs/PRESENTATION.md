@@ -21,7 +21,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Personal**: Focuses on your specific content and interests
 - **Agentic**: Uses LLM agents for intelligent interaction
 - **Multi-modal**: Supports web pages, PDFs, and DOCX documents
-- **Vector Database Agnostic**: Supports multiple vector databases (Weaviate, Pinecone, etc.)
+- **Vector Database Agnostic**: Supports multiple vector databases (Milvus, Weaviate, etc.)
 
 ---
 
@@ -31,21 +31,43 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - Add websites and documents (PDFs and DOCX)
 - Query using natural language
 - Get intelligent responses based on your content
+- **Smart document chunking** for large files
 
 ### 2. **Content Collection & Processing**
 - **Web Crawling**: Automatically discover and process web pages
-- **Document Processing**: PDF and DOCX file ingestion
-- **Watch Directory**: Automatic processing of new files
+- **Document Processing**: PDF and DOCX file ingestion with automatic chunking
+- **Watch Directory**: Automatic processing of new files with consistent chunking
 - **Chrome Extension**: One-click web page capture
+- **Unified Processing**: Same chunking logic across all input methods
 
 ### 3. **Intelligent Querying**
 - Ask questions about your collected content
 - Get summaries and insights
 - Cross-reference information across sources
+- **Enhanced context**: Better handling of large documents through chunking
 
-### 4. **Vector Database Flexibility** ⭐ **NEW!**
+### 4. **Modern Web Interface** ⭐ **ENHANCED!**
+- **Three-pane layout** with resizable and collapsible sidebars
+- **Real-time chat** with markdown support and copy functionality
+- **Interactive document visualization** with D3.js charts (bar, pie, network graphs)
+- **Click-to-scroll functionality** - click visualization nodes to find documents
+- **Responsive design** that works on desktop and mobile
+- **WebSocket communication** for real-time updates
+- **Smart document management** with chunked document grouping
+- **Bulk operations** for document deletion and management
+
+### 5. **Advanced Document Management** ⭐ **NEW!**
+- **Automatic chunking**: Large documents split at sentence boundaries (1000 chars)
+- **Chunked document grouping**: Multiple chunks displayed as single documents
+- **Enhanced metadata**: Rich document information including chunk counts
+- **Visual chunk indicators**: Clear display of document chunking status
+- **Consistent processing**: Same chunking across upload, watch directory, and API
+- **Improved performance**: Better handling of large documents
+
+### 6. **Vector Database Flexibility** ⭐ **ENHANCED!**
+- **Milvus Lite Default**: Local development with no server setup required
+- **Local Weaviate Support**: Podman-based local deployment
 - **Agnostic Architecture**: Easy to switch between vector databases
-- **Weaviate Support**: Current default implementation
 - **Extensible**: Simple to add Pinecone, Chroma, or other databases
 - **Future-Proof**: Adapts to new vector database technologies
 
@@ -57,7 +79,8 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 
 ```mermaid
 flowchart TB
-    ui[Streamlit UI<br/>Port 8020] --> api[API Server<br/>Port 8021]
+    new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
+    legacy-ui[Legacy Streamlit UI<br/>Port 8020] --> api
     chrome[Chrome Extension] --> api
     agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
     mcp --> api
@@ -70,7 +93,8 @@ flowchart TB
 
 | Component | Port | Purpose |
 |-----------|------|---------|
-| **Streamlit UI** | 8020 | Web interface for user interaction |
+| **New Frontend** | 3020 | Modern web interface with three-pane layout ⭐ **DEFAULT** |
+| **Legacy Streamlit UI** | 8020 | Original web interface for user interaction |
 | **API Server** | 8021 | REST API for content ingestion |
 | **MCP Server** | 8022 | Document processing (PDF/DOCX) |
 | **File Monitor** | - | Watches directory for new files |
@@ -84,8 +108,16 @@ flowchart TB
 ### Backend Technologies
 - **Python 3.12+**: Core application language
 - **FastAPI**: High-performance API framework
-- **Streamlit**: Rapid web app development
+- **Streamlit**: Rapid web app development (legacy UI)
 - **Uvicorn**: ASGI server for FastAPI
+
+### Frontend Technologies ⭐ **NEW!**
+- **TypeScript**: Modern JavaScript with type safety
+- **Express.js**: Node.js web framework
+- **Socket.IO**: Real-time bidirectional communication
+- **D3.js**: Data visualization and charts
+- **Marked.js**: Markdown parsing
+- **DOMPurify**: HTML sanitization
 
 ### AI & ML Stack
 - **OpenAI GPT-4o-mini**: Primary LLM for reasoning
@@ -98,11 +130,63 @@ flowchart TB
 - **BeautifulSoup**: HTML parsing for web content
 
 ### Vector Database Support
-- **Weaviate**: Current default implementation
-- **Milvus**: High-performance vector database with local and cloud options
+- **Milvus Lite**: Default local development (no server setup)
+- **Local Weaviate**: Podman-based local deployment
+- **Weaviate Cloud**: Managed vector database service
 - **Extensible**: Easy to add Pinecone, Chroma, etc.
 - **Abstracted Interface**: Clean separation of concerns
 - **Modular Architecture**: Each database in separate files for maintainability
+
+---
+
+## 📄 Smart Document Chunking ⭐ **NEW!**
+
+### Automatic Chunking System
+RAGme.ai now features intelligent document chunking that automatically handles large documents:
+
+**How It Works**:
+- **Size Detection**: Documents exceeding 1000 characters are automatically chunked
+- **Smart Boundaries**: Chunks are split at sentence boundaries (., !, ?) for readability
+- **Fallback Logic**: If no sentence boundary is found, splits at character limit
+- **Metadata Preservation**: Original document information is maintained across chunks
+
+**Benefits**:
+- **Token Limit Compliance**: Prevents LLM token limit errors
+- **Improved Retrieval**: Better context matching for queries
+- **Consistent Processing**: Same chunking logic across all input methods
+- **Enhanced Performance**: Faster processing of large documents
+
+### Chunked Document Management
+**Frontend Display**:
+- **Grouped View**: Multiple chunks appear as single documents in the UI
+- **Chunk Indicators**: Visual badges show chunk counts (e.g., "📄 5 chunks")
+- **Unified Operations**: Delete entire chunked documents with one click
+- **Metadata Display**: Shows original filename and chunk information
+
+**Processing Methods**:
+- **Manual Upload**: Files uploaded via "+Add Content" modal
+- **Watch Directory**: Files placed in `watch_directory/` folder
+- **API Integration**: Direct API calls with chunking support
+- **Chrome Extension**: Web pages with automatic chunking
+
+### Technical Implementation
+**Chunking Algorithm**:
+```python
+def chunkText(text: str, chunk_size: int = 1000) -> list[str]:
+    # Split at sentence boundaries when possible
+    # Fallback to character limits if needed
+    # Preserve document structure and readability
+```
+
+**Metadata Enhancement**:
+```json
+{
+  "total_chunks": 5,
+  "is_chunked": true,
+  "chunk_sizes": [950, 1020, 980, 1050, 890],
+  "original_filename": "large_document.pdf"
+}
+```
 
 ---
 
@@ -113,14 +197,16 @@ flowchart TB
 # Required software
 - Python 3.12+
 - uv (Python package manager)
+- Node.js 18+ (for new frontend)
 ```
 
 ### Environment Configuration
 ```bash
 # .env file setup
 OPENAI_API_KEY=sk-proj-*****-**
-WEAVIATE_API_KEY=*****
-WEAVIATE_URL=*****.weaviate.cloud
+VECTOR_DB_TYPE=milvus  # Default for local development
+# VECTOR_DB_TYPE=weaviate-local  # For local Weaviate
+# VECTOR_DB_TYPE=weaviate  # For cloud Weaviate
 RAGME_API_URL=http://localhost:8021
 RAGME_MCP_URL=http://localhost:8022
 ```
@@ -134,7 +220,7 @@ uv venv
 source .venv/bin/activate
 uv sync
 
-# Start all services
+# Start all services (new frontend by default)
 chmod +x start.sh
 ./start.sh
 ```
@@ -206,6 +292,22 @@ GET /list-documents?limit=10&offset=0
 
 ## 🛠️ Development Features
 
+### New Frontend UI ⭐ **DEFAULT**
+
+```javascript
+// Real-time WebSocket communication
+socket.emit('chat_message', { message: userInput });
+socket.on('chat_response', (data) => {
+    displayResponse(data.response);
+});
+
+// Document visualization with D3.js
+const chart = d3.select('#document-chart')
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height);
+```
+
 ### Chrome Extension
 ```javascript
 // popup.js - Page capture functionality
@@ -242,7 +344,7 @@ flowchart LR
     B --> C[Text Extraction]
     C --> D[Chunking]
     D --> E[Embedding]
-    E --> F[Weaviate DB]
+    E --> F[Vector DB]
 ```
 
 ### 2. **Query Processing**
@@ -261,7 +363,7 @@ flowchart LR
 
 ### Current Limitations
 - ✅ Single collection for all users
-- ✅ ~~Tied to Weaviate as vector database~~ **Fixed!** Now supports multiple vector databases
+- ✅ ~~Tied to Weaviate as vector database~~ **Fixed!** Now supports multiple vector databases with Milvus as default
 - ✅ Tied to LlamaIndex for RAG operations
 - ✅ No HTTPS by default
 
@@ -274,8 +376,11 @@ flowchart LR
 
 ## 🚀 Future Roadmap
 
-### Phase 1: Infrastructure
-- [x] ~~Decouple Weaviate dependency~~ **Completed!** Now supports Weaviate, Milvus, and extensible for others
+### Phase 1: Infrastructure ✅ **COMPLETED**
+- [x] ~~Decouple Weaviate dependency~~ **Completed!** Now supports Milvus, Weaviate, and extensible for others
+- [x] ~~Add modern frontend UI~~ **Completed!** New three-pane interface with real-time features
+- [x] ~~Add local Weaviate support~~ **Completed!** Podman-based local deployment
+- [x] ~~Add debugging and monitoring tools~~ **Completed!** Comprehensive log monitoring
 - [ ] Decouple LlamaIndex (docling integration)
 - [ ] Add HTTPS security
 
@@ -326,12 +431,14 @@ RAGme: "The quarterly report shows..."
 - **Intelligent Search**: Natural language queries across all your content
 - **Automated Processing**: Seamless ingestion of various content types
 - **Insight Generation**: AI-powered analysis and summaries
+- **Modern Interface**: Beautiful, responsive web interface with real-time features
 
 ### For Organizations
 - **Document Intelligence**: Extract insights from internal documents
 - **Research Efficiency**: Rapid analysis of large document collections
 - **Knowledge Discovery**: Find connections across different content sources
 - **Scalable Architecture**: Multi-service design for enterprise deployment
+- **Flexible Deployment**: Support for multiple vector databases and deployment options
 
 ---
 
@@ -342,11 +449,13 @@ RAGme: "The quarterly report shows..."
 - **Vector Indexing**: Fast similarity search
 - **Async Operations**: Non-blocking API responses
 - **Memory Management**: Proper cleanup and resource handling
+- **Real-time Updates**: WebSocket-based live communication
 
 ### Extensibility
 - **Modular Design**: Easy to add new content types
 - **Plugin Architecture**: MCP server for document processing
 - **API-First**: RESTful interfaces for integration
+- **Vector Database Agnostic**: Support for multiple database backends
 - **Open Source**: MIT licensed for customization
 
 ---
@@ -365,19 +474,23 @@ cp .env.example .env
 
 ### Step 2: Start Services
 ```bash
-# Quick start
+# Quick start (new frontend by default)
 ./start.sh
+
+# Or start with legacy UI
+./start.sh legacy-ui
 
 # Or manually
 uv run uvicorn src.ragme.api:app --port 8021 &
 uv run uvicorn src.ragme.mcp:app --port 8022 &
 uv run python -m src.ragme.local_agent &
-uv run streamlit run src/ragme/ui.py --port 8020
+cd frontend && npm install && npm run build && npm start &
 ```
 
 ### Step 3: Add Content
 ```bash
-# Via UI: http://localhost:8020
+# Via UI: http://localhost:3020 (new frontend)
+# Via Legacy UI: http://localhost:8020
 # Via Chrome Extension
 # Via watch_directory/ folder
 # Via API calls
@@ -410,8 +523,8 @@ uv sync --dev
 uv run pytest
 
 # Code formatting
-uv run black src/
-uv run isort src/
+uv run ruff format src/
+uv run ruff check src/
 ```
 
 ---
@@ -441,6 +554,8 @@ RAGme.ai represents a powerful approach to personal knowledge management:
 - **🤖 AI-Powered Insights**: Get intelligent responses from your personal knowledge base
 - **🔄 Seamless Integration**: Multiple ways to add and interact with content
 - **📈 Scalable Architecture**: Built for growth and customization
+- **🎨 Modern Interface**: Beautiful, responsive web interface with real-time features
+- **🔧 Flexible Deployment**: Support for multiple vector databases and deployment options
 
 **Ready to build your personal AI knowledge assistant?**
 

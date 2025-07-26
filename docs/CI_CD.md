@@ -26,7 +26,7 @@ The lint job runs code quality checks before testing:
 - **Platform**: Ubuntu Latest
 - **Python Version**: 3.10
 - **Dependencies**: Uses `uv` for fast dependency management
-- **Lint Command**: Runs `./lint.sh` script
+- **Lint Command**: Runs `./tools/lint.sh` script
 - **Purpose**: Ensures code quality and consistency
 - **Failure**: Blocks test job if linting fails
 
@@ -86,7 +86,7 @@ uv run pytest --cov=src/ragme
 
 ```bash
 # Run all linting checks
-./lint.sh
+./tools/lint.sh
 
 # Run linting on specific directories
 uv run ruff check src/
@@ -98,6 +98,26 @@ uv run ruff check --fix src/ tests/
 
 # Format code
 uv run ruff format src/ tests/ examples/
+```
+
+### Frontend Development
+
+```bash
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Build TypeScript
+npm run build
+
+# Start development server
+npm run dev
+
+# Run frontend linting
+npm run lint
+
+# Format frontend code
+npm run format
 ```
 
 ### Test Script
@@ -139,7 +159,8 @@ The project includes comprehensive integration testing via `test-integration.sh`
 5. **Local Agent** - File monitoring and processing
 6. **RagMe Agent** - Query processing and responses
 7. **Streamlit UI** - Web interface accessibility
-8. **File Monitoring** - PDF/DOCX file processing (optional)
+8. **New Frontend** - Modern web interface accessibility
+9. **File Monitoring** - PDF/DOCX file processing (optional)
 
 **How to run:**
 ```bash
@@ -156,6 +177,7 @@ The project includes comprehensive integration testing via `test-integration.sh`
 - **Automatic cleanup** of test files
 - **Detailed error reporting** for troubleshooting
 - **Service health validation** before testing
+- **Frontend testing** for both new and legacy UIs
 
 Each test file focuses on its specific component, making it easy to:
 - Run tests for specific vector database implementations
@@ -217,6 +239,7 @@ cache:
 1. **Test Failures**: Check if all dependencies are properly mocked
 2. **Environment Issues**: Ensure `uv.lock` is up to date
 3. **Timeout Issues**: Tests should complete within 10 minutes
+4. **Frontend Build Issues**: Ensure Node.js 18+ is available
 
 ### Debugging
 
@@ -229,6 +252,9 @@ uv run pytest tests/test_specific.py::test_specific_function -v
 
 # Check test dependencies
 uv run pip list
+
+# Test frontend build
+cd frontend && npm run build
 ```
 
 ## 🔮 Future Enhancements
@@ -238,21 +264,109 @@ uv run pip list
 1. ✅ **Linting**: Ruff-based linting and formatting checks
 2. ✅ **Code Quality**: Automated code style enforcement
 3. ✅ **Formatting**: Consistent code formatting across the codebase
+4. ✅ **Frontend Testing**: TypeScript compilation and build testing
+5. ✅ **Integration Testing**: Comprehensive service testing
 
 ### Planned Additions
 
 1. **Security**: Add bandit and safety checks
 2. **Coverage Reports**: Generate and upload coverage reports
 3. **Performance Tests**: Add performance benchmarking
-4. **Integration Tests**: Add end-to-end testing
+4. **End-to-End Tests**: Add browser-based testing
+5. **Frontend E2E**: Add Playwright or Cypress tests
 
 ### Code Quality
 
 - **Type Checking**: Add mypy for static type checking
 - **Documentation**: Add docstring coverage checks
+- **Frontend Linting**: Add ESLint and Prettier to CI
 
 ## 📚 Related Documentation
 
 - **[Contributing Guidelines](CONTRIBUTING.md)** - Development workflow
 - **[Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md)** - Testing strategy
-- **[Project Overview](PRESENTATION.md)** - Architecture details 
+- **[Project Overview](PRESENTATION.md)** - Architecture details
+- **[Process Management](PROCESS_MANAGEMENT.md)** - Service testing
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues
+
+## 🎯 Development Workflow
+
+### Pre-commit Checklist
+
+Before committing code:
+
+1. ✅ **Run tests**: `./test.sh`
+2. ✅ **Run linting**: `./tools/lint.sh`
+3. ✅ **Format code**: `uv run ruff format src/ tests/ examples/`
+4. ✅ **Build frontend**: `cd frontend && npm run build`
+5. ✅ **Check integration**: `./test-integration.sh` (if services are running)
+
+### Pull Request Requirements
+
+All pull requests must:
+
+1. ✅ **Pass all CI checks** (linting, tests, formatting)
+2. ✅ **Include tests** for new functionality
+3. ✅ **Update documentation** for new features
+4. ✅ **Follow coding standards** (PEP 8, TypeScript standards)
+5. ✅ **Include proper error handling** and logging
+
+### Release Process
+
+1. **Version bump** in `pyproject.toml`
+2. **Update changelog** with new features and fixes
+3. **Run full test suite** locally
+4. **Create release tag** on GitHub
+5. **Deploy** (if applicable)
+
+## 🔧 Local Development Setup
+
+### Complete Setup
+
+```bash
+# Clone repository
+git clone https://github.com/maximilien/ragme-ai.git
+cd ragme-ai
+
+# Setup Python environment
+uv venv
+source .venv/bin/activate
+uv sync --extra dev
+
+# Setup frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Run tests
+./test.sh
+
+# Start services
+./start.sh
+```
+
+### Development Commands
+
+```bash
+# Python development
+uv run pytest tests/                    # Run tests
+uv run ruff check src/                  # Lint code
+uv run ruff format src/                 # Format code
+uv run ruff check --fix src/            # Auto-fix issues
+
+# Frontend development
+cd frontend
+npm run dev                             # Development server
+npm run build                           # Build for production
+npm run lint                            # Lint TypeScript
+npm run format                          # Format code
+
+# Process management
+./start.sh                              # Start all services
+./stop.sh status                        # Check status
+./stop.sh restart                       # Restart services
+./tools/tail-logs.sh all               # Monitor logs
+```
+
+This comprehensive CI/CD setup ensures code quality, reliability, and maintainability across the entire project. 

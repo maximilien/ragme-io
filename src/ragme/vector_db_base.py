@@ -66,6 +66,32 @@ class VectorDatabase(ABC):
         pass
 
     @abstractmethod
+    def delete_document(self, document_id: str) -> bool:
+        """
+        Delete a document from the vector database by ID.
+
+        Args:
+            document_id: ID of the document to delete
+
+        Returns:
+            bool: True if document was deleted successfully, False if not found
+        """
+        pass
+
+    @abstractmethod
+    def find_document_by_url(self, url: str) -> dict[str, Any] | None:
+        """
+        Find a document by its URL.
+
+        Args:
+            url: URL of the document to find
+
+        Returns:
+            Document dict if found, None if not found
+        """
+        pass
+
+    @abstractmethod
     def create_query_agent(self):
         """Create and return a query agent for this vector database."""
         pass

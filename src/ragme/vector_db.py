@@ -6,11 +6,13 @@ from .vector_db_base import VectorDatabase
 from .vector_db_factory import create_vector_database
 from .vector_db_milvus import MilvusVectorDatabase
 from .vector_db_weaviate import WeaviateVectorDatabase
+from .vector_db_weaviate_local import WeaviateLocalVectorDatabase
 
 # Re-export for backward compatibility
 __all__ = [
     "VectorDatabase",
     "WeaviateVectorDatabase",
+    "WeaviateLocalVectorDatabase",
     "MilvusVectorDatabase",
     "create_vector_database",
 ]

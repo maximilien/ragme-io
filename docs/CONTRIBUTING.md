@@ -10,6 +10,26 @@ Before contributing, please familiarize yourself with our documentation:
 - **[🔧 Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md)** - Understanding the database layer
 - **[📋 Project Overview](PRESENTATION.md)** - Complete project overview
 
+## 🆕 Recent Major Features
+
+### Smart Document Chunking
+- **Automatic chunking** of large documents at sentence boundaries
+- **Consistent processing** across all input methods (upload, watch directory, API)
+- **Enhanced metadata** with chunk information and original filenames
+- **Frontend grouping** of chunked documents for better UX
+
+### Enhanced UI Features
+- **Interactive visualizations** with D3.js charts and click-to-scroll functionality
+- **Responsive design** with collapsible sidebars and smooth animations
+- **Real-time synchronization** between document list and visualizations
+- **Bulk operations** for document management and deletion
+
+### Technical Improvements
+- **Unified chunking logic** in `local_agent.py` and frontend processing
+- **Improved performance** for large document handling
+- **Better error handling** and user feedback
+- **Enhanced debugging** with comprehensive logging
+
 ## Code of Conduct
 
 This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
@@ -43,7 +63,8 @@ Explain the problem and include additional details to help maintainers reproduce
   * What's the name and version of the OS you're using?
   * Are you running RagMe AI in a virtual machine?
   * What are your environment variables?
-  * Which vector database are you using? (Weaviate, Milvus, etc.)
+  * Which vector database are you using? (Milvus, Weaviate, etc.)
+  * Are you using the new frontend or legacy UI?
 
 ### Suggesting Enhancements
 
@@ -91,6 +112,22 @@ This installs:
 - **pytest-cov**: For test coverage
 - **requests-mock**: For mocking HTTP requests in tests
 
+### Frontend Development Setup
+
+For frontend development, you'll also need Node.js 18+:
+
+```bash
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Build TypeScript
+npm run build
+
+# Start development server
+npm run dev
+```
+
 ### Project Structure
 
 ```
@@ -106,13 +143,24 @@ ragme-ai/
 │   ├── local_agent.py      # File monitoring agent
 │   ├── vector_db.py        # Vector database compatibility layer
 │   ├── vector_db_base.py   # Abstract base class
-│   ├── vector_db_weaviate.py # Weaviate implementation
-│   ├── vector_db_milvus.py # Milvus implementation
+│   ├── vector_db_weaviate.py # Weaviate Cloud implementation
+│   ├── vector_db_weaviate_local.py # Local Weaviate implementation
+│   ├── vector_db_milvus.py # Milvus implementation (default)
 │   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
-│   ├── ui.py               # Streamlit UI
+│   ├── ui.py               # Legacy Streamlit UI
+│   ├── socket_manager.py   # WebSocket management
 │   └── common.py           # Common utilities
+├── frontend/               # 🌐 New frontend (TypeScript/Express)
+│   ├── src/
+│   │   └── index.ts        # Main server file
+│   ├── public/
+│   │   ├── index.html      # Main HTML file
+│   │   ├── styles.css      # CSS styles
+│   │   └── app.js          # Frontend JavaScript
+│   ├── package.json
+│   └── tsconfig.json
 ├── tests/                  # 🧪 Test suite
 │   ├── test_vector_db_base.py
 │   ├── test_vector_db_weaviate.py
@@ -121,6 +169,11 @@ ragme-ai/
 │   └── test_vector_db.py   # Compatibility layer
 ├── examples/               # 📖 Usage examples
 ├── chrome_ext/             # 🌐 Chrome extension
+├── tools/                  # 🛠️ Development tools
+│   ├── weaviate-local.sh   # Local Weaviate management
+│   ├── tail-logs.sh        # Log monitoring
+│   ├── lint.sh             # Code linting
+│   └── podman-compose.weaviate.yml
 └── watch_directory/        # 📁 Monitored directory
 ```
 
@@ -164,6 +217,27 @@ class PineconeVectorDatabase(VectorDatabase):
     # Implement all required methods...
 ```
 
+### Frontend Development
+
+When working on the frontend:
+
+1. **TypeScript**: All new code should be written in TypeScript
+2. **ESLint**: Follow the ESLint configuration for code style
+3. **Prettier**: Use Prettier for code formatting
+4. **WebSocket**: Use Socket.IO for real-time communication
+5. **D3.js**: Use D3.js for data visualization
+6. **Responsive Design**: Ensure the UI works on desktop and mobile
+
+### Process Management Development
+
+When working on process management scripts:
+
+1. **Bash Scripts**: Follow shell script best practices
+2. **Error Handling**: Include proper error handling and cleanup
+3. **Port Management**: Handle port conflicts gracefully
+4. **PID Files**: Use PID files for process tracking
+5. **Logging**: Provide clear status messages and logging
+
 ## Style Guides
 
 ### Python Style Guide
@@ -187,7 +261,7 @@ We use **Ruff** for linting and code formatting to maintain high code quality st
 
 ```bash
 # Run all linting checks (required before PRs)
-./lint.sh
+./tools/lint.sh
 
 # Run linting on specific directories
 uv run ruff check src/
@@ -218,7 +292,7 @@ We enforce the following rules strictly:
 Before submitting any pull request, ensure:
 
 1. ✅ **All tests pass**: `./test.sh`
-2. ✅ **All linting checks pass**: `./lint.sh`
+2. ✅ **All linting checks pass**: `./tools/lint.sh`
 3. ✅ **Code is properly formatted**: `uv run ruff format src/ tests/ examples/`
 4. ✅ **No unused imports or variables** (F841)
 5. ✅ **Proper exception handling** (B904 - use `raise ... from e`)
@@ -259,13 +333,15 @@ Some rules are intentionally ignored:
 - **E501**: Line too long (handled by formatter)
 - **C901**: Too complex (allowed for complex business logic)
 
-### JavaScript Style Guide
+### JavaScript/TypeScript Style Guide
 
 * Use 2 spaces for indentation rather than tabs
 * Keep lines to a maximum of 100 characters
 * Use semicolons
 * Use single quotes for strings unless you are writing JSON
 * Follow the Airbnb JavaScript Style Guide
+* Use TypeScript for all new code
+* Include proper type annotations
 
 ### Documentation Style Guide
 
@@ -292,6 +368,8 @@ This section lists the labels we use to help us track and manage issues and pull
 * `question` - Further information is requested
 * `wontfix` - Issues that won't be fixed
 * `vector-db` - Issues related to vector database implementations
+* `frontend` - Issues related to the new frontend UI
+* `process-management` - Issues related to service management
 
 ## Development Process
 
@@ -306,7 +384,7 @@ This section lists the labels we use to help us track and manage issues and pull
 Before submitting a pull request, please ensure that:
 
 1. **All unit tests pass** (`./test.sh`)
-2. **All linting checks pass** (`./lint.sh`) - **REQUIRED**
+2. **All linting checks pass** (`./tools/lint.sh`) - **REQUIRED**
 3. **Code is properly formatted** (`uv run ruff format src/ tests/ examples/`)
 4. **Documentation is updated** for any new features or changes
 5. **New tests are added** for new functionality
@@ -314,6 +392,7 @@ Before submitting a pull request, please ensure that:
 7. **No linting errors** in source files
 8. **Consistent code style** throughout the codebase
 9. **Integration tests pass** (`./test-integration.sh`) - **For major changes**
+10. **Frontend builds successfully** (`cd frontend && npm run build`) - **For frontend changes**
 
 ### Test Organization
 
@@ -329,6 +408,16 @@ Each test file should:
 - Use mocking to avoid external dependencies
 - Test both success and error cases
 - Include proper cleanup in teardown methods
+
+### Process Management Testing
+
+When testing process management:
+
+1. **Test start/stop scripts**: Ensure services start and stop correctly
+2. **Test status checking**: Verify status commands work properly
+3. **Test error handling**: Test with missing dependencies or configuration
+4. **Test port conflicts**: Verify graceful handling of port conflicts
+5. **Test PID file management**: Ensure PID files are created and cleaned up
 
 ## License
 

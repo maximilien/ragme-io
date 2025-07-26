@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # RAGme Process Management Script
-# Usage: ./stop.sh [stop|restart|status]
+# Usage: ./stop.sh [stop|restart|status|legacy-ui]
 
 # Function to check if a port is in use and kill the process
 kill_port_process() {
@@ -39,21 +39,40 @@ stop_processes() {
     fi
 
     # Also kill any processes using our specific ports
-    kill_port_process 8020 "Streamlit UI"
+    kill_port_process 3020 "New Frontend"
+    kill_port_process 8020 "Legacy Streamlit UI"
     kill_port_process 8021 "FastAPI"
     kill_port_process 8022 "MCP"
 
     # Check if any processes are still running
     echo "Checking for any remaining processes..."
-    if lsof -Pi :8020 -sTCP:LISTEN -t >/dev/null 2>&1 || \
+    if lsof -Pi :3020 -sTCP:LISTEN -t >/dev/null 2>&1 || \
+       lsof -Pi :8020 -sTCP:LISTEN -t >/dev/null 2>&1 || \
        lsof -Pi :8021 -sTCP:LISTEN -t >/dev/null 2>&1 || \
        lsof -Pi :8022 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "Warning: Some processes may still be running on ports 8020, 8021, or 8022"
+        echo "Warning: Some processes may still be running on ports 3020, 8020, 8021, or 8022"
         return 1
     else
         echo "All RAGme processes stopped successfully."
         return 0
     fi
+}
+
+# Function to stop legacy UI only
+stop_legacy_ui() {
+    echo "Stopping legacy UI only..."
+    
+    # Kill legacy UI process on port 8020
+    kill_port_process 8020 "Legacy Streamlit UI"
+    
+    # Remove legacy UI PID from .pid file if it exists
+    if [ -f .pid ]; then
+        # Create a temporary file without legacy UI PIDs
+        grep -v "streamlit" .pid > .pid.tmp 2>/dev/null || true
+        mv .pid.tmp .pid
+    fi
+    
+    echo "✅ Legacy UI stopped successfully!"
 }
 
 # Function to show status of RAGme processes
@@ -82,7 +101,7 @@ show_status() {
     echo "🌐 Port Status:"
     
     # Check each port
-    local ports=("8020:Streamlit UI" "8021:FastAPI" "8022:MCP")
+    local ports=("3020:New Frontend" "8020:Legacy Streamlit UI" "8021:FastAPI" "8022:MCP")
     local all_running=true
     
     for port_info in "${ports[@]}"; do
@@ -99,7 +118,8 @@ show_status() {
     echo ""
     if [ "$all_running" = true ]; then
         echo "🎉 All RAGme services are running!"
-        echo "   • UI: http://localhost:8020"
+        echo "   • New Frontend: http://localhost:3020"
+        echo "   • Legacy UI: http://localhost:8020"
         echo "   • API: http://localhost:8021"
         echo "   • MCP: http://localhost:8022"
     else
@@ -143,19 +163,24 @@ case "${1:-stop}" in
     "status")
         show_status
         ;;
+    "legacy-ui")
+        stop_legacy_ui
+        ;;
     *)
-        echo "Usage: $0 [stop|restart|status]"
+        echo "Usage: $0 [stop|restart|status|legacy-ui]"
         echo ""
         echo "Commands:"
-        echo "  stop     - Stop all RAGme processes (default)"
-        echo "  restart  - Stop and restart all RAGme processes"
-        echo "  status   - Show status of all RAGme processes"
+        echo "  stop       - Stop all RAGme processes (default)"
+        echo "  restart    - Stop and restart all RAGme processes"
+        echo "  status     - Show status of all RAGme processes"
+        echo "  legacy-ui  - Stop legacy UI only"
         echo ""
         echo "Examples:"
-        echo "  ./stop.sh        # Stop all processes"
-        echo "  ./stop.sh stop   # Stop all processes"
-        echo "  ./stop.sh restart # Restart all processes"
-        echo "  ./stop.sh status # Show process status"
+        echo "  ./stop.sh          # Stop all processes"
+        echo "  ./stop.sh stop     # Stop all processes"
+        echo "  ./stop.sh restart  # Restart all processes"
+        echo "  ./stop.sh status   # Show process status"
+        echo "  ./stop.sh legacy-ui # Stop legacy UI only"
         exit 1
         ;;
 esac 
