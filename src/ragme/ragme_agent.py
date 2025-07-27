@@ -38,18 +38,20 @@ class RagMeAgent:
         self.agent = self._create_agent()
 
     def _create_agent(self):
-        """Create and return a FunctionAgent with RAG-specific tools."""
+        """
+        Create the RAG agent with tools for managing the RagMeDocs collection.
+        """
 
         def find_urls_crawling_webpage(
             start_url: str, max_pages: int = 10
         ) -> list[str]:
             """
-            Crawl a webpage and find all web pages under it.
+            Useful for finding all URLs on a webpage that match a search term
             Args:
-                start_url (str): The URL to start crawling from
-                max_pages (int): The maximum number of pages to crawl
+                start_url (str): The starting URL to crawl
+                max_pages (int): Maximum number of pages to crawl
             Returns:
-                list[str]: A list of URLs found
+                list[str]: List of URLs found
             """
             return crawl_webpage(start_url, max_pages)
 
@@ -91,7 +93,7 @@ class RagMeAgent:
                 documents = self.ragme.list_documents(limit=1000, offset=0)
                 deleted_count = 0
 
-                for doc in documents:
+                for _i, doc in enumerate(documents):
                     doc_id = doc.get("id")
                     if doc_id:
                         success = self.ragme.delete_document(doc_id)
@@ -106,17 +108,19 @@ class RagMeAgent:
             """
             Get detailed information about a specific document by ID.
             Args:
-                doc_id (int): The document ID/index
+                doc_id (int): The document ID (starts from 1)
             Returns:
                 dict: Detailed document information including full content
             """
             documents = self.ragme.list_documents(
                 limit=1000, offset=0
             )  # Get all to find by ID
-            if doc_id < 0 or doc_id >= len(documents):
+            # Adjust for 1-based indexing
+            adjusted_id = doc_id - 1
+            if adjusted_id < 0 or adjusted_id >= len(documents):
                 return {"error": f"Document ID {doc_id} not found"}
 
-            doc = documents[doc_id]
+            doc = documents[adjusted_id]
             return {
                 "id": doc_id,
                 "url": doc.get("url", "Unknown"),
@@ -137,9 +141,8 @@ class RagMeAgent:
 
             # Return only essential information for fast listing
             summary_docs = []
-            for i, doc in enumerate(documents):
+            for _i, doc in enumerate(documents):
                 summary_doc = {
-                    "id": i + offset,  # Index for reference
                     "url": doc.get("url", "Unknown"),
                     "type": doc.get("metadata", {}).get("type", "Unknown"),
                     "date_added": doc.get("metadata", {}).get("date_added", "Unknown"),
@@ -152,57 +155,82 @@ class RagMeAgent:
 
             return summary_docs
 
-        def write_to_ragme_collection(urls=list[str]):
+        def write_to_ragme_collection(urls=None):
             """
             Useful for writing new content to the RagMeDocs collection
             Args:
                 urls (list[str]): A list of URLs to write to the RagMeDocs collection
             """
+            if urls is None:
+                urls = []
             self.ragme.write_webpages_to_weaviate(urls)
 
         def query_agent(query: str):
             """
             Useful for asking questions about RagMe docs and website
             Args:
-                query (str): The query to ask the QueryAgent
+                query (str): The query to ask about stored documents
             Returns:
-                str: The response from the QueryAgent
+                str: The response with relevant document content
             """
+            # Use direct vector search as the primary method
             try:
-                # Try to use the QueryAgent first
-                response = self.ragme.query_agent.run(query)
-                return response
-            except Exception as e:
-                # Fallback: use direct vector search if QueryAgent fails
-                try:
-                    # Get documents from the collection
-                    documents = self.ragme.list_documents(limit=10, offset=0)
+                # Get documents from the collection - increase limit to find more documents
+                documents = self.ragme.list_documents(limit=100, offset=0)
 
-                    # Simple keyword matching for now
-                    relevant_docs = []
-                    query_lower = query.lower()
+                # Improved keyword matching for chunked documents
+                relevant_docs = []
+                query_lower = query.lower()
+                query_words = query_lower.split()
 
-                    for doc in documents:
-                        text = doc.get("text", "").lower()
-                        if any(word in text for word in query_lower.split()):
-                            relevant_docs.append(doc)
+                for _i, doc in enumerate(documents):
+                    text = doc.get("text", "").lower()
+                    url = doc.get("url", "").lower()
 
-                    if relevant_docs:
-                        # Return the most relevant document's content
-                        most_relevant = relevant_docs[0]
-                        content = most_relevant.get("text", "")
-                        url = most_relevant.get("url", "")
+                    # Check if any query word appears in text or URL
+                    # Also check metadata for chunked documents
+                    metadata = doc.get("metadata", {})
+                    metadata_text = str(metadata).lower()
 
-                        # Truncate content if too long
-                        if len(content) > 1000:
-                            content = content[:1000] + "..."
+                    # Count how many query words match
+                    matches = 0
+                    for word in query_words:
+                        if word in text or word in url or word in metadata_text:
+                            matches += 1
 
-                        return f"Based on the stored documents, here's what I found:\n\nURL: {url}\n\nContent: {content}"
+                    # If at least one word matches, consider it relevant
+                    if matches > 0:
+                        relevant_docs.append(
+                            {"doc": doc, "matches": matches, "text_length": len(text)}
+                        )
+
+                if relevant_docs:
+                    # Sort by relevance (more matches first, then by text length)
+                    relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
+
+                    # Get the most relevant document
+                    most_relevant = relevant_docs[0]["doc"]
+                    content = most_relevant.get("text", "")
+                    url = most_relevant.get("url", "")
+                    metadata = most_relevant.get("metadata", {})
+
+                    # For chunked documents, provide more context
+                    if metadata.get("is_chunked") or metadata.get("is_chunk"):
+                        chunk_info = f" (Chunked document with {metadata.get('total_chunks', 'unknown')} chunks)"
                     else:
-                        return f"I couldn't find any relevant information about '{query}' in the stored documents. The QueryAgent also encountered an error: {str(e)}"
+                        chunk_info = ""
 
-                except Exception as fallback_error:
-                    return f"Error querying the agent: {str(e)}. Fallback also failed: {str(fallback_error)}"
+                    # Truncate content if too long
+                    if len(content) > 1500:
+                        content = content[:1500] + "..."
+
+                    result = f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}\n\nContent: {content}"
+                    return result
+                else:
+                    return f"I couldn't find any relevant information about '{query}' in the stored documents."
+
+            except Exception as e:
+                return f"Error searching documents: {str(e)}"
 
         def get_vector_db_info() -> str:
             """
@@ -231,14 +259,18 @@ class RagMeAgent:
             llm=self.llm,
             system_prompt="""You are a helpful assistant that can write
             the contents of urls to RagMeDocs
-            collection, as well as forwarding questions to a QueryAgent.
+            collection, as well as answering questions about stored documents.
 
-            IMPORTANT: When users ask questions about content that might be in the RagMeDocs collection,
-            you should ALWAYS use the query_agent function to search through the stored documents first.
-            The QueryAgent will search through the contents of the RagMeDocs collection to find relevant information.
+            MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
+
+            DO NOT provide any response about document content without calling query_agent(query).
+            DO NOT use any other method to search documents.
+            ALWAYS use query_agent(query) for document queries.
+
+            The query_agent function searches through all stored documents to find relevant information.
+            Return the query_agent result directly to the user without modification.
 
             You can also ask questions about the RagMeDocs collection directly using list_ragme_collection.
-            If the query is not about the RagMeDocs collection, you can ask the QueryAgent to answer the question.
             You can also answer which vector database is being used if asked.
 
             You can also delete documents from the collection:
@@ -248,7 +280,7 @@ class RagMeAgent:
             """,
         )
 
-    def run(self, query: str):
+    async def run(self, query: str):
         """
         Run a query through the RAG agent.
 
@@ -258,4 +290,5 @@ class RagMeAgent:
         Returns:
             The response from the agent
         """
-        return self.agent.run(query)
+        response = await self.agent.run(query)
+        return str(response)

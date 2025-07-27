@@ -132,4 +132,4 @@ class TestRagMeAgent:
         system_prompt = agent.agent.system_prompt
         assert "helpful assistant" in system_prompt
         assert "RagMeDocs" in system_prompt
-        assert "QueryAgent" in system_prompt
+        assert "query_agent" in system_prompt

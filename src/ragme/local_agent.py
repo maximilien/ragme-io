@@ -10,6 +10,7 @@ import time
 import traceback
 import warnings
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
 import dotenv
@@ -307,6 +308,11 @@ class RagMeLocalAgent:
             # Chunk the text if it's large
             chunks = chunkText(text, chunk_size=1000)
 
+            # Generate unique URL to prevent overwriting
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            base_filename = metadata.get("filename", "unknown")
+            unique_url = f"file://{base_filename}#{timestamp}"
+
             if len(chunks) == 1:
                 # Single chunk - send as regular document
                 document_data = {
@@ -314,7 +320,7 @@ class RagMeLocalAgent:
                         "documents": [
                             {
                                 "text": chunks[0],
-                                "url": f"file://{metadata.get('filename', 'unknown')}",
+                                "url": unique_url,
                                 "metadata": metadata,
                             }
                         ]
@@ -336,7 +342,7 @@ class RagMeLocalAgent:
                         "documents": [
                             {
                                 "text": combined_text,
-                                "url": f"file://{metadata.get('filename', 'unknown')}",
+                                "url": unique_url,
                                 "metadata": chunked_metadata,
                             }
                         ]

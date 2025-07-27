@@ -141,8 +141,18 @@ async def add_json(json_input: JSONInput):
                 if "date_added" not in doc_metadata:
                     doc_metadata["date_added"] = datetime.now().isoformat()
 
+                # Generate unique URL to prevent overwriting
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                if url.startswith("file://"):
+                    # For file URLs, add timestamp to prevent overwriting
+                    base_url = url
+                    unique_url = f"{base_url}#{timestamp}"
+                else:
+                    # For web URLs, add timestamp as fragment
+                    unique_url = f"{url}#{timestamp}"
+
                 # Check if a document with the same URL already exists
-                existing_doc = ragme.vector_db.find_document_by_url(url)
+                existing_doc = ragme.vector_db.find_document_by_url(unique_url)
                 if existing_doc:
                     # Only replace if it's not a chunked document or if the new one is chunked
                     # This prevents chunked documents from replacing regular documents
@@ -166,9 +176,9 @@ async def add_json(json_input: JSONInput):
                         # Skip adding this document to avoid replacing chunked document with regular document
                         continue
 
-                # Add the new document
+                # Add the new document with unique URL
                 ragme.vector_db.write_documents(
-                    [{"text": text, "url": url, "metadata": doc_metadata}]
+                    [{"text": text, "url": unique_url, "metadata": doc_metadata}]
                 )
                 processed_count += 1
 
@@ -400,11 +410,15 @@ async def upload_files(files: list[UploadFile] = File(...)):
                         "date_added": datetime.now().isoformat(),
                     }
 
+                    # Generate unique URL to prevent overwriting
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    unique_url = f"file://{file.filename}#{timestamp}"
+
                     ragme.vector_db.write_documents(
                         [
                             {
                                 "text": text_content,
-                                "url": f"file://{file.filename}",
+                                "url": unique_url,
                                 "metadata": metadata,
                             }
                         ]

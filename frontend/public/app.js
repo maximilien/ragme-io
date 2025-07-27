@@ -631,6 +631,18 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             contentDiv.appendChild(copyBtn);
         }
 
+        // Add replay button for user messages
+        if (message.type === 'user') {
+            const replayBtn = document.createElement('button');
+            replayBtn.className = 'replay-btn';
+            replayBtn.innerHTML = '<i class="fas fa-redo"></i>';
+            replayBtn.title = 'Retry this query';
+            replayBtn.addEventListener('click', () => {
+                this.retryQuery(message.content);
+            });
+            contentDiv.appendChild(replayBtn);
+        }
+
         messageDiv.appendChild(avatar);
         messageDiv.appendChild(contentDiv);
         messagesContainer.appendChild(messageDiv);
@@ -1072,8 +1084,25 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
     }
 
     fetchDocumentSummary(doc) {
-        // Find the document index in the documents array
-        const docIndex = this.documents.findIndex(d => d.url === doc.url);
+        let docIndex = -1;
+        
+        // Handle chunked documents differently
+        if (doc.isGroupedChunks && doc.chunks && doc.chunks.length > 0) {
+            // For grouped chunked documents, use the first chunk's index
+            const firstChunk = doc.chunks[0];
+            docIndex = this.documents.findIndex(d => d.id === firstChunk.id);
+        } else if (doc.metadata?.is_chunked && doc.metadata?.total_chunks) {
+            // For new chunked documents, find by base URL
+            const baseUrl = doc.url.split('#')[0];
+            docIndex = this.documents.findIndex(d => {
+                const docBaseUrl = d.url.split('#')[0];
+                return docBaseUrl === baseUrl;
+            });
+        } else {
+            // For regular documents, find by URL
+            docIndex = this.documents.findIndex(d => d.url === doc.url);
+        }
+        
         if (docIndex === -1) {
             this.updateDocumentSummary('Document not found for summarization.');
             return;
@@ -2109,36 +2138,17 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         const doc = this.documents[docIndex];
         
         if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-            // Call backend API to delete the document using the document ID
-            fetch(`/delete-document/${doc.id}`, {
-                method: 'DELETE',
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    // Remove from local array
-                    this.documents.splice(docIndex, 1);
-                    
-                    // Close the modal
-                    this.hideModal('documentDetailsModal');
-                    
-                    // Re-render the documents list
-                    this.renderDocuments();
-                    
-                    // Update visualization to reflect the changes
-                    this.updateVisualization();
-                    
-                    // Show success notification
-                    this.showNotification('success', 'Document deleted successfully');
-                } else {
-                    // Show error notification
-                    this.showNotification('error', result.message || 'Failed to delete document');
-                }
-            })
-            .catch(error => {
-                console.error('Error deleting document:', error);
-                this.showNotification('error', 'Failed to delete document. Please try again.');
-            });
+            // Check if this is a chunked document that needs special handling
+            if (doc.isGroupedChunks && doc.totalChunks > 1) {
+                // Delete all chunks of this document
+                this.deleteChunkedDocument(doc);
+            } else {
+                // Delete single document
+                this.deleteSingleDocument(docIndex, doc);
+            }
+            
+            // Close the modal
+            this.hideModal('documentDetailsModal');
         }
     }
 
@@ -2264,6 +2274,20 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         
         // Convert groups object to array
         return Object.values(groups);
+    }
+
+    retryQuery(query) {
+        // Set the query in the input field
+        const inputField = document.getElementById('chatInput');
+        if (inputField) {
+            inputField.value = query;
+        }
+        
+        // Directly send the message
+        this.sendMessage();
+        
+        // Show notification
+        this.showNotification('info', 'Retrying query...');
     }
 }
 

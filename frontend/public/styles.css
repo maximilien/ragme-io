@@ -585,6 +585,30 @@ body {
     background: rgba(0, 0, 0, 0.2);
 }
 
+.replay-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 0.25rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    color: #667eea;
+}
+
+.message-content:hover .replay-btn {
+    opacity: 1;
+}
+
+.replay-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    color: #5a67d8;
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
 /* Thinking animation */
 .message.thinking .message-content {
     background: rgba(255, 255, 255, 0.8);
@@ -1000,7 +1024,7 @@ body {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
     max-width: 600px;
     width: 90%;
-    max-height: 80vh;
+    max-height: 85vh;
     overflow: hidden;
     transform: scale(0.9);
     transition: transform 0.3s ease;
