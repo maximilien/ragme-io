@@ -244,9 +244,86 @@ class MilvusVectorDatabase(VectorDatabase):
 
     def create_query_agent(self):
         """Create a query agent for Milvus."""
-        # Placeholder: Milvus does not have a built-in query agent like Weaviate
-        # You would implement your own search logic here
-        return self
+
+        # Create a simple query agent that can perform vector similarity search
+        class MilvusQueryAgent:
+            def __init__(self, vector_db):
+                self.vector_db = vector_db
+                self.client = vector_db.client
+                self.collection_name = vector_db.collection_name
+
+            def run(self, query: str):
+                """Run a query using vector similarity search."""
+                try:
+                    # For now, use simple keyword matching as fallback
+                    # In a full implementation, you would:
+                    # 1. Generate embeddings for the query
+                    # 2. Perform vector similarity search
+                    # 3. Return the most relevant documents
+
+                    # Get all documents and perform keyword matching - increase limit
+                    documents = self.vector_db.list_documents(limit=100, offset=0)
+
+                    # Improved keyword matching for chunked documents
+                    query_lower = query.lower()
+                    query_words = query_lower.split()
+                    relevant_docs = []
+
+                    for doc in documents:
+                        text = doc.get("text", "").lower()
+                        url = doc.get("url", "").lower()
+
+                        # Check if any query word appears in text or URL
+                        # Also check metadata for chunked documents
+                        metadata = doc.get("metadata", {})
+                        metadata_text = str(metadata).lower()
+
+                        # Count how many query words match
+                        matches = 0
+                        for word in query_words:
+                            if word in text or word in url or word in metadata_text:
+                                matches += 1
+
+                        # If at least one word matches, consider it relevant
+                        if matches > 0:
+                            relevant_docs.append(
+                                {
+                                    "doc": doc,
+                                    "matches": matches,
+                                    "text_length": len(text),
+                                }
+                            )
+
+                    if relevant_docs:
+                        # Sort by relevance (more matches first, then by text length)
+                        relevant_docs.sort(
+                            key=lambda x: (-x["matches"], -x["text_length"])
+                        )
+
+                        # Get the most relevant document
+                        most_relevant = relevant_docs[0]["doc"]
+                        content = most_relevant.get("text", "")
+                        url = most_relevant.get("url", "")
+                        metadata = most_relevant.get("metadata", {})
+
+                        # For chunked documents, provide more context
+                        if metadata.get("is_chunked") or metadata.get("is_chunk"):
+                            chunk_info = f" (Chunked document with {metadata.get('total_chunks', 'unknown')} chunks)"
+                        else:
+                            chunk_info = ""
+
+                        # Truncate content if too long
+                        if len(content) > 2000:
+                            content = content[:2000] + "..."
+
+                        return f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}\n\nContent: {content}"
+                    else:
+                        return f"I couldn't find any relevant information about '{query}' in the stored documents."
+
+                except Exception as e:
+                    return f"Error performing query: {str(e)}"
+
+        return MilvusQueryAgent(self)
 
     def cleanup(self):
         """Clean up Milvus client."""

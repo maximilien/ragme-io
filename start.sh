@@ -116,6 +116,27 @@ restart_frontend() {
     echo "   • New Frontend: http://localhost:3020"
 }
 
+# Function to restart legacy UI only
+restart_legacy_ui() {
+    echo "🔄 Restarting legacy UI only..."
+    
+    # Kill existing legacy UI process
+    check_port 8020
+    
+    # Remove legacy UI PID from .pid file if it exists
+    if [ -f .pid ]; then
+        # Create a temporary file without legacy UI PIDs
+        grep -v "streamlit" .pid > .pid.tmp 2>/dev/null || true
+        mv .pid.tmp .pid
+    fi
+    
+    # Start legacy UI
+    start_legacy_ui
+    
+    echo "✅ Legacy UI restarted successfully!"
+    echo "   • Legacy UI: http://localhost:8020"
+}
+
 # Function to start default services (core + new frontend)
 start_default() {
     echo "🚀 Starting RAGme with new frontend (default)..."
@@ -167,19 +188,24 @@ case "${1:-default}" in
     "restart-frontend")
         restart_frontend
         ;;
+    "restart-legacy-ui")
+        restart_legacy_ui
+        ;;
     *)
-        echo "Usage: $0 [default|legacy-ui|restart-frontend]"
+        echo "Usage: $0 [default|legacy-ui|restart-frontend|restart-legacy-ui]"
         echo ""
         echo "Commands:"
         echo "  default           - Start core services + new frontend (default)"
         echo "  legacy-ui         - Start core services + legacy Streamlit UI"
         echo "  restart-frontend  - Restart only the new frontend"
+        echo "  restart-legacy-ui - Restart only the legacy UI"
         echo ""
         echo "Examples:"
         echo "  ./start.sh              # Start with new frontend (default)"
         echo "  ./start.sh default      # Start with new frontend"
         echo "  ./start.sh legacy-ui    # Start with legacy UI"
         echo "  ./start.sh restart-frontend # Restart frontend only"
+        echo "  ./start.sh restart-legacy-ui # Restart legacy UI only"
         echo ""
         echo "Note: The new frontend is now the default. Use 'legacy-ui' to start the old Streamlit UI."
         exit 1

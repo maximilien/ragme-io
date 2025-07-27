@@ -142,10 +142,10 @@ restart_processes() {
     # Wait a moment for cleanup
     sleep 2
     
-    # Start processes using start.sh
-    echo "🚀 Starting RAGme processes..."
+    # Start processes using start.sh (default - core services + new frontend only)
+    echo "🚀 Starting RAGme processes (core services + new frontend)..."
     if [ -f start.sh ]; then
-        ./start.sh
+        ./start.sh default
     else
         echo "❌ Error: start.sh not found!"
         exit 1
