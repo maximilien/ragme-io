@@ -35,9 +35,15 @@ warnings.filterwarnings(
     "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*"
 )
 warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*"
+)
+warnings.filterwarnings(
     "ignore",
     category=DeprecationWarning,
     message=".*Support for class-based `config`.*",
+)
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*model_fields.*"
 )
 
 

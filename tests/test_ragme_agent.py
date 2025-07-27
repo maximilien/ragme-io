@@ -63,10 +63,9 @@ class TestRagMeAgent:
         # Verify the agent was created
         assert agent.agent is not None
         # The agent should be a FunctionAgent with tools
-        assert hasattr(agent.agent, "tools")
         assert (
-            len(agent.agent.tools) == 8
-        )  # 8 tools: write, delete_collection, delete_document, delete_all_documents, list, crawl, query, db info
+            len(agent.agent.tools) == 9
+        )  # 9 tools: write, delete_collection, delete_document, delete_all_documents, delete_documents_by_pattern, list, crawl, query, db info
 
     def test_run_method(self):
         """Test the run method of RagMeAgent."""
@@ -106,8 +105,8 @@ class TestRagMeAgent:
 
         # Verify we have the expected number of tools
         assert (
-            len(tools) == 8
-        )  # write, delete_collection, delete_document, delete_all_documents, list, crawl, query, db info
+            len(tools) == 9
+        )  # write, delete_collection, delete_document, delete_all_documents, delete_documents_by_pattern, list, crawl, query, db info
 
         # Test that the tools can access RagMe methods by calling them directly
         # We'll test the list_ragme_collection function by finding it in the agent's _create_agent method
@@ -133,3 +132,25 @@ class TestRagMeAgent:
         assert "helpful assistant" in system_prompt
         assert "RagMeDocs" in system_prompt
         assert "query_agent" in system_prompt
+
+    def test_pattern_based_deletion_tool(self):
+        """Test that the delete_documents_by_pattern tool is available."""
+        # Mock the RagMe instance
+        mock_ragme = Mock()
+        mock_ragme.weeviate_client = Mock()
+        mock_ragme.collection_name = "RagMeDocs"
+        mock_ragme.query_agent = Mock()
+        mock_ragme.list_documents = Mock()
+        mock_ragme.write_webpages_to_weaviate = Mock()
+
+        # Create RagMeAgent instance
+        agent = RagMeAgent(mock_ragme)
+
+        # Verify the system prompt includes pattern-based deletion
+        system_prompt = agent.agent.system_prompt
+        assert "delete_documents_by_pattern" in system_prompt
+        assert "pattern" in system_prompt.lower()
+
+        # Verify the tool is in the tools list
+        tool_names = [tool.fn.__name__ for tool in agent.agent.tools]
+        assert "delete_documents_by_pattern" in tool_names

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # RAGme Log Tailing Script
-# Usage: ./tools/tail-logs.sh [all|api|mcp|agent|frontend|legacy-ui|status|recent]
+# Usage: ./tools/tail-logs.sh [all|api|mcp|agent|frontend|status|recent]
 
 # Colors for different services
 RED='\033[0;31m'
@@ -36,7 +36,6 @@ show_status() {
     echo -e "${BLUE}=== RAGme Service Status ===${NC}"
     echo ""
     check_service 3020 "New Frontend"
-    check_service 8020 "Legacy UI"
     check_service 8021 "API"
     check_service 8022 "MCP"
     
@@ -147,21 +146,6 @@ tail_frontend_logs() {
     fi
 }
 
-# Function to tail legacy UI logs
-tail_legacy_ui_logs() {
-    echo -e "${BLUE}📡 Tailing Legacy UI logs (port 8020)...${NC}"
-    if check_service 8020 "Legacy UI"; then
-        if [ -f "logs/legacy-ui.log" ]; then
-            echo -e "${BLUE}Following Legacy UI log file...${NC}"
-            echo -e "${YELLOW}Press Ctrl+C to stop monitoring${NC}"
-            echo ""
-            tail -f logs/legacy-ui.log
-        else
-            echo -e "${RED}❌ Legacy UI log file not found (logs/legacy-ui.log)${NC}"
-        fi
-    fi
-}
-
 # Function to tail all logs
 tail_all_logs() {
     echo -e "${BLUE}📡 Tailing all service logs...${NC}"
@@ -182,7 +166,7 @@ tail_all_logs() {
 show_help() {
     echo -e "${BLUE}RAGme Log Tailing Script${NC}"
     echo ""
-    echo "Usage: $0 [all|api|mcp|agent|frontend|legacy-ui|status|recent]"
+    echo "Usage: $0 [all|api|mcp|agent|frontend|status|recent]"
     echo ""
     echo "Commands:"
     echo -e "  ${GREEN}all${NC}        - Tail logs from all running services"
@@ -190,7 +174,6 @@ show_help() {
     echo -e "  ${GREEN}mcp${NC}        - Tail MCP logs (port 8022)"
     echo -e "  ${GREEN}agent${NC}      - Tail Agent logs"
     echo -e "  ${GREEN}frontend${NC}   - Tail Frontend logs (port 3020)"
-    echo -e "  ${GREEN}legacy-ui${NC}  - Tail Legacy UI logs (port 8020)"
     echo -e "  ${GREEN}status${NC}     - Show status of all services"
     echo -e "  ${GREEN}recent${NC}     - Show recent logs"
     echo ""
@@ -219,9 +202,6 @@ case "${1:-all}" in
         ;;
     "frontend")
         tail_frontend_logs
-        ;;
-    "legacy-ui")
-        tail_legacy_ui_logs
         ;;
     "status")
         show_status

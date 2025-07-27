@@ -104,6 +104,71 @@ class RagMeAgent:
             except Exception as e:
                 return f"Error deleting documents: {str(e)}"
 
+        def delete_documents_by_pattern(pattern: str) -> str:
+            """
+            Delete documents from the RagMeDocs collection that match a pattern in their name/URL.
+            Args:
+                pattern (str): Pattern to match against document names/URLs (supports regex-like patterns)
+            Returns:
+                str: Success message with count of deleted documents
+            """
+            try:
+                import re
+
+                # Get all documents first
+                documents = self.ragme.list_documents(limit=1000, offset=0)
+                deleted_count = 0
+                matched_docs = []
+
+                # Convert pattern to regex (handle common patterns)
+                # If pattern doesn't look like regex, treat it as a simple substring match
+                if not any(
+                    char in pattern
+                    for char in ["*", "+", "?", "(", ")", "[", "]", "\\", "^", "$"]
+                ):
+                    # Simple substring match - convert to case-insensitive regex
+                    regex_pattern = re.escape(pattern)
+                else:
+                    # Treat as regex pattern
+                    regex_pattern = pattern
+
+                try:
+                    regex = re.compile(regex_pattern, re.IGNORECASE)
+                except re.error:
+                    return f"Invalid regex pattern: {pattern}"
+
+                # Find documents that match the pattern
+                for doc in documents:
+                    doc_url = doc.get("url", "")
+                    doc_filename = doc.get("metadata", {}).get("filename", "")
+                    doc_original_filename = doc.get("metadata", {}).get(
+                        "original_filename", ""
+                    )
+
+                    # Check if pattern matches any of the document identifiers
+                    if (
+                        regex.search(doc_url)
+                        or regex.search(doc_filename)
+                        or regex.search(doc_original_filename)
+                    ):
+                        matched_docs.append(doc)
+
+                # Delete matched documents
+                for doc in matched_docs:
+                    doc_id = doc.get("id")
+                    if doc_id:
+                        success = self.ragme.delete_document(doc_id)
+                        if success:
+                            deleted_count += 1
+
+                if deleted_count == 0:
+                    return f"No documents found matching pattern: {pattern}"
+                else:
+                    return f"Successfully deleted {deleted_count} documents matching pattern: {pattern}"
+
+            except Exception as e:
+                return f"Error deleting documents by pattern: {str(e)}"
+
         def get_document_details(doc_id: int) -> dict[str, Any]:
             """
             Get detailed information about a specific document by ID.
@@ -251,6 +316,7 @@ class RagMeAgent:
                 delete_ragme_collection,
                 delete_document,
                 delete_all_documents,
+                delete_documents_by_pattern,
                 list_ragme_collection,
                 find_urls_crawling_webpage,
                 query_agent,
@@ -276,7 +342,9 @@ class RagMeAgent:
             You can also delete documents from the collection:
             - Use delete_document(doc_id) to delete a specific document by its ID
             - Use delete_all_documents() to delete all documents from the collection
+            - Use delete_documents_by_pattern(pattern) to delete documents matching a pattern in their name/URL
             - When users ask to "delete docs" or similar, you can use these functions to help them
+            - For pattern-based deletion, users can say things like "del all docs with name pattern test_integration.pdf" or "delete documents matching pattern test_*"
             """,
         )
 

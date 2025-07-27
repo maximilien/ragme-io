@@ -26,6 +26,12 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings("ignore", message=".*model_fields.*")
 warnings.filterwarnings("ignore", message=".*not JSON serializable.*")
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince20.*"
+)
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, message=".*class-based `config`.*"
+)
 
 # Suppress ResourceWarnings from dependencies
 warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
