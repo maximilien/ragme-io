@@ -5,7 +5,10 @@ set -a
 [ -f .env ] && . .env
 set +a
 
-# Function to check if a port is in use
+# RAGme Process Management Script
+# Usage: ./start.sh [default|restart-frontend]
+
+# Function to check if a port is in use and kill the process
 check_port() {
     local port=$1
     if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
@@ -15,28 +18,37 @@ check_port() {
     fi
 }
 
-# Function to kill all processes if one fails
+# Function to cleanup on error
 cleanup() {
-    echo "Error occurred. Cleaning up..."
+    echo "❌ Error occurred. Cleaning up..."
     if [ -f .pid ]; then
         while read pid; do
             if [ ! -z "$pid" ]; then
                 kill $pid 2>/dev/null
             fi
         done < .pid
+        rm -f .pid
     fi
-    rm -f .pid
     exit 1
 }
 
 # Function to stop existing processes
 stop_existing() {
     echo "Stopping any existing RAGme processes..."
+    
+    # Stop processes from PID file
     if [ -f .pid ]; then
+        echo "Stopping processes from PID file..."
         while read pid; do
             if [ ! -z "$pid" ]; then
-                echo "Stopping existing process $pid..."
+                echo "Stopping process $pid..."
                 kill $pid 2>/dev/null
+                # Wait a bit and force kill if still running
+                sleep 1
+                if kill -0 $pid 2>/dev/null; then
+                    echo "Force killing process $pid..."
+                    kill -9 $pid 2>/dev/null
+                fi
             fi
         done < .pid
         rm -f .pid
@@ -45,7 +57,6 @@ stop_existing() {
     
     # Also kill any processes using our ports
     check_port 3020  # New Frontend
-    check_port 8020  # Legacy UI
     check_port 8021  # API
     check_port 8022  # MCP
 }
@@ -87,12 +98,20 @@ start_new_frontend() {
     cd ..
 }
 
-# Function to start legacy UI
-start_legacy_ui() {
-    echo "Starting legacy Streamlit UI..."
-    PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port 8020 > logs/legacy-ui.log 2>&1 &
-    echo $! >> .pid
-    sleep 3
+# Function to start default services (core + new frontend)
+start_default() {
+    echo "🚀 Starting RAGme with new frontend..."
+    
+    # Stop any existing processes
+    stop_existing
+    
+    # Start core services
+    start_core_services
+    
+    # Start new frontend
+    start_new_frontend
+    
+    echo "✅ All services started successfully!"
 }
 
 # Function to restart frontend only
@@ -116,104 +135,31 @@ restart_frontend() {
     echo "   • New Frontend: http://localhost:3020"
 }
 
-# Function to restart legacy UI only
-restart_legacy_ui() {
-    echo "🔄 Restarting legacy UI only..."
-    
-    # Kill existing legacy UI process
-    check_port 8020
-    
-    # Remove legacy UI PID from .pid file if it exists
-    if [ -f .pid ]; then
-        # Create a temporary file without legacy UI PIDs
-        grep -v "streamlit" .pid > .pid.tmp 2>/dev/null || true
-        mv .pid.tmp .pid
-    fi
-    
-    # Start legacy UI
-    start_legacy_ui
-    
-    echo "✅ Legacy UI restarted successfully!"
-    echo "   • Legacy UI: http://localhost:8020"
-}
-
-# Function to start default services (core + new frontend)
-start_default() {
-    echo "🚀 Starting RAGme with new frontend (default)..."
-    
-    # Set up error handling
-    trap cleanup ERR
-    
-    # Stop any existing processes first
-    stop_existing
-    
-    # Create a clean PID file
-    echo "" > .pid
-    
-    # Start core services
-    start_core_services
-    
-    # Start new frontend
-    start_new_frontend
-}
-
-# Function to start with legacy UI
-start_with_legacy() {
-    echo "🚀 Starting RAGme with legacy UI..."
-    
-    # Set up error handling
-    trap cleanup ERR
-    
-    # Stop any existing processes first
-    stop_existing
-    
-    # Create a clean PID file
-    echo "" > .pid
-    
-    # Start core services
-    start_core_services
-    
-    # Start legacy UI
-    start_legacy_ui
-}
-
 # Main script logic
 case "${1:-default}" in
     "default"|"")
         start_default
         ;;
-    "legacy-ui")
-        start_with_legacy
-        ;;
     "restart-frontend")
         restart_frontend
         ;;
-    "restart-legacy-ui")
-        restart_legacy_ui
-        ;;
     *)
-        echo "Usage: $0 [default|legacy-ui|restart-frontend|restart-legacy-ui]"
+        echo "Usage: $0 [default|restart-frontend]"
         echo ""
         echo "Commands:"
         echo "  default           - Start core services + new frontend (default)"
-        echo "  legacy-ui         - Start core services + legacy Streamlit UI"
         echo "  restart-frontend  - Restart only the new frontend"
-        echo "  restart-legacy-ui - Restart only the legacy UI"
         echo ""
         echo "Examples:"
         echo "  ./start.sh              # Start with new frontend (default)"
         echo "  ./start.sh default      # Start with new frontend"
-        echo "  ./start.sh legacy-ui    # Start with legacy UI"
         echo "  ./start.sh restart-frontend # Restart frontend only"
-        echo "  ./start.sh restart-legacy-ui # Restart legacy UI only"
-        echo ""
-        echo "Note: The new frontend is now the default. Use 'legacy-ui' to start the old Streamlit UI."
         exit 1
         ;;
 esac
 
-# Show success message for default and legacy-ui commands
-if [ "$1" = "default" ] || [ "$1" = "legacy-ui" ] || [ -z "$1" ]; then
+# Show success message for default command
+if [ "$1" = "default" ] || [ -z "$1" ]; then
     echo ""
     echo "✅ All RAGme processes started successfully!"
     echo ""
@@ -222,17 +168,9 @@ if [ "$1" = "default" ] || [ "$1" = "legacy-ui" ] || [ -z "$1" ]; then
     echo "  ./stop.sh restart      # Restart all processes"
     echo "  ./stop.sh status       # Show process status"
     echo "  ./start.sh restart-frontend # Restart frontend only"
-    echo "  ./start.sh legacy-ui   # Start legacy UI"
     echo ""
-    if [ "$1" = "legacy-ui" ]; then
-        echo "Access your RAGme services:"
-        echo "  • Legacy UI: http://localhost:8020"
-        echo "  • API: http://localhost:8021"
-        echo "  • MCP: http://localhost:8022"
-    else
-        echo "Access your RAGme services:"
-        echo "  • New Frontend: http://localhost:3020"
-        echo "  • API: http://localhost:8021"
-        echo "  • MCP: http://localhost:8022"
-    fi
+    echo "Access your RAGme services:"
+    echo "  • New Frontend: http://localhost:3020"
+    echo "  • API: http://localhost:8021"
+    echo "  • MCP: http://localhost:8022"
 fi 

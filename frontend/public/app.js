@@ -269,9 +269,31 @@ class RAGmeAssistant {
             this.deleteDocumentFromDetails();
         });
 
+        // Email modal
+        document.getElementById('closeEmailModal').addEventListener('click', () => {
+            this.hideModal('emailModal');
+        });
+
+        document.getElementById('cancelEmail').addEventListener('click', () => {
+            this.hideModal('emailModal');
+        });
+
+        document.getElementById('sendEmail').addEventListener('click', () => {
+            this.sendEmail();
+        });
+
         // File upload setup
         this.setupFileUpload();
 
+        // Modal overlay click to close
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    const modalId = overlay.id;
+                    this.hideModal(modalId);
+                }
+            });
+        });
 
     }
 
@@ -471,6 +493,12 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 <div class="chat-id">#${chat.id}</div>
                 <div class="chat-title" data-chat-id="${chat.id}">${chat.title}</div>
                 <div class="chat-time">${timeString}</div>
+                <button class="chat-save-btn" data-chat-id="${chat.id}" title="Save chat">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button class="chat-email-btn" data-chat-id="${chat.id}" title="Email chat">
+                    <i class="fas fa-envelope"></i>
+                </button>
                 <button class="chat-delete-btn" data-chat-id="${chat.id}" title="Delete chat">
                     <i class="fas fa-trash"></i>
                 </button>
@@ -478,8 +506,11 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             
             // Add click handler for loading chat
             chatItem.addEventListener('click', (e) => {
-                // Don't load chat if clicking on the title (for editing) or delete button
-                if (!e.target.classList.contains('chat-title') && !e.target.closest('.chat-delete-btn')) {
+                // Don't load chat if clicking on buttons or title (for editing)
+                if (!e.target.classList.contains('chat-title') && 
+                    !e.target.closest('.chat-delete-btn') &&
+                    !e.target.closest('.chat-save-btn') &&
+                    !e.target.closest('.chat-email-btn')) {
                     this.loadChat(chat.id);
                 }
             });
@@ -496,6 +527,20 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.deleteChat(chat.id);
+            });
+            
+            // Add click handler for saving chat
+            const saveBtn = chatItem.querySelector('.chat-save-btn');
+            saveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.saveChatAsFile(chat);
+            });
+            
+            // Add click handler for emailing chat
+            const emailBtn = chatItem.querySelector('.chat-email-btn');
+            emailBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showChatEmailModal(chat);
             });
             
             container.appendChild(chatItem);
@@ -629,6 +674,26 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 this.showNotification('success', 'Copied to clipboard!');
             });
             contentDiv.appendChild(copyBtn);
+
+            // Add save button for AI messages
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-btn';
+            saveBtn.innerHTML = '<i class="fas fa-download"></i>';
+            saveBtn.title = 'Save as markdown file';
+            saveBtn.addEventListener('click', () => {
+                this.saveMessageAsFile(message);
+            });
+            contentDiv.appendChild(saveBtn);
+
+            // Add email button for AI messages
+            const emailBtn = document.createElement('button');
+            emailBtn.className = 'email-btn';
+            emailBtn.innerHTML = '<i class="fas fa-envelope"></i>';
+            emailBtn.title = 'Send via email';
+            emailBtn.addEventListener('click', () => {
+                this.showEmailModal(message);
+            });
+            contentDiv.appendChild(emailBtn);
         }
 
         // Add replay button for user messages
@@ -1188,7 +1253,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             
             // Add click handler for viewing document details
             card.addEventListener('click', (e) => {
-                // Don't trigger if clicking on the delete button
+                console.log('Card clicked', group, e.target);
                 if (!e.target.closest('.document-delete-btn')) {
                     this.showDocumentDetails(group);
                 }
@@ -1212,7 +1277,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 card.innerHTML = `
                     <div class="document-content">
                         <div class="document-title">
-                            ${this.escapeHtml(originalFilename)}
+                            <span class="document-title-text">${this.escapeHtml(originalFilename)}</span>
                             ${chunkInfo}
                         </div>
                         <div class="document-meta">
@@ -1236,7 +1301,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 card.innerHTML = `
                     <div class="document-content">
                         <div class="document-title">
-                            ${this.escapeHtml(originalFilename)}
+                            <span class="document-title-text">${this.escapeHtml(originalFilename)}</span>
                             ${chunkInfo}
                         </div>
                         <div class="document-meta">
@@ -1256,7 +1321,9 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 
                 card.innerHTML = `
                     <div class="document-content">
-                        <div class="document-title">${this.escapeHtml(title)}</div>
+                        <div class="document-title">
+                            <span class="document-title-text">${this.escapeHtml(title)}</span>
+                        </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
                             <i class="fas fa-database"></i> ${group.metadata?.collection || 'Default'}
@@ -1269,15 +1336,30 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 `;
             }
 
-            // Add delete button event listener
-            const deleteBtn = card.querySelector('.document-delete-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.deleteDocument(index);
-            });
-
             container.appendChild(card);
+
+            // Attach delete button handler after appending to DOM
+            const deleteBtn = card.querySelector('.document-delete-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.deleteDocument(index);
+                });
+            }
+
+            // Attach card click handler after appending to DOM
+            card.addEventListener('click', (e) => {
+                console.log('Card clicked', group, e.target);
+                if (!e.target.closest('.document-delete-btn')) {
+                    this.showDocumentDetails(group);
+                }
+            });
         });
+        
+        // Check for text truncation after rendering all documents
+        setTimeout(() => {
+            this.checkDocumentTitlesTruncation();
+        }, 100);
     }
 
     showDocumentDetails(doc) {
@@ -1344,6 +1426,11 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
 
         body.innerHTML = details;
         this.showModal('documentDetailsModal');
+        
+        // Check for text truncation in modal details
+        setTimeout(() => {
+            this.checkDetailValuesTruncation();
+        }, 100);
         
         // Fetch AI summary
         this.fetchDocumentSummary(doc);
@@ -2288,6 +2375,273 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         
         // Show notification
         this.showNotification('info', 'Retrying query...');
+    }
+
+    saveMessageAsFile(message) {
+        // Find the user message that generated this AI response
+        const userMessage = this.findUserMessageForResponse(message);
+        let filename = 'ragme-response.md';
+        
+        if (userMessage) {
+            // Create filename from first three words of the query
+            const words = userMessage.content.trim().split(/\s+/).slice(0, 3);
+            if (words.length > 0) {
+                filename = words.join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') + '.md';
+            }
+        }
+        
+        // Create the file content
+        const fileContent = `# RAGme.ai Response
+
+${userMessage ? `**Query:** ${userMessage.content}
+
+` : ''}**Response:**
+
+${message.content}
+
+---
+*Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}*
+`;
+
+        // Create and download the file
+        const blob = new Blob([fileContent], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.showNotification('success', `Response saved as ${filename}`);
+    }
+
+    findUserMessageForResponse(aiMessage) {
+        // Find the most recent user message before this AI message
+        const messageIndex = this.chatHistory.findIndex(m => m.id === aiMessage.id);
+        if (messageIndex > 0) {
+            for (let i = messageIndex - 1; i >= 0; i--) {
+                if (this.chatHistory[i].type === 'user') {
+                    return this.chatHistory[i];
+                }
+            }
+        }
+        return null;
+    }
+
+    showEmailModal(message) {
+        // Find the user message that generated this AI response
+        const userMessage = this.findUserMessageForResponse(message);
+        
+        // Set the subject and body
+        const subjectInput = document.getElementById('emailSubject');
+        const bodyInput = document.getElementById('emailBody');
+        const toInput = document.getElementById('emailTo');
+        
+        if (userMessage) {
+            subjectInput.value = userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? '...' : '');
+        } else {
+            subjectInput.value = 'RAGme.ai Response';
+        }
+        
+        bodyInput.value = message.content;
+        toInput.value = '';
+        
+        // Show the modal
+        this.showModal('emailModal');
+    }
+
+    sendEmail() {
+        const toInput = document.getElementById('emailTo');
+        const subjectInput = document.getElementById('emailSubject');
+        const bodyInput = document.getElementById('emailBody');
+        
+        const to = toInput.value.trim();
+        const subject = subjectInput.value;
+        const body = bodyInput.value;
+        
+        if (!to) {
+            this.showNotification('error', 'Please enter a recipient email address');
+            return;
+        }
+        
+        // Create mailto link
+        const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        // Open default email client
+        window.open(mailtoLink);
+        
+        // Hide modal and show success notification
+        this.hideModal('emailModal');
+        this.showNotification('success', 'Email client opened with your message');
+    }
+
+    saveChatAsFile(chat) {
+        // Create filename from chat title
+        let filename = 'ragme-chat.md';
+        
+        if (chat.title) {
+            // Create filename from first three words of the title
+            const words = chat.title.trim().split(/\s+/).slice(0, 3);
+            if (words.length > 0) {
+                filename = words.join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') + '.md';
+            }
+        }
+        
+        // Create the file content with entire conversation
+        let fileContent = `# RAGme.ai Chat: ${chat.title}
+
+**Chat ID:** ${chat.id}  
+**Created:** ${new Date(chat.createdAt).toLocaleString()}  
+**Updated:** ${new Date(chat.updatedAt).toLocaleString()}
+
+---
+
+`;
+
+        // Add all messages from the conversation
+        if (chat.messages && chat.messages.length > 0) {
+            chat.messages.forEach((message, index) => {
+                const timestamp = message.timestamp ? new Date(message.timestamp).toLocaleString() : '';
+                const role = message.type === 'user' ? '👤 User' : '🤖 AI';
+                
+                fileContent += `## ${role}${timestamp ? ` (${timestamp})` : ''}
+
+${message.content}
+
+---
+`;
+            });
+        } else {
+            fileContent += `*No messages in this conversation*
+
+`;
+        }
+
+        fileContent += `---
+*Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}*
+`;
+
+        // Create and download the file
+        const blob = new Blob([fileContent], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.showNotification('success', `Chat saved as ${filename}`);
+    }
+
+    showChatEmailModal(chat) {
+        // Set the subject and body
+        const subjectInput = document.getElementById('emailSubject');
+        const bodyInput = document.getElementById('emailBody');
+        const toInput = document.getElementById('emailTo');
+        
+        // Use chat title as subject
+        subjectInput.value = chat.title || 'RAGme.ai Chat';
+        
+        // Create email body with entire conversation
+        let emailBody = `RAGme.ai Chat: ${chat.title}
+
+Chat ID: ${chat.id}
+Created: ${new Date(chat.createdAt).toLocaleString()}
+Updated: ${new Date(chat.updatedAt).toLocaleString()}
+
+---
+
+`;
+
+        // Add all messages from the conversation
+        if (chat.messages && chat.messages.length > 0) {
+            chat.messages.forEach((message, index) => {
+                const timestamp = message.timestamp ? new Date(message.timestamp).toLocaleString() : '';
+                const role = message.type === 'user' ? 'User' : 'AI';
+                
+                emailBody += `${role}${timestamp ? ` (${timestamp})` : ''}:
+${message.content}
+
+---
+`;
+            });
+        } else {
+            emailBody += `No messages in this conversation
+
+`;
+        }
+
+        emailBody += `---
+Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}`;
+        
+        bodyInput.value = emailBody;
+        toInput.value = '';
+        
+        // Show the modal
+        this.showModal('emailModal');
+    }
+
+    // Function to detect if text is truncated and add tooltip if needed
+    checkTextTruncation(element) {
+        if (!element) return;
+        
+        // Force a reflow to get accurate measurements
+        element.offsetHeight;
+        
+        // For document titles, check the document-title-text span
+        if (element.classList.contains('document-title')) {
+            const titleTextSpan = element.querySelector('.document-title-text');
+            if (titleTextSpan) {
+                const isTruncated = titleTextSpan.scrollWidth > titleTextSpan.clientWidth;
+                if (isTruncated) {
+                    element.classList.add('truncated');
+                    // Clear any existing title attribute to prevent tooltip interference
+                    element.title = '';
+                    console.log('Document title truncated:', titleTextSpan.textContent || titleTextSpan.innerText);
+                } else {
+                    element.classList.remove('truncated');
+                    element.title = '';
+                }
+            }
+        } else {
+            // For other elements like detail-value
+            const isTruncated = element.scrollWidth > element.clientWidth;
+            if (isTruncated) {
+                element.classList.add('truncated');
+                element.title = element.textContent || element.innerText;
+                console.log('Element truncated:', element.textContent || element.innerText);
+            } else {
+                element.classList.remove('truncated');
+                element.title = '';
+            }
+        }
+    }
+
+    // Function to check all document titles for truncation
+    checkDocumentTitlesTruncation() {
+        const documentTitles = document.querySelectorAll('.document-title');
+        console.log('Checking', documentTitles.length, 'document titles for truncation');
+        
+        documentTitles.forEach((title, index) => {
+            const titleTextSpan = title.querySelector('.document-title-text');
+            console.log('Checking title', index, ':', titleTextSpan ? (titleTextSpan.textContent || titleTextSpan.innerText) : 'No title text span');
+            this.checkTextTruncation(title);
+        });
+    }
+
+    // Function to check all detail values for truncation
+    checkDetailValuesTruncation() {
+        const detailValues = document.querySelectorAll('.detail-value');
+        console.log('Checking', detailValues.length, 'detail values for truncation');
+        
+        detailValues.forEach((value, index) => {
+            console.log('Checking detail value', index, ':', value.textContent || value.innerText);
+            this.checkTextTruncation(value);
+        });
     }
 }
 

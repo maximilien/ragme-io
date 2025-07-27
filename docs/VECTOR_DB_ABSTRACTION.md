@@ -7,9 +7,9 @@ The `RagMe` class has been refactored to be vector database agnostic, allowing y
 The vector database abstraction consists of:
 
 1. **`VectorDatabase`** - Abstract base class defining the interface
-2. **`WeaviateVectorDatabase`** - Implementation for Weaviate Cloud
-3. **`WeaviateLocalVectorDatabase`** - Implementation for local Weaviate (Podman)
-4. **`MilvusVectorDatabase`** - Implementation for Milvus (default for local development)
+2. **`WeaviateVectorDatabase`** - Implementation for Weaviate Cloud (⭐ Recommended)
+3. **`WeaviateLocalVectorDatabase`** - Implementation for local Weaviate (Podman) (⭐ Recommended for local development)
+4. **`MilvusVectorDatabase`** - Implementation for Milvus (alternative for local development)
 5. **`create_vector_database()`** - Factory function for creating database instances
 6. **Updated `RagMe`** - Now accepts any vector database implementation
 
@@ -54,19 +54,40 @@ VectorDatabase (ABC)
 
 ## Usage Examples
 
-### Default Milvus Usage ⭐ **RECOMMENDED**
+### Default Weaviate Usage ⭐ **RECOMMENDED**
 
 ```python
 from src.ragme.ragme import RagMe
+import os
 
-# Uses Milvus by default (no setup required)
+# Uses Weaviate by default (recommended)
+os.environ["VECTOR_DB_TYPE"] = "weaviate-local"
+os.environ["WEAVIATE_LOCAL_URL"] = "http://localhost:8080"
 ragme = RagMe()
 ragme.write_webpages_to_weaviate(["https://example.com"])
 documents = ragme.list_documents()
 ragme.cleanup()
 ```
 
-### Using Milvus Explicitly
+### Using Weaviate Cloud
+
+```python
+from src.ragme.ragme import RagMe
+import os
+
+# Configure for Weaviate Cloud
+os.environ["VECTOR_DB_TYPE"] = "weaviate"
+os.environ["WEAVIATE_URL"] = "https://your-cluster.weaviate.cloud"
+os.environ["WEAVIATE_API_KEY"] = "your-api-key"
+
+# Initialize RagMe with Weaviate Cloud
+ragme = RagMe()
+ragme.write_webpages_to_weaviate(["https://example.com"])
+documents = ragme.list_documents()
+ragme.cleanup()
+```
+
+### Using Milvus (Alternative)
 
 ```python
 from src.ragme.ragme import RagMe
@@ -295,10 +316,9 @@ from src.ragme.vector_db_factory import create_vector_database
 
 ## Environment Variables
 
-### Milvus (Default) ⭐ **RECOMMENDED**
-- `VECTOR_DB_TYPE=milvus` - Set to use Milvus as the vector database (default)
-- `MILVUS_URI` - URI for Milvus connection (e.g., `milvus_demo.db` for local, `http://localhost:19530` for server)
-- `MILVUS_TOKEN` - Authentication token (optional, for Milvus Cloud)
+### Weaviate (Recommended)
+- `VECTOR_DB_TYPE=weaviate-local` - Set to use local Weaviate (default: `http://localhost:8080`)
+- `WEAVIATE_LOCAL_URL` - Local Weaviate URL (default: `http://localhost:8080`)
 - `OPENAI_API_KEY` - OpenAI API key for LLM operations
 
 ### Weaviate Cloud
@@ -307,13 +327,14 @@ from src.ragme.vector_db_factory import create_vector_database
 - `WEAVIATE_URL` - Your Weaviate Cloud cluster URL
 - `OPENAI_API_KEY` - OpenAI API key for LLM operations
 
-### Local Weaviate
-- `VECTOR_DB_TYPE=weaviate-local` - Set to use local Weaviate
-- `WEAVIATE_LOCAL_URL` - Local Weaviate URL (default: `http://localhost:8080`)
+### Milvus (Alternative)
+- `VECTOR_DB_TYPE=milvus` - Set to use Milvus as the vector database (alternative)
+- `MILVUS_URI` - URI for Milvus connection (e.g., `milvus_demo.db` for local, `http://localhost:19530` for server)
+- `MILVUS_TOKEN` - Authentication token (optional, for Milvus Cloud)
 - `OPENAI_API_KEY` - OpenAI API key for LLM operations
 
 ### General
-- `VECTOR_DB_TYPE` - Set to `milvus` (default), `weaviate`, or `weaviate-local` to choose the vector database
+- `VECTOR_DB_TYPE` - Set to `weaviate-local` (default), `weaviate`, `milvus`, or `pinecone` to choose the vector database
 
 ## Testing
 
@@ -373,14 +394,14 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*Pydant
 
 ## Local Development Setup
 
-### Milvus Lite (Recommended)
+### Weaviate (Recommended)
 
-For local development, Milvus Lite is now the default and requires no additional setup:
+For local development, Weaviate is now the default and requires no additional setup:
 
 ```bash
 # Default configuration
-VECTOR_DB_TYPE=milvus
-MILVUS_URI=milvus_demo.db
+VECTOR_DB_TYPE=weaviate-local
+WEAVIATE_LOCAL_URL=http://localhost:8080
 ```
 
 ### Local Weaviate (Podman)

@@ -305,6 +305,19 @@ class RagMeLocalAgent:
             text = data["data"]["text"]
             metadata = data["metadata"]
 
+            # Ensure the type field is set correctly based on filename
+            filename = metadata.get("filename", "unknown")
+            if filename != "unknown":
+                file_extension = Path(filename).suffix.lower()
+                if file_extension:
+                    # Remove the dot and convert to uppercase for consistency
+                    file_type = file_extension[1:].upper()
+                    metadata["type"] = file_type
+                else:
+                    metadata["type"] = "unknown"
+            else:
+                metadata["type"] = "unknown"
+
             # Chunk the text if it's large
             chunks = chunkText(text, chunk_size=1000)
 

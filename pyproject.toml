@@ -78,6 +78,7 @@ line-ending = "auto"
 
 [tool.pytest.ini_options]
 addopts = "--disable-warnings"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "ignore::DeprecationWarning:pydantic.*:",
     "ignore::UserWarning:src.ragme.vector_db_milvus:",

@@ -256,19 +256,54 @@ class TestRagMeLocalAgent:
 
             mock_process_pdf.assert_called_once_with(file_path)
 
+    @patch("src.ragme.local_agent.RAGME_API_URL", "http://test-api.com")
+    @patch("src.ragme.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
     def test_process_file_docx(self):
-        """Test process_file with DOCX"""
-        agent = RagMeLocalAgent(
-            api_url="http://test-api.com", mcp_url="http://test-mcp.com"
-        )
+        """Test processing a DOCX file."""
+        mock_ragme = RagMeLocalAgent()
+        mock_ragme._process_docx_file = Mock(return_value=True)
 
-        with patch.object(agent, "_process_docx_file") as mock_process_docx:
-            mock_process_docx.return_value = True
+        # Test with a DOCX file
+        result = mock_ragme.process_file(Path("test.docx"))
+        assert result is None  # process_file doesn't return anything
+        mock_ragme._process_docx_file.assert_called_once_with(Path("test.docx"))
 
-            file_path = Path("test.docx")
-            agent.process_file(file_path)
+    @patch("src.ragme.local_agent.RAGME_API_URL", "http://test-api.com")
+    @patch("src.ragme.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
+    def test_file_type_metadata_setting(self):
+        """Test that file type is correctly set in metadata."""
+        mock_ragme = RagMeLocalAgent()
 
-            mock_process_docx.assert_called_once_with(file_path)
+        # Mock the API response
+        with patch("requests.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json.return_value = {"status": "success"}
+
+            # Test data with a PDF filename
+            test_data = {
+                "data": {"text": "Test content"},
+                "metadata": {
+                    "filename": "test_document.pdf",
+                    "date_added": "2024-01-01",
+                },
+            }
+
+            # Call add_to_rag
+            result = mock_ragme.add_to_rag(test_data)
+
+            # Verify the API was called
+            mock_post.assert_called_once()
+
+            # Get the data that was sent to the API
+            call_args = mock_post.call_args
+            sent_data = call_args[1]["json"]
+
+            # Check that the type field was set correctly
+            metadata = sent_data["data"]["documents"][0]["metadata"]
+            assert metadata["type"] == "PDF"
+            assert metadata["filename"] == "test_document.pdf"
+
+            assert result is True
 
     def test_process_file_unsupported(self):
         """Test process_file with unsupported file type"""

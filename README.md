@@ -6,11 +6,14 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **💾 Save Chat Responses**: Save individual AI responses as markdown files with smart filename generation
+- **📧 Email Chat Responses**: Send AI responses via email with pre-filled subject and content
 - **📄 Smart Document Chunking**: Large documents are automatically split into manageable chunks while preserving readability
 - **🎯 Enhanced Document Management**: Grouped document display with chunk counts and improved deletion functionality
 - **📊 Interactive Visualizations**: D3.js-powered charts with click-to-scroll functionality and responsive resizing
 - **🔄 Real-time Refresh**: Improved document list and visualization synchronization
 - **🗑️ Bulk Document Operations**: Delete entire chunked documents with a single click
+- **🔍 Pattern-Based Document Deletion**: Delete documents matching regex patterns (e.g., "del all docs with name pattern test_integration.pdf")
 - **📱 Responsive Design**: Better mobile and desktop experience with collapsible sidebars
 
 ### 🔧 Technical Improvements
@@ -19,6 +22,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **Unified Processing**: Consistent chunking across all input methods (upload, watch directory, API)
 - **Enhanced Metadata**: Rich document metadata including chunk information and original filenames
 - **Improved Performance**: Better handling of large documents and optimized visualization updates
+- **Modern UI**: Streamlined interface with save and email functionality for individual chat responses
 
 ## 📚 Documentation
 
@@ -39,7 +43,7 @@ Install and/or update the following if needed:
 2. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) 
 3. Install [`gh`](https://cli.github.com/) from GitHub
 4. Install [Node.js 18+](https://nodejs.org/) (for new frontend)
-5. Vector Database setup (Milvus Lite by default, or Weaviate Cloud)
+5. Vector Database setup (**Weaviate recommended**, or Milvus Lite)
 
 ### Get code, setup dependencies
 
@@ -66,17 +70,7 @@ uv sync --extra dev
 
 ### Vector Database Setup
 
-#### Option 1: Milvus Lite (Default - Local Development) ⭐ **RECOMMENDED**
-
-For local development, **Milvus Lite is now the default** and requires no server setup. The system will automatically create a local database file.
-
-```bash
-# Default configuration (no setup required)
-VECTOR_DB_TYPE=milvus
-MILVUS_URI=milvus_demo.db
-```
-
-#### Option 2: Local Weaviate (Podman)
+#### Option 1: Weaviate (Recommended)
 
 For local development with Weaviate, you can run Weaviate locally using Podman:
 
@@ -94,15 +88,23 @@ For local development with Weaviate, you can run Weaviate locally using Podman:
 ./tools/weaviate-local.sh stop
 ```
 
-This provides a full Weaviate experience locally without requiring cloud credentials.
-
-#### Option 3: Weaviate Cloud
+Or use Weaviate Cloud:
 
 Create an account and cluster at [Weaviate Cloud](https://console.weaviate.cloud/). You can select to create a `Sandbox` cluster which will allow you to create free clusters (for 14 days). In your cluster, create a collection named "RagMeDocs".
 
 Once you have the cluster, Weaviate should give you a page with the cluster REST endpoint and the API key (select the Admin one).
 
 These will be your `WEAVIATE_URL` and `WEAVIATE_API_KEY` respectively.
+
+#### Option 2: Milvus Lite (Alternative - Local Development)
+
+For local development, Milvus Lite is available and requires no server setup. The system will automatically create a local database file.
+
+```bash
+# Default configuration (no setup required)
+VECTOR_DB_TYPE=milvus
+MILVUS_URI=milvus_demo.db
+```
 
 ### API keys
 
@@ -118,16 +120,16 @@ cp env.example .env
 
 # Edit .env with your values:
 OPENAI_API_KEY=sk-proj-*****-**
-VECTOR_DB_TYPE=milvus  # Default for local development (recommended)
-# VECTOR_DB_TYPE=weaviate-local  # For local Weaviate (Podman)
+VECTOR_DB_TYPE=weaviate-local  # Recommended for local development
 # VECTOR_DB_TYPE=weaviate  # For cloud Weaviate
+# VECTOR_DB_TYPE=milvus  # For Milvus Lite (alternative)
 
 # For Local Weaviate (only if VECTOR_DB_TYPE=weaviate-local):
-# WEAVIATE_LOCAL_URL=http://localhost:8080
+WEAVIATE_LOCAL_URL=http://localhost:8080
 
 # For Weaviate Cloud (only if VECTOR_DB_TYPE=weaviate):
-# WEAVIATE_API_KEY=*****
-# WEAVIATE_URL=*****.weaviate.cloud
+WEAVIATE_API_KEY=*****
+WEAVIATE_URL=*****.weaviate.cloud
 
 # For Milvus (optional, uses defaults if not set):
 # MILVUS_URI=milvus_demo.db
@@ -146,7 +148,6 @@ RAGme.ai consists of multiple services that work together:
 2. **MCP Server** (port 8022): Processes PDF and DOCX files  
 3. **Agent** (background): Monitors watch directory for new files
 4. **New Frontend** (port 3020): Modern web interface with three-pane layout ⭐ **DEFAULT**
-5. **Legacy Streamlit UI** (port 8020): Original web interface for interaction
 
 ### Quick Start (All Services)
 
@@ -195,14 +196,6 @@ This will show you:
 - Service URLs when all are running
 - PID information for debugging
 
-#### Start with Legacy UI
-
-To start with the legacy Streamlit UI instead of the new frontend:
-
-```bash
-./start.sh legacy-ui
-```
-
 ### Debugging and Log Monitoring
 
 The `./tools/tail-logs.sh` script provides real-time log monitoring and debugging capabilities:
@@ -224,7 +217,6 @@ To monitor specific services:
 ./tools/tail-logs.sh mcp        # Monitor MCP logs (port 8022)
 ./tools/tail-logs.sh agent      # Monitor Agent logs
 ./tools/tail-logs.sh frontend   # Monitor Frontend logs (port 3020)
-./tools/tail-logs.sh legacy-ui  # Monitor Legacy UI logs (port 8020)
 ```
 
 #### Check Service Status
@@ -269,9 +261,6 @@ cd frontend
 npm install
 npm run build
 npm start
-
-# Start Streamlit UI (in another terminal)
-PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port 8020
 ```
 
 ## 🎯 Use Cases and Features
@@ -286,6 +275,31 @@ PYTHONPATH=$PYTHONPATH:$(pwd) uv run streamlit run src/ragme/ui.py --server.port
 
 RAG-ing and searching refers to adding documents into a vector database using some appropriate embedding (creates a vector for document) and then using an LLM agent to query and use that vector database as a source of knowledge.
 
+## 💾 Save and Email Features
+
+### Save Chat Responses
+
+RAGme.ai now includes the ability to save individual AI responses as markdown files:
+
+- **Smart Filename Generation**: Automatically creates meaningful filenames using the first 3 words of the query
+- **Complete Context**: Saves both the original query and the AI response
+- **Metadata Included**: Includes timestamp and generation information
+- **Easy Access**: Hover over any AI response to reveal the save button (📥 icon)
+
+**Example**: A query "What is machine learning?" will generate a file named `what-is-machine.md` containing the full conversation context.
+
+### Email Chat Responses
+
+Send AI responses directly via email:
+
+- **Pre-filled Content**: Subject line uses the original query (truncated to 50 characters)
+- **Message Body**: Contains the complete AI response
+- **User-friendly**: Simply enter the recipient email address
+- **Email Client Integration**: Opens your default email client with the prepared message
+- **Easy Access**: Hover over any AI response to reveal the email button (📧 icon)
+
+**Example**: Click the email button on an AI response, enter `colleague@company.com`, and your email client will open with the subject "What is machine learning?" and the AI response in the body.
+
 ## 🛠️ Components
 
 ### New Frontend UI ⭐ **DEFAULT**
@@ -298,6 +312,7 @@ A modern, responsive web interface with three-pane layout:
 
 **Features**:
 - **Real-time chat** with markdown support and copy functionality
+- **Save and Email**: Save individual responses as markdown files or send via email
 - **Smart document management** with automatic chunking and grouped display
 - **Interactive visualizations** with D3.js charts (bar, pie, network graphs)
 - **Click-to-scroll functionality** - click on visualization nodes to scroll to documents
@@ -313,6 +328,8 @@ A modern, responsive web interface with three-pane layout:
 - **Bulk operations**: Delete entire chunked documents with one click
 - **Enhanced metadata display**: Shows document types, dates, and chunk information
 - **Network graph visualization**: Interactive document relationship mapping
+- **Save responses**: Download any AI response as a markdown file with smart naming
+- **Email responses**: Send AI responses via email with pre-filled content
 
 **Access**: `http://localhost:3020` (default when running `./start.sh`)
 
@@ -388,7 +405,6 @@ flowchart LR
 ```mermaid
 flowchart TB
     new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
-    legacy-ui[Legacy Streamlit UI<br/>Port 8020] --> api
     chrome[Chrome Extension] --> api
     agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
     mcp --> api
@@ -397,7 +413,6 @@ flowchart TB
     ragme --> openai[OpenAI LLM]
     
     subgraph "Vector Database Layer"
-        vector-db --> milvus[(Milvus Lite<br/>Default)]
         vector-db --> weaviate-local[(Local Weaviate<br/>Podman)]
         vector-db --> weaviate-cloud[(Weaviate Cloud)]
         vector-db --> future[(Future DBs)]
@@ -407,13 +422,12 @@ flowchart TB
 ### Components
 
 - **New Frontend** (port 3020): Modern web interface with three-pane layout ⭐ **DEFAULT**
-- **Legacy Streamlit UI** (port 8020): Original web interface for user interaction
 - **API Server** (port 8021): REST API for URL and JSON ingestion
 - **MCP Server** (port 8022): Document processing for PDF and DOCX files
 - **File Monitor Agent**: Watches `watch_directory/` for new files
 - **Chrome Extension**: Browser extension for capturing web pages
 - **RAGme Core**: Main RAG processing logic using LlamaIndex and vector database abstraction
-- **Vector Database Layer**: Modular support for multiple vector databases (Milvus, Weaviate, etc.)
+- **Vector Database Layer**: Modular support for multiple vector databases (Weaviate, Milvus, etc.)
 
 ### MCP
 
@@ -520,9 +534,6 @@ uv run pytest --cov=src/ragme tests/
 # Start all services (new frontend by default)
 ./start.sh
 
-# Start with legacy UI
-./start.sh legacy-ui
-
 # Stop all services
 ./stop.sh
 
@@ -547,33 +558,12 @@ Created with ❤️ by @maximilien
 
 RagMe supports multiple vector database backends with a modular architecture:
 
-### Milvus (Default) ⭐ **RECOMMENDED**
-- **Milvus Lite**: Local development with no server setup required
-- **High-performance**: Vector search and similarity matching
-- **Easy setup**: Automatic local database file creation
-- **Production ready**: Can scale to Milvus Server for production
-
-#### Configuring Milvus
-
-Set the following environment variables:
-
-```bash
-# Choose Milvus as the vector database (default)
-VECTOR_DB_TYPE=milvus
-
-# For local Milvus Lite (recommended for development)
-MILVUS_URI=milvus_demo.db
-
-# For remote Milvus server
-MILVUS_URI=http://localhost:19530
-MILVUS_TOKEN=root:Milvus
-```
-
-### Weaviate
+### Weaviate (Recommended) ⭐ **RECOMMENDED**
 - **Cloud-based**: Managed vector database service
 - **Local support**: Podman-based local deployment
 - **Automatic vectorization**: Built-in embedding capabilities
 - **Query agents**: Advanced query capabilities
+- **Easy setup**: No server setup required for local development
 
 #### Configuring Local Weaviate
 
@@ -620,28 +610,29 @@ response = await ragme.run("What is this about?")
 
 See `examples/weaviate_local_example.py` for a complete example.
 
-#### Example Usage with Milvus
+### Milvus (Alternative)
+- **Milvus Lite**: Local development with no server setup required
+- **High-performance**: Vector search and similarity matching
+- **Easy setup**: Automatic local database file creation
+- **Production ready**: Can scale to Milvus Server for production
 
-```python
-import os
-from src.ragme import RagMe
+#### Configuring Milvus
 
-# Configure for Milvus (default)
-os.environ["VECTOR_DB_TYPE"] = "milvus"
-os.environ["MILVUS_URI"] = "milvus_demo.db"
+Set the following environment variables:
 
-# Initialize RagMe
-ragme = RagMe(db_type="milvus")
+```bash
+# Choose Milvus as the vector database
+VECTOR_DB_TYPE=milvus
 
-# Add web pages
-urls = ["https://example.com"]
-ragme.write_webpages_to_weaviate(urls)
+# For local Milvus Lite
+MILVUS_URI=milvus_demo.db
 
-# Query the database
-response = await ragme.run("What is this about?")
+# For remote Milvus server
+MILVUS_URI=http://localhost:19530
+MILVUS_TOKEN=root:Milvus
 ```
 
-See `examples/vector_db_usage.py` for a complete example.
+See `examples/milvus_example.py` for a complete example.
 
 ## Project Structure
 

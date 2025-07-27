@@ -13,6 +13,7 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### 🆕 Latest Features Documentation
+- **Save and Email**: Save individual chat responses as markdown files or send via email
 - **Smart Document Chunking**: Automatic splitting of large documents at sentence boundaries
 - **Enhanced UI**: Interactive visualizations with click-to-scroll functionality
 - **Improved Document Management**: Grouped chunked documents with bulk operations
@@ -43,7 +44,6 @@ ragme-ai/
 │   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
-│   ├── ui.py               # Legacy Streamlit UI
 │   ├── socket_manager.py   # WebSocket management
 │   └── common.py           # Common utilities
 ├── frontend/               # 🌐 New frontend (TypeScript/Express)
@@ -163,9 +163,9 @@ See [CI_CD.md](CI_CD.md) for detailed testing information.
 ## 🚀 Key Features
 
 ### Vector Database Support
-- **Milvus Lite**: Default for local development (no server setup)
-- **Local Weaviate**: Podman-based local deployment
-- **Weaviate Cloud**: Managed vector database service
+- **Weaviate Cloud**: Recommended managed vector database service
+- **Local Weaviate**: Podman-based local deployment (recommended for local development)
+- **Milvus Lite**: Alternative for local development (no server setup)
 - **Extensible**: Easy to add new vector databases
 
 ### User Interfaces

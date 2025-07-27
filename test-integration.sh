@@ -15,7 +15,6 @@ NC='\033[0m' # No Color
 # Configuration
 API_URL="http://localhost:8021"
 MCP_URL="http://localhost:8022"
-UI_URL="http://localhost:8020"
 PID_FILE=".pid"
 WATCH_DIR="watch_directory"
 TIMEOUT=30
@@ -409,8 +408,30 @@ main() {
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
-    # Remove test file if it exists
-    rm -f "$WATCH_DIR/test_integration.pdf"
+    
+    # Remove test files if they exist
+    local test_files=(
+        "$WATCH_DIR/test_integration.pdf"
+        "$WATCH_DIR/test.pdf"
+        "$WATCH_DIR/test_integration_*.pdf"
+    )
+    
+    for test_file in "${test_files[@]}"; do
+        if [ -f "$test_file" ]; then
+            echo -e "  🗑️ Removing test file: $test_file"
+            rm -f "$test_file"
+        fi
+        
+        # Also check for files with similar names
+        for file in "$WATCH_DIR"/test*integration*.pdf "$WATCH_DIR"/test*.pdf; do
+            if [ -f "$file" ] && [[ "$file" == *"test"* ]]; then
+                echo -e "  🗑️ Removing test file: $file"
+                rm -f "$file"
+            fi
+        done
+    done
+    
+    echo -e "  ✅ Cleanup completed"
 }
 
 # Set up trap for cleanup
