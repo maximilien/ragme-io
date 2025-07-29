@@ -15,6 +15,7 @@ class RAGmeAssistant {
         this.vectorDbInfo = null;
         this.thinkingStartTime = null;
         this.documentRefreshInterval = null; // Add interval for auto-refresh
+        this.currentDateFilter = 'current'; // Default to current (this week)
         
         this.init();
     }
@@ -177,6 +178,13 @@ class RAGmeAssistant {
         // Refresh documents button
         document.getElementById('refreshDocuments').addEventListener('click', () => {
             this.refreshDocuments();
+        });
+
+        // Date filter selector
+        document.getElementById('dateFilterSelector').addEventListener('change', (e) => {
+            this.currentDateFilter = e.target.value;
+            localStorage.setItem('ragme-date-filter', this.currentDateFilter);
+            this.loadDocuments();
         });
 
         // Chat input
@@ -1097,6 +1105,9 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         this.settings.showVectorDbInfo = showVectorDbInfo;
         localStorage.setItem('ragme-settings', JSON.stringify(this.settings));
         
+        // Save date filter preference
+        localStorage.setItem('ragme-date-filter', this.currentDateFilter);
+        
         this.hideModal('settingsModal');
         this.showNotification('success', 'Settings saved');
         
@@ -1112,13 +1123,25 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         if (saved) {
             this.settings = { ...this.settings, ...JSON.parse(saved) };
         }
+        
+        // Load date filter preference
+        const savedDateFilter = localStorage.getItem('ragme-date-filter');
+        if (savedDateFilter) {
+            this.currentDateFilter = savedDateFilter;
+            // Update the dropdown to reflect the saved preference
+            const dateFilterSelector = document.getElementById('dateFilterSelector');
+            if (dateFilterSelector) {
+                dateFilterSelector.value = this.currentDateFilter;
+            }
+        }
     }
 
     loadDocuments() {
-        console.log('Loading documents...');
+        console.log('Loading documents with date filter:', this.currentDateFilter);
         this.socket.emit('list_documents', {
             limit: this.settings.maxDocuments,
-            offset: 0
+            offset: 0,
+            dateFilter: this.currentDateFilter
         });
     }
 
@@ -1130,7 +1153,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         refreshBtn.classList.add('loading');
         icon.className = 'fas fa-sync-alt';
         
-        // Load documents
+        // Load documents with current date filter
         this.loadDocuments();
         
         // Also explicitly update visualization after a short delay to ensure it's refreshed
@@ -1146,7 +1169,17 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         }, 1000);
         
         // Show notification
-        this.showNotification('info', 'Refreshing documents...');
+        this.showNotification('info', `Refreshing documents (${this.getDateFilterDisplayName()})...`);
+    }
+
+    getDateFilterDisplayName() {
+        const filterNames = {
+            'current': 'Current',
+            'month': 'This Month',
+            'year': 'This Year',
+            'all': 'All'
+        };
+        return filterNames[this.currentDateFilter] || 'Current';
     }
 
     startAutoRefresh() {

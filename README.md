@@ -314,6 +314,7 @@ A modern, responsive web interface with three-pane layout:
 - **Real-time chat** with markdown support and copy functionality
 - **Save and Email**: Save individual responses as markdown files or send via email
 - **Smart document management** with automatic chunking and grouped display
+- **Date filtering**: Filter documents by Current (this week), This Month, This Year, or All
 - **Interactive visualizations** with D3.js charts (bar, pie, network graphs)
 - **Click-to-scroll functionality** - click on visualization nodes to scroll to documents
 - **Responsive design** with collapsible sidebars and smooth animations
@@ -330,8 +331,35 @@ A modern, responsive web interface with three-pane layout:
 - **Network graph visualization**: Interactive document relationship mapping
 - **Save responses**: Download any AI response as a markdown file with smart naming
 - **Email responses**: Send AI responses via email with pre-filled content
+- **Date filtering**: Filter documents by time periods to manage large collections
 
 **Access**: `http://localhost:3020` (default when running `./start.sh`)
+
+### Document Date Filtering
+
+The new frontend includes a powerful date filtering system to help manage large document collections:
+
+**Filter Options**:
+- **Current**: Shows documents added in the last 7 days (this week)
+- **This Month**: Shows documents added in the current month
+- **This Year**: Shows documents added in the current year  
+- **All**: Shows all documents (no date filtering)
+
+**Features**:
+- **Persistent preferences**: Your date filter choice is saved and restored on page reload
+- **Real-time filtering**: Documents are filtered instantly when you change the filter
+- **Visual feedback**: The refresh button shows which filter is currently active
+- **Smart defaults**: Defaults to "Current" to show recent documents first
+- **Backend optimization**: Efficient server-side filtering for large collections
+
+**Usage**:
+1. Look for the dropdown in the Documents sidebar header (right panel)
+2. Select your desired time period from the dropdown
+3. The document list will update immediately to show only documents from that period
+4. The visualization will also update to reflect the filtered documents
+5. Your preference is automatically saved for future sessions
+
+This feature is especially useful when you have hundreds of documents collected over many months and want to focus on recent content or explore documents from specific time periods.
 
 ### Chrome Extension
 

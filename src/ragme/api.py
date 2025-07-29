@@ -6,7 +6,7 @@ import tempfile
 import traceback
 import warnings
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import PyPDF2
@@ -228,12 +228,81 @@ async def query(query_input: QueryInput):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+def filter_documents_by_date(
+    documents: list[dict[str, Any]], date_filter: str
+) -> list[dict[str, Any]]:
+    """
+    Filter documents by date based on the date_filter parameter.
+
+    Args:
+        documents: List of documents to filter
+        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+
+    Returns:
+        Filtered list of documents
+    """
+    if date_filter == "all":
+        return documents
+
+    now = datetime.now()
+
+    if date_filter == "current":
+        # Current = this week (last 7 days)
+        cutoff_date = now - timedelta(days=7)
+    elif date_filter == "month":
+        # This month (current month)
+        cutoff_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif date_filter == "year":
+        # This year (current year)
+        cutoff_date = now.replace(
+            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+    else:
+        # Invalid filter, return all documents
+        return documents
+
+    filtered_documents = []
+
+    for doc in documents:
+        # Extract date_added from metadata
+        metadata = doc.get("metadata", {})
+        if isinstance(metadata, str):
+            # Handle case where metadata is a JSON string
+            try:
+                import json
+
+                metadata = json.loads(metadata)
+            except (json.JSONDecodeError, TypeError):
+                metadata = {}
+
+        date_added_str = metadata.get("date_added")
+        if not date_added_str:
+            # If no date_added, include the document (could be old documents without date)
+            filtered_documents.append(doc)
+            continue
+
+        try:
+            # Parse the date_added string
+            date_added = datetime.fromisoformat(date_added_str.replace("Z", "+00:00"))
+            if date_added >= cutoff_date:
+                filtered_documents.append(doc)
+        except (ValueError, TypeError):
+            # If date parsing fails, include the document
+            filtered_documents.append(doc)
+
+    return filtered_documents
+
+
 @app.get("/list-documents")
 async def list_documents(
     limit: int = Query(
         default=10, ge=1, le=100, description="Maximum number of documents to return"
     ),
     offset: int = Query(default=0, ge=0, description="Number of documents to skip"),
+    date_filter: str = Query(
+        default="all",
+        description="Date filter: 'current' (this week), 'month' (this month), 'year' (this year), 'all' (all documents)",
+    ),
 ):
     """
     List documents in the RAG system.
@@ -241,16 +310,26 @@ async def list_documents(
     Args:
         limit: Maximum number of documents to return (1-100)
         offset: Number of documents to skip
+        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
 
     Returns:
         dict: List of documents and pagination info
     """
     try:
-        documents = ragme.list_documents(limit=limit, offset=offset)
+        # Get all documents first to apply date filtering
+        all_documents = ragme.list_documents(limit=1000, offset=0)
+
+        # Apply date filtering
+        filtered_documents = filter_documents_by_date(all_documents, date_filter)
+
+        # Apply pagination to filtered results
+        total_count = len(filtered_documents)
+        paginated_documents = filtered_documents[offset : offset + limit]
+
         return {
             "status": "success",
-            "documents": documents,
-            "pagination": {"limit": limit, "offset": offset, "count": len(documents)},
+            "documents": paginated_documents,
+            "pagination": {"limit": limit, "offset": offset, "count": total_count},
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

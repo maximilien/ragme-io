@@ -126,7 +126,40 @@ The new frontend is now ready for use at `http://localhost:3020` when running `.
 # features
 
 ## UX
-* show Documents in different panes: recent, this week, this month, this year
+* ✅ **COMPLETED** - show Documents in different panes: recent, this week, this month, this year
+
+Successfully implemented document date filtering in the Documents pane:
+
+### ✅ Implemented Features:
+- **Date Filter Dropdown**: Added dropdown selector in Documents sidebar header with options: Current, This Month, This Year, All
+- **Backend API Enhancement**: Updated `/list-documents` endpoint to support `date_filter` parameter
+- **Date Filtering Logic**: Implemented server-side filtering based on document `date_added` metadata
+- **Frontend Integration**: Updated frontend to send date filter parameter and handle filtered results
+- **Persistent Preferences**: Date filter choice is saved in localStorage and restored on page reload
+- **Visual Feedback**: Refresh button shows active filter in notifications
+- **Smart Defaults**: Defaults to "Current" (this week) for better UX
+
+### ✅ Filter Options:
+- **Current**: Documents added in the last 7 days (this week)
+- **This Month**: Documents added in the current month
+- **This Year**: Documents added in the current year
+- **All**: All documents (no date filtering)
+
+### ✅ Technical Implementation:
+- **Backend**: Added `filter_documents_by_date()` function in `api.py`
+- **Frontend**: Updated `app.js` with date filter state management and event handlers
+- **UI**: Added dropdown selector with CSS styling in `index.html` and `styles.css`
+- **API**: Enhanced `/list-documents` endpoint with `date_filter` query parameter
+- **Testing**: All unit and integration tests passing
+
+### 🎯 Key Benefits:
+1. **Better UX**: Users can focus on recent documents or explore specific time periods
+2. **Performance**: Efficient server-side filtering for large document collections
+3. **Persistence**: User preferences are saved and restored automatically
+4. **Flexibility**: Multiple time period options to suit different use cases
+5. **Integration**: Works seamlessly with existing document management features
+
+The date filtering feature is now ready for use and documented in the README!
 
 ## content types
 * Images - add images from URLs and documents or individually JPEG files
