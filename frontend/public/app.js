@@ -746,6 +746,15 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         if (sidebar && restoreBtn) {
             sidebar.classList.add('collapsed');
             restoreBtn.style.display = 'block';
+            
+            // Hide resize divider when documents sidebar is collapsed
+            if (sidebarId === 'documentsSidebar') {
+                const resizeDivider = document.getElementById('resizeDivider');
+                if (resizeDivider) {
+                    resizeDivider.classList.add('hidden');
+                }
+            }
+            
             console.log('Sidebar collapsed, restore button shown');
         } else {
             console.error('Could not find sidebar or restore button:', { sidebar, restoreBtn });
@@ -760,6 +769,15 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         if (sidebar && restoreBtn) {
             sidebar.classList.remove('collapsed');
             restoreBtn.style.display = 'none';
+            
+            // Show resize divider when documents sidebar is restored
+            if (sidebarId === 'documentsSidebar') {
+                const resizeDivider = document.getElementById('resizeDivider');
+                if (resizeDivider) {
+                    resizeDivider.classList.remove('hidden');
+                }
+            }
+            
             console.log('Sidebar restored, restore button hidden');
         } else {
             console.error('Could not find sidebar or restore button:', { sidebar, restoreBtn });

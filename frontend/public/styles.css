@@ -401,7 +401,11 @@ body {
     transform: translateX(100%);
     width: 0;
     min-width: 0;
+    max-width: 0;
     overflow: hidden;
+    border-left: none;
+    margin-left: 0;
+    padding-left: 0;
 }
 
 .sidebar-header {
@@ -841,6 +845,10 @@ body {
     position: relative;
     transition: background-color 0.2s;
     z-index: 10;
+}
+
+.resize-divider.hidden {
+    display: none;
 }
 
 .resize-divider:hover {

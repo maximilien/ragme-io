@@ -111,11 +111,36 @@ Successfully created a new modern UI for RAGme.ai Assistant with the following f
 
 The new frontend is now ready for use at `http://localhost:3020` when running `./start.sh`!
 
---
-Test with remote weaviate and with local milvus
+# chore
+* ✅ add TypeScript linting
 
---
-A2A integration for A2A hackathon
+# bugs
+* adding large PDF doc via + Add Content seem to cause new doc to not be querryable -- could be needs time for Weaviate to respond?
 
---
-Complete images support
+# tests
+* Test with remote weaviate and with local milvus
+
+# integrations
+* A2A integration for A2A hackathon
+
+# features
+
+## UX
+* show Documents in different panes: recent, this week, this month, this year
+
+## content types
+* Images - add images from URLs and documents or individually JPEG files
+* Voice memos - `.wav` files and other formats
+* Podcasts - link to podcast files
+* Videos (YouTube) - link to youtube videos
+* Blogs (RSS) subscriptions - any RSS feed
+
+## insights
+* Daily summaries - create a summary of a particular day's activity
+* Daily insights - generate insight from documents added in a particular day
+* Monthly versions - monthly versions of summaries and insights
+
+## services
+* Twilio (phone messages) - add documents and links using messages with a phone number
+* Slack channels - add documents and links using slack messages
+* X / Twitter - add documents and links from X account posts
