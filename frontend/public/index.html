@@ -89,8 +89,14 @@
             <!-- Recent Documents sidebar (resizable) -->
             <div class="documents-sidebar" id="documentsSidebar">
                 <div class="sidebar-header">
-                    <h3>Recent Documents</h3>
+                    <h3>Documents</h3>
                     <div class="sidebar-header-actions">
+                        <select class="date-filter-selector" id="dateFilterSelector" title="Filter documents by date">
+                            <option value="current">Current</option>
+                            <option value="month">This Month</option>
+                            <option value="year">This Year</option>
+                            <option value="all">All</option>
+                        </select>
                         <button class="refresh-btn" id="refreshDocuments" title="Refresh documents">
                             <i class="fas fa-sync-alt"></i>
                         </button>

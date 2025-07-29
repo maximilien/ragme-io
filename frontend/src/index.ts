@@ -512,8 +512,11 @@ io.on('connection', socket => {
 
     const limit = data.limit || 10;
     const offset = data.offset || 0;
+    const dateFilter = data.dateFilter || 'all';
 
-    const apiResult = await callRAGmeAPI(`/list-documents?limit=${limit}&offset=${offset}`);
+    const apiResult = await callRAGmeAPI(
+      `/list-documents?limit=${limit}&offset=${offset}&date_filter=${dateFilter}`
+    );
 
     if (apiResult && apiResult.status === 'success') {
       socket.emit('documents_listed', {
