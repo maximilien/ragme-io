@@ -230,6 +230,9 @@ class RagMeAgent:
                 urls = []
             self.ragme.write_webpages_to_weaviate(urls)
 
+        # Capture the class instance for use in the query_agent function
+        agent_instance = self
+
         def query_agent(query: str):
             """
             Useful for asking questions about RagMe docs and website
@@ -238,44 +241,14 @@ class RagMeAgent:
             Returns:
                 str: The response with relevant document content
             """
-            # Use direct vector search as the primary method
+            # Use vector similarity search as the primary method
             try:
-                # Get documents from the collection - increase limit to find more documents
-                documents = self.ragme.list_documents(limit=100, offset=0)
+                # Use the vector database's search method for proper vector similarity search
+                documents = agent_instance.ragme.vector_db.search(query, limit=5)
 
-                # Improved keyword matching for chunked documents
-                relevant_docs = []
-                query_lower = query.lower()
-                query_words = query_lower.split()
-
-                for _i, doc in enumerate(documents):
-                    text = doc.get("text", "").lower()
-                    url = doc.get("url", "").lower()
-
-                    # Check if any query word appears in text or URL
-                    # Also check metadata for chunked documents
-                    metadata = doc.get("metadata", {})
-                    metadata_text = str(metadata).lower()
-
-                    # Count how many query words match
-                    matches = 0
-                    for word in query_words:
-                        if word in text or word in url or word in metadata_text:
-                            matches += 1
-
-                    # If at least one word matches, consider it relevant
-                    if matches > 0:
-                        relevant_docs.append(
-                            {"doc": doc, "matches": matches, "text_length": len(text)}
-                        )
-
-                if relevant_docs:
-                    # Sort by relevance (more matches first, then by text length)
-                    relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
-
-                    # Get the most relevant document
-                    most_relevant = relevant_docs[0]["doc"]
-                    content = most_relevant.get("text", "")
+                if documents:
+                    # Get the most relevant documents
+                    most_relevant = documents[0]
                     url = most_relevant.get("url", "")
                     metadata = most_relevant.get("metadata", {})
 
@@ -285,11 +258,23 @@ class RagMeAgent:
                     else:
                         chunk_info = ""
 
-                    # Truncate content if too long
-                    if len(content) > 1500:
-                        content = content[:1500] + "..."
+                    # Include similarity score if available
+                    score_info = ""
+                    if "score" in most_relevant:
+                        score_info = f" (Similarity: {most_relevant['score']:.3f})"
 
-                    result = f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}\n\nContent: {content}"
+                    # Use LLM to summarize the relevant content
+                    # Call the method on the class instance using the captured reference
+                    summary = agent_instance._summarize_chunks_with_llm(
+                        query, documents
+                    )
+
+                    result = f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}{score_info}\n\nSummary: {summary}"
+
+                    # If we have multiple relevant documents, mention them
+                    if len(documents) > 1:
+                        result += f"\n\nFound {len(documents)} relevant documents and summarized the most relevant content."
+
                     return result
                 else:
                     return f"I couldn't find any relevant information about '{query}' in the stored documents."
@@ -358,5 +343,126 @@ class RagMeAgent:
         Returns:
             The response from the agent
         """
-        response = await self.agent.run(query)
-        return str(response)
+        # Always try to use query_agent first for any query
+        try:
+            # Use the 7th tool (index 7) which is the query_agent function
+            if len(self.agent.tools) >= 8:
+                query_agent_func = self.agent.tools[7]  # query_agent is the 7th tool
+                result_obj = query_agent_func(query)
+                # Handle ToolOutput object
+                if hasattr(result_obj, "content"):
+                    result = result_obj.content
+                elif hasattr(result_obj, "value"):
+                    result = result_obj.value
+                else:
+                    result = str(result_obj)
+                return result
+            else:
+                # Fallback: use direct vector search
+                return await self._direct_vector_search(query)
+        except Exception:
+            # Fallback: use direct vector search
+            return await self._direct_vector_search(query)
+
+    async def _direct_vector_search(self, query: str) -> str:
+        """
+        Perform direct vector search without using the agent.
+
+        Args:
+            query (str): The search query
+
+        Returns:
+            str: Formatted search results
+        """
+        try:
+            # Use the vector database's search method directly
+            documents = self.ragme.vector_db.search(query, limit=5)
+
+            if documents:
+                # Get the most relevant document
+                most_relevant = documents[0]
+                content = most_relevant.get("text", "")
+                url = most_relevant.get("url", "")
+                metadata = most_relevant.get("metadata", {})
+
+                # For chunked documents, provide more context
+                if metadata.get("is_chunked") or metadata.get("is_chunk"):
+                    chunk_info = f" (Chunked document with {metadata.get('total_chunks', 'unknown')} chunks)"
+                else:
+                    chunk_info = ""
+
+                # Include similarity score if available
+                score_info = ""
+                if "score" in most_relevant:
+                    score_info = f" (Similarity: {most_relevant['score']:.3f})"
+
+                # Truncate content if too long
+                if len(content) > 1500:
+                    content = content[:1500] + "..."
+
+                result = f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}{score_info}\n\nContent: {content}"
+
+                # If we have multiple relevant documents, mention them
+                if len(documents) > 1:
+                    result += f"\n\nFound {len(documents)} relevant documents. Showing the most relevant one."
+
+                return result
+            else:
+                return f"I couldn't find any relevant information about '{query}' in the stored documents."
+
+        except Exception as e:
+            return f"Error searching documents: {str(e)}"
+
+    def _summarize_chunks_with_llm(self, query: str, documents: list[dict]) -> str:
+        """
+        Use LLM to summarize relevant chunks in the context of the query.
+
+        Args:
+            query (str): The user's query
+            documents (list): List of relevant documents
+
+        Returns:
+            str: LLM-generated summary
+        """
+        try:
+            # Prepare context from the most relevant documents
+            context_parts = []
+            for i, doc in enumerate(documents[:3]):  # Use top 3 documents
+                content = doc.get("text", "")
+                metadata = doc.get("metadata", {})
+                filename = metadata.get("filename", "Unknown")
+
+                # Truncate content if too long (keep more for summarization)
+                if len(content) > 2000:
+                    content = content[:2000] + "..."
+
+                context_parts.append(f"Document {i + 1} ({filename}):\n{content}\n")
+
+            context = "\n".join(context_parts)
+
+            # Create prompt for LLM summarization
+            prompt = f"""Based on the following documents, please provide a comprehensive answer to the user's question.
+
+User Question: {query}
+
+Relevant Documents:
+{context}
+
+Please provide a clear, well-structured answer that directly addresses the user's question. Use information from the documents to support your response. If the documents don't contain enough information to fully answer the question, acknowledge this and provide what information is available.
+
+Answer:"""
+
+            # Use the LLM to generate the summary
+            response = self.llm.complete(prompt)
+            return response.text.strip()
+
+        except Exception:
+            # Fallback to simple text extraction if LLM summarization fails
+            most_relevant = documents[0]
+            content = most_relevant.get("text", "")
+
+            # Truncate content if too long
+            if len(content) > 1500:
+                content = content[:1500] + "..."
+
+            return f"Content: {content}"

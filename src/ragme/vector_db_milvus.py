@@ -168,12 +168,15 @@ class MilvusVectorDatabase(VectorDatabase):
             warnings.warn("Milvus client is not available. Returning empty list.")
             return []
 
-        # Query all documents, paginated
+        # Query all documents, paginated and sorted by creation time (most recent first)
         results = self.client.query(
             self.collection_name,
             output_fields=["id", "url", "text", "metadata"],
             limit=limit,
             offset=offset,
+            sort=[
+                {"field": "id", "order": "desc"}
+            ],  # Sort by ID (which represents creation order), newest first
         )
 
         docs = []
@@ -209,17 +212,16 @@ class MilvusVectorDatabase(VectorDatabase):
 
     def find_document_by_url(self, url: str) -> dict[str, Any] | None:
         """Find a document by its URL."""
-        self._ensure_client()
-        if self.client is None:
-            warnings.warn("Milvus client is not available. Cannot find document.")
-            return None
-
         try:
+            self._ensure_client()
+            if self.client is None:
+                return None
+
             # Query for documents with the specific URL
             results = self.client.query(
                 self.collection_name,
-                filter=f'url == "{url}"',
                 output_fields=["id", "url", "text", "metadata"],
+                filter=f'url == "{url}"',
                 limit=1,
             )
 
@@ -229,7 +231,6 @@ class MilvusVectorDatabase(VectorDatabase):
                     metadata = json.loads(doc.get("metadata", "{}"))
                 except Exception:
                     metadata = {}
-
                 return {
                     "id": doc.get("id"),
                     "url": doc.get("url", ""),
@@ -241,6 +242,127 @@ class MilvusVectorDatabase(VectorDatabase):
         except Exception as e:
             warnings.warn(f"Failed to find document by URL {url}: {e}")
             return None
+
+    def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        """
+        Search for documents using Milvus vector similarity search.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        try:
+            self._ensure_client()
+            if self.client is None:
+                warnings.warn("Milvus client is not available. Returning empty list.")
+                return []
+
+            # Generate embedding for the query
+            import os
+
+            from openai import OpenAI
+
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                warnings.warn(
+                    "OPENAI_API_KEY not found. Falling back to keyword search."
+                )
+                return self._fallback_keyword_search(query, limit)
+
+            client = OpenAI(api_key=api_key)
+            response = client.embeddings.create(
+                model="text-embedding-3-small", input=query
+            )
+            query_vector = response.data[0].embedding
+
+            # Perform vector similarity search
+            results = self.client.search(
+                self.collection_name,
+                data=[query_vector],
+                anns_field="vector",
+                param={"metric_type": "COSINE", "params": {"nprobe": 10}},
+                limit=limit,
+                output_fields=["id", "url", "text", "metadata"],
+            )
+
+            documents = []
+            for hits in results:
+                for hit in hits:
+                    try:
+                        metadata = json.loads(hit.entity.get("metadata", "{}"))
+                    except Exception:
+                        metadata = {}
+
+                    doc = {
+                        "id": hit.entity.get("id"),
+                        "url": hit.entity.get("url", ""),
+                        "text": hit.entity.get("text", ""),
+                        "metadata": metadata,
+                        "score": hit.score,  # Include similarity score
+                    }
+                    documents.append(doc)
+
+            return documents
+
+        except Exception as e:
+            warnings.warn(f"Failed to perform vector search for query '{query}': {e}")
+            # Fallback to simple keyword matching if vector search fails
+            return self._fallback_keyword_search(query, limit)
+
+    def _fallback_keyword_search(
+        self, query: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """
+        Fallback to simple keyword matching if vector search fails.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        try:
+            # Get all documents and perform keyword matching
+            documents = self.list_documents(limit=100, offset=0)
+
+            query_lower = query.lower()
+            query_words = query_lower.split()
+            relevant_docs = []
+
+            for doc in documents:
+                text = doc.get("text", "").lower()
+                url = doc.get("url", "").lower()
+                metadata = doc.get("metadata", {})
+                metadata_text = str(metadata).lower()
+
+                # Count how many query words match
+                matches = 0
+                for word in query_words:
+                    if word in text or word in url or word in metadata_text:
+                        matches += 1
+
+                # If at least one word matches, consider it relevant
+                if matches > 0:
+                    relevant_docs.append(
+                        {"doc": doc, "matches": matches, "text_length": len(text)}
+                    )
+
+            if relevant_docs:
+                # Sort by relevance (more matches first, then by text length)
+                relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
+
+                # Return the top results
+                return [item["doc"] for item in relevant_docs[:limit]]
+
+            return []
+
+        except Exception as e:
+            warnings.warn(f"Fallback keyword search also failed: {e}")
+            return []
 
     def create_query_agent(self):
         """Create a query agent for Milvus."""

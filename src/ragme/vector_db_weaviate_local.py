@@ -136,7 +136,9 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             # Get documents from the collection using the correct Weaviate v4 API
             collection = self.client.collections.get(self.collection_name)
             response = collection.query.fetch_objects(
-                limit=limit, offset=offset, include_vector=False
+                limit=limit,
+                offset=offset,
+                include_vector=False,
             )
 
             documents = []
@@ -154,6 +156,12 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                         doc["metadata"][key] = value
 
                 documents.append(doc)
+
+            # Sort by creation time (most recent first) - Weaviate doesn't support sorting in query
+            # So we'll sort the results after fetching
+            documents.sort(
+                key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
+            )
 
             return documents
 
@@ -179,6 +187,102 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
         except Exception as e:
             print(f"Error deleting document {document_id} from Weaviate: {str(e)}")
             return False
+
+    def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        """
+        Search for documents using local Weaviate's vector similarity search.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        try:
+            collection = self.client.collections.get(self.collection_name)
+
+            # Use Weaviate's near_text search for vector similarity
+            result = collection.query.near_text(
+                query=query,
+                limit=limit,
+                include_vector=False,
+            )
+
+            documents = []
+            for obj in result.objects:
+                doc = {
+                    "id": obj.uuid,
+                    "url": obj.properties.get("url", ""),
+                    "text": obj.properties.get("text", ""),
+                    "metadata": {},
+                }
+
+                # Add all other properties as metadata
+                for key, value in obj.properties.items():
+                    if key not in ["url", "text"]:
+                        doc["metadata"][key] = value
+
+                documents.append(doc)
+
+            return documents
+
+        except Exception as e:
+            print(f"Failed to perform vector search for query '{query}': {str(e)}")
+            # Fallback to simple keyword matching if vector search fails
+            return self._fallback_keyword_search(query, limit)
+
+    def _fallback_keyword_search(
+        self, query: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """
+        Fallback to simple keyword matching if vector search fails.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        try:
+            # Get all documents and perform keyword matching
+            documents = self.list_documents(limit=100, offset=0)
+
+            query_lower = query.lower()
+            query_words = query_lower.split()
+            relevant_docs = []
+
+            for doc in documents:
+                text = doc.get("text", "").lower()
+                url = doc.get("url", "").lower()
+                metadata = doc.get("metadata", {})
+                metadata_text = str(metadata).lower()
+
+                # Count how many query words match
+                matches = 0
+                for word in query_words:
+                    if word in text or word in url or word in metadata_text:
+                        matches += 1
+
+                # If at least one word matches, consider it relevant
+                if matches > 0:
+                    relevant_docs.append(
+                        {"doc": doc, "matches": matches, "text_length": len(text)}
+                    )
+
+            if relevant_docs:
+                # Sort by relevance (more matches first, then by text length)
+                relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
+
+                # Return the top results
+                return [item["doc"] for item in relevant_docs[:limit]]
+
+            return []
+
+        except Exception as e:
+            print(f"Fallback keyword search also failed: {str(e)}")
+            return []
 
     def create_query_agent(self):
         """Create a local Weaviate query agent."""

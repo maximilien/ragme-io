@@ -93,7 +93,7 @@ start_new_frontend() {
     cd frontend
     npm install
     npm run build
-    npm start > ../logs/frontend.log 2>&1 &
+    RAGME_API_URL=http://localhost:8021 npm start > ../logs/frontend.log 2>&1 &
     echo $! >> ../.pid
     cd ..
 }

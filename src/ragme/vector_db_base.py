@@ -92,6 +92,20 @@ class VectorDatabase(ABC):
         pass
 
     @abstractmethod
+    def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        """
+        Search for documents using vector similarity search.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        pass
+
+    @abstractmethod
     def create_query_agent(self):
         """Create and return a query agent for this vector database."""
         pass

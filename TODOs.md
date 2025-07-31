@@ -151,9 +151,32 @@ Successfully implemented document date filtering in the Documents pane:
 The date filtering feature is now ready for use and documented in the README!
 
 # bugs
-* adding large PDF doc via + Add Content seem to cause new doc to not be querryable -- could be needs time for Weaviate to respond?
 
 * ✅ README and other docs seems to have repetitions
+
+* ✅ **FIXED** - adding large PDF doc via + Add Content seem to cause new doc to not be querryable -- could be needs time for Weaviate to respond?
+
+**Root Cause**: The querying mechanism was using simple keyword matching instead of proper vector similarity search, and the FunctionAgent was not properly executing function calls, returning function call text instead of actual results.
+
+**Solution Implemented**:
+1. **Added proper vector search method**: Implemented `search()` method in all vector database implementations (Weaviate, Weaviate Local, and Milvus) that uses proper vector similarity search
+2. **Always use query_agent with fallback**: Modified `ragme_agent.py` to always use the query_agent function first, with fallback to direct vector search
+3. **Fixed FunctionAgent execution**: Updated the `run` method to properly handle `ToolOutput` objects from LlamaIndex FunctionTools
+4. **LLM summarization of chunks**: Added `_summarize_chunks_with_llm()` method that uses the LLM to generate coherent summaries of relevant chunks instead of showing raw text
+5. **Enhanced response quality**: Now provides well-structured, contextual summaries that directly answer the user's query
+6. **Added fallback mechanism**: If LLM summarization fails, falls back to raw content for robustness
+
+**Key Improvements**:
+- **Semantic search**: Uses proper vector similarity search instead of keyword matching
+- **LLM summarization**: Chunks are summarized by the LLM in the context of the user's query
+- **Better UX**: Responses are coherent, well-structured, and directly answer the question
+- **Robust fallbacks**: Multiple fallback mechanisms ensure the system always works
+
+**Testing**: Verified that large PDF files like `2506.18511v1.pdf` (83 chunks) now return excellent, coherent summaries for queries like "what do you know about RAG-based framework" and "what is Standard Applicability Judgment".
+
+* right pane shows as purple block when collapse on mobile (iPhone)
+
+* the chat text input is hidden on mobile (iPhone). Need to flip to horizonal and touch bottom to be able to make text input visible and use
 
 # tests
 * Test with remote weaviate and with local milvus
@@ -162,6 +185,12 @@ The date filtering feature is now ready for use and documented in the README!
 * A2A integration for A2A hackathon
 
 # features
+
+## UI/UX improvements
+
+* ✅ order document in document pane by order of their additions to the VDB
+* ✅ add a "new" badge (upper right top) when a new document is added to make it stand out in list
+
 
 ## content types
 * Images - add images from URLs and documents or individually JPEG files
