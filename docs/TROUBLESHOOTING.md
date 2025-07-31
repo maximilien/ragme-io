@@ -2,7 +2,7 @@
 
 This guide covers common issues and their solutions for RAGme AI.
 
-## �� Common Issues
+## 🚨 Common Issues
 
 ### Vector Database Connection Errors
 
@@ -99,157 +99,88 @@ DeprecationWarning: pkg_resources is deprecated as an API
 
 **Solution**: This is a known issue with Milvus Lite dependencies. The warning is harmless and doesn't affect functionality. It will be resolved in future versions of Milvus Lite.
 
-## 🔧 Configuration Issues
+### API Server Not Responding
 
-### Missing Environment Variables
-
-**Problem**: Services fail to start due to missing configuration.
-
-**Solution**: 
-1. Copy the example configuration:
-   ```bash
-   cp env.example .env
-   ```
-2. Edit `.env` with your settings:
-   ```bash
-   # For local development (default - recommended)
-   VECTOR_DB_TYPE=milvus
-   
-   # For OpenAI queries
-   OPENAI_API_KEY=your-openai-key
-   
-   # For Weaviate Cloud (optional)
-   VECTOR_DB_TYPE=weaviate
-   WEAVIATE_API_KEY=your-weaviate-key
-   WEAVIATE_URL=https://your-cluster.weaviate.network
-   
-   # For local Weaviate (optional)
-   VECTOR_DB_TYPE=weaviate-local
-   WEAVIATE_LOCAL_URL=http://localhost:8080
-   ```
-
-### Port Conflicts
-
-**Problem**: Services fail to start because ports are already in use.
-
-**Solution**:
-1. Check what's using the ports:
-   ```bash
-   lsof -i :3020  # New Frontend
-   lsof -i :8020  # Legacy UI
-   lsof -i :8021  # API
-   lsof -i :8022  # MCP
-   ```
-2. Stop conflicting processes or use the process management:
-   ```bash
-   ./stop.sh stop
-   ./stop.sh restart
-   ```
-
-## 🛠️ Process Management Issues
-
-### Stale PID Files
-
-**Problem**: Services show as running but aren't actually responding.
-
-**Solution**:
-```bash
-# Check status
-./stop.sh status
-
-# Clean restart
-./stop.sh restart
-```
-
-### Services Not Starting
-
-**Problem**: Some services fail to start during restart.
-
-**Solution**:
-1. Check the logs in the terminal where services were started
-2. Verify configuration in `.env`
-3. Try manual start to see specific errors:
-   ```bash
-   # Start API manually
-   uv run uvicorn src.ragme.api:app --reload --host 0.0.0.0 --port 8021
-   ```
-
-### Frontend Build Issues
-
-**Problem**: Frontend fails to build or start.
+**Problem**: API server (port 8021) is not responding to requests.
 
 **Symptoms**:
 ```
-npm ERR! Failed to build
+Connection refused on port 8021
 ```
 
 **Solution**:
-1. **Clear node_modules and reinstall**:
+1. **Check API server status**:
    ```bash
-   cd frontend
-   rm -rf node_modules package-lock.json
-   npm install
-   npm run build
+   ./stop.sh status
    ```
-2. **Check Node.js version** (requires 18+):
+2. **Restart API server**:
    ```bash
-   node --version
+   ./stop.sh restart
    ```
-3. **Check for TypeScript errors**:
+3. **Check API logs**:
    ```bash
-   cd frontend
-   npm run build
+   ./tools/tail-logs.sh api
+   ```
+4. **Test API endpoint**:
+   ```bash
+   curl --max-time 10 http://localhost:8021/docs
    ```
 
-## 🔍 Debugging
+### MCP Server Issues
 
-### Check Service Status
+**Problem**: MCP server (port 8022) is not processing documents.
 
-```bash
-./stop.sh status
+**Symptoms**:
+```
+MCP server not responding
+Document processing failures
 ```
 
-This will show:
-- Which processes are running
-- Port status for each service
-- PID information for debugging
+**Solution**:
+1. **Check MCP server status**:
+   ```bash
+   ./stop.sh status
+   ```
+2. **Restart MCP server**:
+   ```bash
+   ./stop.sh restart
+   ```
+3. **Check MCP logs**:
+   ```bash
+   ./tools/tail-logs.sh mcp
+   ```
+4. **Test MCP endpoint**:
+   ```bash
+   curl --max-time 10 http://localhost:8022/docs
+   ```
 
-### View Logs
+### File Monitoring Not Working
 
-Services log to the terminal where they were started. Check for:
-- Connection errors
-- Configuration issues
-- Import errors
+**Problem**: Files placed in `watch_directory/` are not being processed.
 
-### Monitor Logs in Real-time
-
-```bash
-# Monitor all services
-./tools/tail-logs.sh all
-
-# Monitor specific services
-./tools/tail-logs.sh api
-./tools/tail-logs.sh mcp
-./tools/tail-logs.sh frontend
-./tools/tail-logs.sh legacy-ui
-./tools/tail-logs.sh agent
+**Symptoms**:
+```
+New files not detected
+No automatic processing
 ```
 
-### Test Individual Components
-
-```bash
-# Test API
-curl --max-time 10 http://localhost:8021/docs
-
-# Test MCP
-curl --max-time 10 http://localhost:8022/docs
-
-# Test new frontend
-open http://localhost:3020
-
-# Test legacy UI
-open http://localhost:8020
-```
+**Solution**:
+1. **Check if file monitor is running**:
+   ```bash
+   ./stop.sh status
+   ```
+2. **Restart file monitor**:
+   ```bash
+   ./stop.sh restart
+   ```
+3. **Check agent logs**:
+   ```bash
+   ./tools/tail-logs.sh agent
+   ```
+4. **Verify file permissions**:
+   ```bash
+   ls -la watch_directory/
+   ```
 
 ## 🚀 Performance Issues
 
@@ -289,6 +220,29 @@ open http://localhost:8020
 3. **Check WebSocket connection** in browser dev tools
 4. **Monitor frontend logs**: `./tools/tail-logs.sh frontend`
 5. **Restart frontend**: `./start.sh restart-frontend`
+
+## 🔍 Debugging
+
+For comprehensive debugging information, see [Process Management Guide](PROCESS_MANAGEMENT.md).
+
+### Quick Debugging Steps
+
+1. **Check service status**:
+   ```bash
+   ./stop.sh status
+   ```
+
+2. **Monitor logs in real-time**:
+   ```bash
+   ./tools/tail-logs.sh all
+   ```
+
+3. **Test individual components**:
+   ```bash
+   curl --max-time 10 http://localhost:8021/docs  # API
+   curl --max-time 10 http://localhost:8022/docs  # MCP
+   open http://localhost:3020                     # Frontend
+   ```
 
 ## 📞 Getting Help
 
@@ -340,25 +294,4 @@ These improvements make the system more robust and easier to use for local devel
 | Memory issues | `./stop.sh restart` |
 | Log monitoring | `./tools/tail-logs.sh all` |
 
-### Emergency Procedures
-
-```bash
-# Force kill all processes
-pkill -f "ragme"
-pkill -f "streamlit"
-pkill -f "uvicorn"
-pkill -f "node"
-
-# Complete reset
-rm -f .pid
-./stop.sh stop
-./start.sh
-
-# Frontend reset
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-npm run build
-cd ..
-./start.sh restart-frontend
-``` 
+For detailed process management and emergency procedures, see [Process Management Guide](PROCESS_MANAGEMENT.md). 

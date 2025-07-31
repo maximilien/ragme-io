@@ -25,6 +25,55 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 
 ---
 
+## 🖼️ New Frontend Interface
+
+### Modern Three-Pane Layout
+
+<div style="display: flex; justify-content: center; margin: 20px 0;">
+  <img src="../images/ragme1.png" alt="RAGme.ai Interface - Main Chat" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+</div>
+
+**Key Features:**
+- **Left Sidebar**: Chat history with collapsible design
+- **Center**: Main chat area with markdown support
+- **Right Sidebar**: Document management with D3.js visualizations
+- **Real-time Updates**: WebSocket communication for live interactions
+
+---
+
+## 📊 Document Management & Visualizations
+
+### Interactive Document Dashboard
+
+<div style="display: flex; justify-content: center; margin: 20px 0;">
+  <img src="../images/ragme2.png" alt="RAGme.ai Interface - Document Management" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+</div>
+
+**Advanced Features:**
+- **Smart Chunking**: Large documents automatically split at sentence boundaries
+- **Date Filtering**: Filter by Current, This Month, This Year, or All
+- **Bulk Operations**: Delete entire chunked documents with one click
+- **Enhanced Metadata**: Rich document information and chunk counts
+
+---
+
+## 📈 Data Visualization & Analytics
+
+### D3.js Powered Charts
+
+<div style="display: flex; justify-content: center; margin: 20px 0;">
+  <img src="../images/ragme3.png" alt="RAGme.ai Interface - Visualizations" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+</div>
+
+**Visualization Features:**
+- **Bar Charts**: Document type distribution
+- **Pie Charts**: Content source analysis
+- **Network Graphs**: Document relationship mapping
+- **Click-to-Scroll**: Interactive navigation to documents
+- **Responsive Design**: Adapts to different screen sizes
+
+---
+
 ## 🚀 Key Features & Use Cases
 
 ### 1. **Interactive Personal RAG**
@@ -80,13 +129,21 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 ```mermaid
 flowchart TB
     new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
-    legacy-ui[Legacy Streamlit UI<br/>Port 8020] --> api
+    new-ui[New Frontend<br/>Port 3020] --> agent-query[Query Agent]
     chrome[Chrome Extension] --> api
-    agent[File Monitor Agent] --> mcp[MCP Server<br/>Port 8022]
+    subgraph "AI Agent Layer"
+      agent-local[File Monitor Local Agent] --> mcp[MCP Server<br/>Port 8022]
+      agent-query[Query Agent] --> mcp[MCP Server<br/>Port 8022]
+      agent-query[Query Agent] --> openai[OpenAI LLM]
+    end
     mcp --> api
     api --> ragme[RAGme Core]
-    ragme --> vector_db[(Vector DB<br/>Agnostic)]
-    ragme --> openai[OpenAI LLM]
+    ragme --> vector-db[(Vector DB)]    
+    subgraph "Vector Database Layer"
+        vector-db --> weaviate-local[(Local Weaviate<br/>Podman)]
+        vector-db --> weaviate-cloud[(Weaviate Cloud)]
+        vector-db --> milvus[(Milvus Lite)]
+    end
 ```
 
 ### Core Components
@@ -94,136 +151,14 @@ flowchart TB
 | Component | Port | Purpose |
 |-----------|------|---------|
 | **New Frontend** | 3020 | Modern web interface with three-pane layout ⭐ **DEFAULT** |
-| **Legacy Streamlit UI** | 8020 | Original web interface for user interaction |
 | **API Server** | 8021 | REST API for content ingestion |
 | **MCP Server** | 8022 | Document processing (PDF/DOCX) |
-| **File Monitor** | - | Watches directory for new files |
-| **Chrome Extension** | - | Browser-based content capture |
-| **Vector DB Layer** | - | Abstracted database interface |
-
----
-
-## 🔧 Technology Stack
-
-### Backend Technologies
-- **Python 3.12+**: Core application language
-- **FastAPI**: High-performance API framework
-- **Streamlit**: Rapid web app development (legacy UI)
-- **Uvicorn**: ASGI server for FastAPI
-
-### Frontend Technologies ⭐ **NEW!**
-- **TypeScript**: Modern JavaScript with type safety
-- **Express.js**: Node.js web framework
-- **Socket.IO**: Real-time bidirectional communication
-- **D3.js**: Data visualization and charts
-- **Marked.js**: Markdown parsing
-- **DOMPurify**: HTML sanitization
-
-### AI & ML Stack
-- **OpenAI GPT-4o-mini**: Primary LLM for reasoning
-- **LlamaIndex**: Document processing and RAG framework
-- **Vector Database Abstraction**: Support for multiple vector databases
-
-### Document Processing
-- **PyPDF2**: PDF text extraction
-- **python-docx**: DOCX document processing
-- **BeautifulSoup**: HTML parsing for web content
-
-### Vector Database Support
-- **Milvus Lite**: Default local development (no server setup)
-- **Local Weaviate**: Podman-based local deployment
-- **Weaviate Cloud**: Managed vector database service
-- **Extensible**: Easy to add Pinecone, Chroma, etc.
-- **Abstracted Interface**: Clean separation of concerns
-- **Modular Architecture**: Each database in separate files for maintainability
-
----
-
-## 📄 Smart Document Chunking ⭐ **NEW!**
-
-### Automatic Chunking System
-RAGme.ai now features intelligent document chunking that automatically handles large documents:
-
-**How It Works**:
-- **Size Detection**: Documents exceeding 1000 characters are automatically chunked
-- **Smart Boundaries**: Chunks are split at sentence boundaries (., !, ?) for readability
-- **Fallback Logic**: If no sentence boundary is found, splits at character limit
-- **Metadata Preservation**: Original document information is maintained across chunks
-
-**Benefits**:
-- **Token Limit Compliance**: Prevents LLM token limit errors
-- **Improved Retrieval**: Better context matching for queries
-- **Consistent Processing**: Same chunking logic across all input methods
-- **Enhanced Performance**: Faster processing of large documents
-
-### Chunked Document Management
-**Frontend Display**:
-- **Grouped View**: Multiple chunks appear as single documents in the UI
-- **Chunk Indicators**: Visual badges show chunk counts (e.g., "📄 5 chunks")
-- **Unified Operations**: Delete entire chunked documents with one click
-- **Metadata Display**: Shows original filename and chunk information
-
-**Processing Methods**:
-- **Manual Upload**: Files uploaded via "+Add Content" modal
-- **Watch Directory**: Files placed in `watch_directory/` folder
-- **API Integration**: Direct API calls with chunking support
-- **Chrome Extension**: Web pages with automatic chunking
-
-### Technical Implementation
-**Chunking Algorithm**:
-```python
-def chunkText(text: str, chunk_size: int = 1000) -> list[str]:
-    # Split at sentence boundaries when possible
-    # Fallback to character limits if needed
-    # Preserve document structure and readability
-```
-
-**Metadata Enhancement**:
-```json
-{
-  "total_chunks": 5,
-  "is_chunked": true,
-  "chunk_sizes": [950, 1020, 980, 1050, 890],
-  "original_filename": "large_document.pdf"
-}
-```
-
----
-
-## 📦 Installation & Setup
-
-### Prerequisites
-```bash
-# Required software
-- Python 3.12+
-- uv (Python package manager)
-- Node.js 18+ (for new frontend)
-```
-
-### Environment Configuration
-```bash
-# .env file setup
-OPENAI_API_KEY=sk-proj-*****-**
-VECTOR_DB_TYPE=milvus  # Default for local development
-# VECTOR_DB_TYPE=weaviate-local  # For local Weaviate
-# VECTOR_DB_TYPE=weaviate  # For cloud Weaviate
-RAGME_API_URL=http://localhost:8021
-RAGME_MCP_URL=http://localhost:8022
-```
-
-### Quick Start
-```bash
-# Clone and setup
-gh repo clone maximilien/ragme-ai
-cd ragme-ai
-uv venv
-source .venv/bin/activate
-uv sync
-
-# Start all services (new frontend by default)
-chmod +x start.sh
-./start.sh
-```
+| **File Monitor Local Agent** | - | Watches directory for new files |
+| **Query Agent** | - | Handles user queries and LLM interactions |
+| **Chrome Extension** | - | Browser integration for web content capture |
+| **RAGme Core** | - | Main RAG processing logic using LlamaIndex |
+| **AI Agent Layer** | - | Orchestrates AI interactions and document processing |
+| **Vector Database Layer** | - | Modular support for multiple vector databases |
 
 ---
 
@@ -359,43 +294,6 @@ flowchart LR
 
 ---
 
-## 🔒 Security & Limitations
-
-### Current Limitations
-- ✅ Single collection for all users
-- ✅ ~~Tied to Weaviate as vector database~~ **Fixed!** Now supports multiple vector databases with Milvus as default
-- ✅ Tied to LlamaIndex for RAG operations
-- ✅ No HTTPS by default
-
-### Security Considerations
-- API keys stored in environment variables
-- CORS enabled for development
-- No user authentication (single-user system)
-
----
-
-## 🚀 Future Roadmap
-
-### Phase 1: Infrastructure ✅ **COMPLETED**
-- [x] ~~Decouple Weaviate dependency~~ **Completed!** Now supports Milvus, Weaviate, and extensible for others
-- [x] ~~Add modern frontend UI~~ **Completed!** New three-pane interface with real-time features
-- [x] ~~Add local Weaviate support~~ **Completed!** Podman-based local deployment
-- [x] ~~Add debugging and monitoring tools~~ **Completed!** Comprehensive log monitoring
-- [ ] Decouple LlamaIndex (docling integration)
-- [ ] Add HTTPS security
-
-### Phase 2: Content Types
-- [ ] Image and video processing
-- [ ] Audio content support
-- [ ] Email integration (xyz@ragme.io)
-
-### Phase 3: Collaboration
-- [ ] Multi-user support (SaaS)
-- [ ] Slack integration
-- [ ] X/Twitter content ingestion
-
----
-
 ## 💡 Use Case Scenarios
 
 ### Scenario 1: Research Assistant
@@ -460,53 +358,60 @@ RAGme: "The quarterly report shows..."
 
 ---
 
+## 🚀 Future Roadmap
+
+### Phase 1: Infrastructure ✅ **COMPLETED**
+- [x] ~~Decouple Weaviate dependency~~ **Completed!** Now supports Milvus, Weaviate, and extensible for others
+- [x] ~~Add modern frontend UI~~ **Completed!** New three-pane interface with real-time features
+- [x] ~~Add local Weaviate support~~ **Completed!** Podman-based local deployment
+- [x] ~~Add debugging and monitoring tools~~ **Completed!** Comprehensive log monitoring
+- [ ] Decouple LlamaIndex (docling integration)
+- [ ] Add HTTPS security
+
+### Phase 2: Content Types
+- [ ] Image and video processing
+- [ ] Audio content support
+- [ ] Email integration (xyz@ragme.io)
+
+### Phase 3: Collaboration
+- [ ] Multi-user support (SaaS)
+- [ ] Slack integration
+- [ ] X/Twitter content ingestion
+
+---
+
 ## 📈 Getting Started Guide
 
-### Step 1: Setup Environment
+For detailed setup instructions, see the main [README.md](../README.md) in the project root.
+
+### Quick Start
 ```bash
-# Install dependencies
-uv sync
+# Clone and setup
+gh repo clone maximilien/ragme-ai
+cd ragme-ai
+uv venv
+source .venv/bin/activate
+uv sync --extra dev
 
 # Configure environment
-cp .env.example .env
+cp env.example .env
 # Edit .env with your API keys
-```
 
-### Step 2: Start Services
-```bash
-# Quick start (new frontend by default)
+# Start all services (new frontend by default)
 ./start.sh
-
-# Or start with legacy UI
-./start.sh legacy-ui
-
-# Or manually
-uv run uvicorn src.ragme.api:app --port 8021 &
-uv run uvicorn src.ragme.mcp:app --port 8022 &
-uv run python -m src.ragme.local_agent &
-cd frontend && npm install && npm run build && npm start &
 ```
 
-### Step 3: Add Content
-```bash
-# Via UI: http://localhost:3020 (new frontend)
-# Via Legacy UI: http://localhost:8020
-# Via Chrome Extension
-# Via watch_directory/ folder
-# Via API calls
-```
-
-### Step 4: Query & Explore
-```bash
-# Ask questions about your content
-# Generate summaries
-# Discover insights
-# Cross-reference information
-```
+### Access Points
+- **New Frontend**: http://localhost:3020 (default)
+- **Legacy UI**: http://localhost:8020
+- **API Docs**: http://localhost:8021/docs
+- **Chrome Extension**: Load from `chrome_ext/` directory
 
 ---
 
 ## 🤝 Contributing
+
+For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### How to Help
 - **Bug Reports**: Open issues for problems
@@ -517,14 +422,13 @@ cd frontend && npm install && npm run build && npm start &
 ### Development Setup
 ```bash
 # Install development dependencies
-uv sync --dev
+uv sync --extra dev
 
 # Run tests
-uv run pytest
+./test.sh
 
 # Code formatting
-uv run ruff format src/
-uv run ruff check src/
+./tools/lint.sh
 ```
 
 ---
@@ -532,9 +436,11 @@ uv run ruff check src/
 ## 📞 Support & Resources
 
 ### Documentation
-- **README.md**: Comprehensive setup guide
+- **[README.md](../README.md)**: Comprehensive setup guide
+- **[Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md)**: Database architecture guide
+- **[Process Management](PROCESS_MANAGEMENT.md)**: Service management guide
+- **[Troubleshooting](TROUBLESHOOTING.md)**: Common issues and solutions
 - **API Documentation**: Available at `/docs` when API server is running
-- **Code Comments**: Well-documented source code
 
 ### Community
 - **GitHub**: https://github.com/maximilien/ragme-ai
