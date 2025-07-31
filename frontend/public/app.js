@@ -2,20 +2,21 @@
 class RAGmeAssistant {
     constructor() {
         this.socket = null;
-        this.chatHistory = [];
         this.documents = [];
-        this.chatSessions = [];
+        this.chatHistory = [];
         this.currentChatId = null;
         this.settings = {
-            maxDocuments: 20,
-            showVectorDbInfo: true
+            maxDocuments: 50,
+            autoRefresh: true,
+            refreshInterval: 30000, // 30 seconds
+            maxTokens: 4000,
+            temperature: 0.7
         };
-        this.isVisualizationVisible = true;
-        this.currentVisualizationType = 'graph'; // Default to network graph
+        this.currentDateFilter = 'current';
+        this.currentVisualizationType = 'graph'; // Default to Network Graph
         this.vectorDbInfo = null;
-        this.thinkingStartTime = null;
-        this.documentRefreshInterval = null; // Add interval for auto-refresh
-        this.currentDateFilter = 'current'; // Default to current (this week)
+        this.autoRefreshInterval = null;
+        this.lastDocumentCount = 0;
         
         this.init();
     }
@@ -87,6 +88,7 @@ class RAGmeAssistant {
 
         this.socket.on('documents_listed', (result) => {
             console.log('Documents listed result:', result);
+            console.log('Current date filter:', this.currentDateFilter);
             if (result.success) {
                 this.documents = result.documents;
                 console.log('Loaded documents:', this.documents.length);
@@ -182,6 +184,7 @@ class RAGmeAssistant {
 
         // Date filter selector
         document.getElementById('dateFilterSelector').addEventListener('change', (e) => {
+            console.log('Date filter changed to:', e.target.value);
             this.currentDateFilter = e.target.value;
             localStorage.setItem('ragme-date-filter', this.currentDateFilter);
             this.loadDocuments();
@@ -259,6 +262,7 @@ class RAGmeAssistant {
         // Visualization type selector
         document.getElementById('visualizationTypeSelector').addEventListener('change', (e) => {
             this.currentVisualizationType = e.target.value;
+            localStorage.setItem('ragme-visualization-type', this.currentVisualizationType);
             if (this.isVisualizationVisible) {
                 this.updateVisualization();
             }
@@ -1134,6 +1138,18 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                 dateFilterSelector.value = this.currentDateFilter;
             }
         }
+        
+        // Load visualization type preference
+        const savedVisualizationType = localStorage.getItem('ragme-visualization-type');
+        if (savedVisualizationType) {
+            this.currentVisualizationType = savedVisualizationType;
+        }
+        
+        // Update the visualization type selector to reflect the saved preference
+        const visualizationTypeSelector = document.getElementById('visualizationTypeSelector');
+        if (visualizationTypeSelector) {
+            visualizationTypeSelector.value = this.currentVisualizationType;
+        }
     }
 
     loadDocuments() {
@@ -1186,16 +1202,16 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         // Clear any existing interval
         this.stopAutoRefresh();
         // Start new interval - refresh every 30 seconds
-        this.documentRefreshInterval = setInterval(() => {
+        this.autoRefreshInterval = setInterval(() => {
             console.log('Auto-refreshing documents...');
             this.loadDocuments();
         }, 30000); // 30 seconds
     }
 
     stopAutoRefresh() {
-        if (this.documentRefreshInterval) {
-            clearInterval(this.documentRefreshInterval);
-            this.documentRefreshInterval = null;
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
         }
     }
 
@@ -1312,10 +1328,12 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
 
             const title = group.url || group.metadata?.filename || `Document ${index + 1}`;
             const date = group.metadata?.date_added || 'Unknown date';
+            const isNew = this.isDocumentNew(date);
             
             // Handle chunked documents (both new and existing)
             let summary = '';
             let chunkInfo = '';
+            let newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
             
             if (group.metadata?.is_chunked && group.metadata?.total_chunks) {
                 // New chunked document format
@@ -1330,6 +1348,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                         <div class="document-title">
                             <span class="document-title-text">${this.escapeHtml(originalFilename)}</span>
                             ${chunkInfo}
+                            ${newBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -1354,6 +1373,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                         <div class="document-title">
                             <span class="document-title-text">${this.escapeHtml(originalFilename)}</span>
                             ${chunkInfo}
+                            ${newBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -1374,6 +1394,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
                     <div class="document-content">
                         <div class="document-title">
                             <span class="document-title-text">${this.escapeHtml(title)}</span>
+                            ${newBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -1434,7 +1455,11 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             displayTitle = doc.metadata.original_filename;
         }
 
-        title.textContent = displayTitle;
+        // Add NEW badge if document is new
+        const isNew = this.isDocumentNew(doc.metadata?.date_added);
+        const newBadge = isNew ? '<span class="new-badge-modal">NEW</span>' : '';
+        
+        title.innerHTML = `${displayTitle}${newBadge}`;
 
         // Create metadata tags (including collection and type)
         const metadataTags = this.createMetadataTags(doc.metadata);
@@ -1589,19 +1614,27 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
     }
 
     toggleVisualization() {
-        const visualization = document.getElementById('visualizationContent');
+        const visualizationContent = document.getElementById('visualizationContent');
+        const visualizationResizeHandle = document.getElementById('visualizationResizeHandle');
+        const documentsVisualization = document.getElementById('documentsVisualization');
         const toggleBtn = document.getElementById('visualizationToggleBtn');
         
         this.isVisualizationVisible = !this.isVisualizationVisible;
         
         if (this.isVisualizationVisible) {
-            visualization.style.display = 'flex';
+            visualizationContent.style.display = 'block';
+            visualizationResizeHandle.style.display = 'flex';
+            documentsVisualization.style.height = '20vh'; // Restore original height
+            documentsVisualization.style.minHeight = '200px';
             toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
             
             // D3.js is now loaded synchronously, so we can call updateVisualization immediately
             this.updateVisualization();
         } else {
-            visualization.style.display = 'none';
+            visualizationContent.style.display = 'none';
+            visualizationResizeHandle.style.display = 'none';
+            documentsVisualization.style.height = 'auto'; // Collapse to header height only
+            documentsVisualization.style.minHeight = 'auto';
             toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
         }
     }
@@ -2693,6 +2726,22 @@ Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}`;
             console.log('Checking detail value', index, ':', value.textContent || value.innerText);
             this.checkTextTruncation(value);
         });
+    }
+
+    isDocumentNew(dateAdded) {
+        if (!dateAdded) return false;
+        
+        try {
+            const addedDate = new Date(dateAdded);
+            const now = new Date();
+            const timeDiff = now.getTime() - addedDate.getTime();
+            const hoursDiff = timeDiff / (1000 * 60 * 60);
+            
+            return hoursDiff <= 24;
+        } catch (error) {
+            console.error('Error parsing date:', error);
+            return false;
+        }
     }
 }
 

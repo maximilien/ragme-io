@@ -144,6 +144,12 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             documents.append(doc)
 
+        # Sort by creation time (most recent first) - Weaviate doesn't support sorting in query
+        # So we'll sort the results after fetching
+        documents.sort(
+            key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
+        )
+
         return documents
 
     def delete_document(self, document_id: str) -> bool:
@@ -189,6 +195,103 @@ class WeaviateVectorDatabase(VectorDatabase):
         except Exception as e:
             warnings.warn(f"Failed to find document by URL {url}: {e}")
             return None
+
+    def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        """
+        Search for documents using Weaviate's vector similarity search.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        try:
+            collection = self.client.collections.get(self.collection_name)
+
+            # Use Weaviate's near_text search for vector similarity
+            result = collection.query.near_text(
+                query=query,
+                limit=limit,
+                include_vector=False,
+            )
+
+            documents = []
+            for obj in result.objects:
+                doc = {
+                    "id": obj.uuid,
+                    "url": obj.properties.get("url", ""),
+                    "text": obj.properties.get("text", ""),
+                    "metadata": obj.properties.get("metadata", "{}"),
+                }
+
+                # Try to parse metadata if it's a JSON string
+                try:
+                    doc["metadata"] = json.loads(doc["metadata"])
+                except json.JSONDecodeError:
+                    pass
+
+                documents.append(doc)
+
+            return documents
+
+        except Exception as e:
+            warnings.warn(f"Failed to perform vector search for query '{query}': {e}")
+            # Fallback to simple keyword matching if vector search fails
+            return self._fallback_keyword_search(query, limit)
+
+    def _fallback_keyword_search(
+        self, query: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """
+        Fallback to simple keyword matching if vector search fails.
+
+        Args:
+            query: The search query text
+            limit: Maximum number of results to return
+
+        Returns:
+            List of documents sorted by relevance
+        """
+        try:
+            # Get all documents and perform keyword matching
+            documents = self.list_documents(limit=100, offset=0)
+
+            query_lower = query.lower()
+            query_words = query_lower.split()
+            relevant_docs = []
+
+            for doc in documents:
+                text = doc.get("text", "").lower()
+                url = doc.get("url", "").lower()
+                metadata = doc.get("metadata", {})
+                metadata_text = str(metadata).lower()
+
+                # Count how many query words match
+                matches = 0
+                for word in query_words:
+                    if word in text or word in url or word in metadata_text:
+                        matches += 1
+
+                # If at least one word matches, consider it relevant
+                if matches > 0:
+                    relevant_docs.append(
+                        {"doc": doc, "matches": matches, "text_length": len(text)}
+                    )
+
+            if relevant_docs:
+                # Sort by relevance (more matches first, then by text length)
+                relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
+
+                # Return the top results
+                return [item["doc"] for item in relevant_docs[:limit]]
+
+            return []
+
+        except Exception as e:
+            warnings.warn(f"Fallback keyword search also failed: {e}")
+            return []
 
     def create_query_agent(self):
         """Create a Weaviate query agent."""

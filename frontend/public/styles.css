@@ -887,6 +887,8 @@ body {
     font-size: 0.8rem;
 }
 
+
+
 /* Documents content */
 .documents-content {
     flex: 1;
@@ -1065,6 +1067,56 @@ body {
     align-items: flex-start;
     max-width: 100%;
     overflow: hidden;
+}
+
+.new-badge {
+    background: #e5f7e5;
+    color: #059669;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
+    border-radius: 8px;
+    border: 1px solid #10b981;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 2.5rem;
+    text-align: center;
+    margin-left: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.new-badge:hover {
+    background: #10b981;
+    color: white;
+    transform: scale(1.05);
+}
+
+@keyframes newBadgePulse {
+    0%, 100% {
+        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 4px 8px rgba(16, 185, 129, 0.5);
+        transform: scale(1.05);
+    }
+}
+
+/* NEW badge for modal */
+.new-badge-modal {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+    animation: newBadgePulse 2s ease-in-out infinite;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 0.5rem;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .document-card:hover {
