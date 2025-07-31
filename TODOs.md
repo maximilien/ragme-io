@@ -114,17 +114,6 @@ The new frontend is now ready for use at `http://localhost:3020` when running `.
 # chore
 * ✅ add TypeScript linting
 
-# bugs
-* adding large PDF doc via + Add Content seem to cause new doc to not be querryable -- could be needs time for Weaviate to respond?
-
-# tests
-* Test with remote weaviate and with local milvus
-
-# integrations
-* A2A integration for A2A hackathon
-
-# features
-
 ## UX
 * ✅ **COMPLETED** - show Documents in different panes: recent, this week, this month, this year
 
@@ -160,6 +149,19 @@ Successfully implemented document date filtering in the Documents pane:
 5. **Integration**: Works seamlessly with existing document management features
 
 The date filtering feature is now ready for use and documented in the README!
+
+# bugs
+* adding large PDF doc via + Add Content seem to cause new doc to not be querryable -- could be needs time for Weaviate to respond?
+
+* ✅ README and other docs seems to have repetitions
+
+# tests
+* Test with remote weaviate and with local milvus
+
+# integrations
+* A2A integration for A2A hackathon
+
+# features
 
 ## content types
 * Images - add images from URLs and documents or individually JPEG files

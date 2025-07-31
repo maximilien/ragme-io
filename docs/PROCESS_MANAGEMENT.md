@@ -155,57 +155,6 @@ npm start
    Use './stop.sh restart' to restart all services.
 ```
 
-## 🔄 Integration with CI/CD
-
-The process management system integrates with CI/CD pipelines:
-
-```yaml
-# Example CI step
-- name: Restart services
-  run: |
-    chmod +x stop.sh
-    ./stop.sh restart
-```
-
-## 📝 Best Practices
-
-1. **Always use status first**: Check service status before making changes
-2. **Use restart for updates**: Restart services after code changes
-3. **Monitor PID files**: The system automatically manages PID files
-4. **Check logs**: Monitor service logs for debugging
-5. **Port management**: The system automatically handles port conflicts
-6. **Frontend development**: Use `./start.sh restart-frontend` for frontend changes
-
-## 🚨 Emergency Procedures
-
-### Force Kill All Processes
-```bash
-# If normal stop doesn't work
-pkill -f "ragme"
-pkill -f "streamlit"
-pkill -f "uvicorn"
-pkill -f "node"
-```
-
-### Reset Everything
-```bash
-# Complete reset
-rm -f .pid
-./stop.sh stop
-./start.sh
-```
-
-### Frontend Reset
-```bash
-# Reset frontend only
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-npm run build
-cd ..
-./start.sh restart-frontend
-```
-
 ## 🔍 Debugging
 
 ### Check Service Status
@@ -247,36 +196,34 @@ curl --max-time 10 http://localhost:8022/docs
 open http://localhost:3020
 ```
 
-## 🎯 Service-Specific Management
+## 🚨 Emergency Procedures
 
-### New Frontend Management
+### Force Kill All Processes
 ```bash
-# Start with new frontend (default)
-./start.sh
-
-# Restart frontend only
-./start.sh restart-frontend
-
-# Check frontend status
-./stop.sh status | grep "3020"
-
-# Monitor frontend logs
-./tools/tail-logs.sh frontend
+# If normal stop doesn't work
+pkill -f "ragme"
+pkill -f "streamlit"
+pkill -f "uvicorn"
+pkill -f "node"
 ```
 
-### Core Services Management
+### Reset Everything
 ```bash
-# Check core services
-./stop.sh status | grep -E "(8021|8022)"
+# Complete reset
+rm -f .pid
+./stop.sh stop
+./start.sh
+```
 
-# Monitor API logs
-./tools/tail-logs.sh api
-
-# Monitor MCP logs
-./tools/tail-logs.sh mcp
-
-# Monitor agent logs
-./tools/tail-logs.sh agent
+### Frontend Reset
+```bash
+# Reset frontend only
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+cd ..
+./start.sh restart-frontend
 ```
 
 ## 📈 Performance Monitoring
