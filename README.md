@@ -183,6 +183,7 @@ A modern, responsive web interface with three-pane layout:
 
 **Key Features**:
 - **Real-time chat** with markdown support and copy functionality
+- **Quick New Chat**: "+" button in chat history sidebar for instant new chat creation
 - **Save and Email**: Save individual responses as markdown files or send via email
 - **Smart document management** with automatic chunking and grouped display
 - **Date filtering**: Filter documents by Current, This Month, This Year, or All
