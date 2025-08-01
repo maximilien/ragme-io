@@ -1,5 +1,6 @@
---
-0. ✅ **COMPLETED** - Local Weaviate support for development
+**COMPLETED**
+
+* ✅ **COMPLETED** - Local Weaviate support for development
 
 Successfully added local Weaviate support for development and testing:
 
@@ -154,7 +155,7 @@ The date filtering feature is now ready for use and documented in the README!
 
 * ✅ README and other docs seems to have repetitions
 
-* ✅ **FIXED** - adding large PDF doc via + Add Content seem to cause new doc to not be querryable -- could be needs time for Weaviate to respond?
+* ✅ **FIXED** - adding large PDF doc via + Add Content seem to cause new doc to not be querryable. Implement semantic search
 
 **Root Cause**: The querying mechanism was using simple keyword matching instead of proper vector similarity search, and the FunctionAgent was not properly executing function calls, returning function call text instead of actual results.
 
@@ -174,6 +175,40 @@ The date filtering feature is now ready for use and documented in the README!
 
 **Testing**: Verified that large PDF files like `2506.18511v1.pdf` (83 chunks) now return excellent, coherent summaries for queries like "what do you know about RAG-based framework" and "what is Standard Applicability Judgment".
 
+# UI/UX 
+
+* ✅ order document in document pane by order of their additions to the VDB
+* ✅ add a "new" badge (upper right top) when a new document is added to make it stand out in list
+* ✅ add a + to create New Chat easily as a shortcut to new Chat in hamburger menu
+
+### ✅ Implemented Features:
+- **Quick New Chat Button**: Added "+" button between "Chat History" title and collapse button
+- **Visual Design**: Dim by default (opacity 0.7), highlights in green on hover like save chat button
+- **Tooltip**: "New chat" tooltip on hover for clear user guidance
+- **Functionality**: Direct shortcut to createNewChat() function, same as hamburger menu
+- **Responsive**: Works seamlessly with existing sidebar layout and mobile design
+
+### ✅ Technical Implementation:
+- **HTML**: Added button with FontAwesome plus icon in sidebar header
+- **CSS**: Styled with hover effects matching existing save button design
+- **JavaScript**: Connected to existing createNewChat() function via event listener
+- **Testing**: All unit and integration tests passing
+- **Linting**: All code quality checks passing
+
+### 🎯 Key Benefits:
+1. **Improved UX**: One-click access to new chat creation without menu navigation
+2. **Visual Consistency**: Matches existing button styling and hover effects
+3. **Accessibility**: Clear tooltip and intuitive placement
+4. **Performance**: No additional overhead, reuses existing functionality
+
+The quick new chat button is now ready for use and documented in the README!
+
+**OPEN**
+
+# bugs
+
+* AI summary shows then disapears as if being refreshed (unsure what's triggering refresh)
+
 * right pane shows as purple block when collapse on mobile (iPhone)
 
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizonal and touch bottom to be able to make text input visible and use
@@ -187,10 +222,6 @@ The date filtering feature is now ready for use and documented in the README!
 # features
 
 ## UI/UX improvements
-
-* ✅ order document in document pane by order of their additions to the VDB
-* ✅ add a "new" badge (upper right top) when a new document is added to make it stand out in list
-
 
 ## content types
 * Images - add images from URLs and documents or individually JPEG files

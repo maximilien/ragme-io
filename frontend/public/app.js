@@ -159,6 +159,11 @@ class RAGmeAssistant {
             this.showSettingsModal();
         });
 
+        // New chat button
+        document.getElementById('newChatBtn').addEventListener('click', () => {
+            this.createNewChat();
+        });
+
         // Sidebar collapse buttons
         document.getElementById('collapseSidebar').addEventListener('click', () => {
             this.toggleSidebar('chatHistorySidebar', 'restoreSidebarBtn');
