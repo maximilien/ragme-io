@@ -98,6 +98,40 @@ start_new_frontend() {
     cd ..
 }
 
+# Function to start specific service
+start_service() {
+    local service=$1
+    echo "Starting $service service..."
+    
+    case $service in
+        "frontend")
+            check_port 3020
+            start_new_frontend
+            ;;
+        "api")
+            check_port 8021
+            echo "Starting api.py..."
+            uv run uvicorn src.ragme.api:app --reload --host 0.0.0.0 --port 8021 > logs/api.log 2>&1 &
+            echo $! >> .pid
+            sleep 3
+            ;;
+        "mcp")
+            check_port 8022
+            echo "Starting mcp.py..."
+            uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022 > logs/mcp.log 2>&1 &
+            echo $! >> .pid
+            sleep 3
+            ;;
+        *)
+            echo "Unknown service: $service"
+            echo "Available services: frontend, api, mcp"
+            return 1
+            ;;
+    esac
+    
+    echo "$service service started successfully."
+}
+
 # Function to start default services (core + new frontend)
 start_default() {
     echo "🚀 Starting RAGme with new frontend..."
@@ -143,8 +177,11 @@ case "${1:-default}" in
     "restart-frontend")
         restart_frontend
         ;;
+    "frontend"|"api"|"mcp")
+        start_service "$1"
+        ;;
     *)
-        echo "Usage: $0 [default|restart-frontend]"
+        echo "Usage: $0 [default|restart-frontend|frontend|api|mcp]"
         echo ""
         echo "Commands:"
         echo "  default           - Start core services + new frontend (default)"

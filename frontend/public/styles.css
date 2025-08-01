@@ -70,6 +70,29 @@ body {
     border-color: rgba(102, 126, 234, 0.3);
 }
 
+.vector-db-info.connection-error {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    border-radius: 8px;
+    animation: connectionErrorPulse 2s ease-in-out infinite;
+}
+
+.vector-db-info.connection-error .vector-db-type,
+.vector-db-info.connection-error .vector-db-collection {
+    color: #dc3545;
+}
+
+@keyframes connectionErrorPulse {
+    0%, 100% {
+        background-color: rgba(220, 53, 69, 0.1);
+        border-color: rgba(220, 53, 69, 0.3);
+    }
+    50% {
+        background-color: rgba(220, 53, 69, 0.15);
+        border-color: rgba(220, 53, 69, 0.5);
+    }
+}
+
 .vector-db-label {
     font-weight: 500;
     color: #6b7280;
@@ -167,6 +190,42 @@ body {
 
 .menu-item:hover {
     background-color: #f5f5f5;
+}
+
+.submenu-trigger {
+    justify-content: space-between;
+}
+
+.submenu-arrow {
+    font-size: 0.8rem;
+    transition: transform 0.2s ease;
+}
+
+.submenu-trigger.active .submenu-arrow {
+    transform: rotate(90deg);
+}
+
+.submenu {
+    display: none;
+    background-color: #f8f9fa;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+
+.submenu.show {
+    display: block;
+}
+
+.submenu-item {
+    padding-left: 2.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.submenu-item:hover {
+    background-color: #e9ecef;
+    color: #333;
 }
 
 .menu-divider {
