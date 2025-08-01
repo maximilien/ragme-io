@@ -56,10 +56,95 @@ stop_processes() {
     fi
 }
 
+# Function to stop specific service
+stop_service() {
+    local service=$1
+    echo "Stopping $service service..."
+    
+    case $service in
+        "frontend")
+            kill_port_process 3020 "New Frontend"
+            # Remove frontend PID from .pid file if it exists
+            if [ -f .pid ]; then
+                # Create a temporary file without frontend PIDs
+                grep -v "frontend" .pid > .pid.tmp 2>/dev/null || true
+                mv .pid.tmp .pid
+            fi
+            ;;
+        "api")
+            kill_port_process 8021 "FastAPI"
+            ;;
+        "mcp")
+            kill_port_process 8022 "MCP"
+            ;;
+        *)
+            echo "Unknown service: $service"
+            echo "Available services: frontend, api, mcp"
+            return 1
+            ;;
+    esac
+    
+    echo "$service service stopped successfully."
+}
+
+# Function to identify service from PID
+identify_service() {
+    local pid=$1
+    if ! kill -0 $pid 2>/dev/null; then
+        echo "stale"
+        return
+    fi
+    
+    # Get the command line for the PID
+    local cmd=$(ps -p $pid -o command= 2>/dev/null)
+    if [[ $cmd == *"src.ragme.api"* ]]; then
+        echo "API"
+    elif [[ $cmd == *"src.ragme.mcp"* ]]; then
+        echo "MCP"
+    elif [[ $cmd == *"src.ragme.local_agent"* ]]; then
+        echo "Agent"
+    elif [[ $cmd == *"npm start"* ]]; then
+        echo "Frontend"
+    else
+        echo "Unknown"
+    fi
+}
+
+# Function to clean up stale PIDs from PID file
+cleanup_stale_pids() {
+    if [ -f .pid ]; then
+        local temp_pid_file=".pid.tmp"
+        local cleaned=false
+        
+        while read pid; do
+            if [ ! -z "$pid" ]; then
+                if kill -0 $pid 2>/dev/null; then
+                    # PID is still running, keep it
+                    echo $pid >> $temp_pid_file
+                else
+                    # PID is stale, remove it
+                    echo "🧹 Cleaning up stale PID: $pid"
+                    cleaned=true
+                fi
+            fi
+        done < .pid
+        
+        if [ "$cleaned" = true ]; then
+            mv $temp_pid_file .pid
+            echo "✅ PID file cleaned up"
+        else
+            rm -f $temp_pid_file
+        fi
+    fi
+}
+
 # Function to show status of RAGme processes
 show_status() {
     echo "=== RAGme Process Status ==="
     echo ""
+    
+    # Clean up stale PIDs first
+    cleanup_stale_pids
     
     # Check PID file
     if [ -f .pid ]; then
@@ -67,10 +152,11 @@ show_status() {
         echo "   PID file exists with the following processes:"
         while read pid; do
             if [ ! -z "$pid" ]; then
-                if kill -0 $pid 2>/dev/null; then
-                    echo "   ✅ Process $pid is running"
-                else
+                local service=$(identify_service $pid)
+                if [ "$service" = "stale" ]; then
                     echo "   ❌ Process $pid is not running (stale PID)"
+                else
+                    echo "   ✅ Process $pid is running ($service)"
                 fi
             fi
         done < .pid
@@ -143,8 +229,11 @@ case "${1:-stop}" in
     "status")
         show_status
         ;;
+    "frontend"|"api"|"mcp")
+        stop_service "$1"
+        ;;
     *)
-        echo "Usage: $0 [stop|restart|status]"
+        echo "Usage: $0 [stop|restart|status|frontend|api|mcp]"
         echo ""
         echo "Commands:"
         echo "  stop       - Stop all RAGme processes (default)"

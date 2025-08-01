@@ -153,21 +153,28 @@
 
     <!-- Hamburger menu dropdown OUTSIDE app-container -->
     <div class="menu-dropdown" id="menuDropdown">
-        <div class="menu-item" id="newChat">
-            <i class="fas fa-plus"></i>
-            New Chat
+        <div class="menu-item submenu-trigger" id="manageChatsTrigger">
+            <i class="fas fa-comments"></i>
+            Manage Chats
+            <i class="fas fa-chevron-right submenu-arrow"></i>
         </div>
-        <div class="menu-item" id="clearCurrentChat">
-            <i class="fas fa-eraser"></i>
-            Clear Current Chat
-        </div>
-        <div class="menu-item" id="clearHistory">
-            <i class="fas fa-trash"></i>
-            Clear All History
-        </div>
-        <div class="menu-item" id="clearEverything">
-            <i class="fas fa-broom"></i>
-            Clear Everything
+        <div class="submenu" id="manageChatsSubmenu">
+            <div class="menu-item submenu-item" id="newChat">
+                <i class="fas fa-plus"></i>
+                New Chat
+            </div>
+            <div class="menu-item submenu-item" id="clearCurrentChat">
+                <i class="fas fa-eraser"></i>
+                Clear Current Chat
+            </div>
+            <div class="menu-item submenu-item" id="clearHistory">
+                <i class="fas fa-trash"></i>
+                Clear All History
+            </div>
+            <div class="menu-item submenu-item" id="clearEverything">
+                <i class="fas fa-broom"></i>
+                Clear Everything
+            </div>
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item" id="settings">

@@ -17,6 +17,18 @@ class RAGmeAssistant {
         this.vectorDbInfo = null;
         this.autoRefreshInterval = null;
         this.lastDocumentCount = 0;
+        this.connectionStatus = {
+            isConnected: true,
+            lastSuccess: Date.now(),
+            failureCount: 0,
+            lastFailure: null
+        };
+        this.documentDetailsModal = {
+            isOpen: false,
+            currentDocId: null,
+            summaryGenerated: false,
+            summaryInProgress: false
+        };
         
         this.init();
     }
@@ -38,6 +50,13 @@ class RAGmeAssistant {
         
         this.socket.on('connect', () => {
             console.log('Connected to RAGme.ai Assistant server');
+            // Update connection status
+            this.connectionStatus.isConnected = true;
+            this.connectionStatus.lastSuccess = Date.now();
+            this.connectionStatus.failureCount = 0;
+            this.connectionStatus.lastFailure = null;
+            this.updateVectorDbInfoDisplay();
+            
             // Load documents after connection is established
             this.loadDocuments();
             // Start auto-refresh every 30 seconds
@@ -46,6 +65,11 @@ class RAGmeAssistant {
 
         this.socket.on('disconnect', () => {
             console.log('Disconnected from RAGme.ai Assistant server');
+            // Update connection status
+            this.connectionStatus.isConnected = false;
+            this.connectionStatus.lastFailure = Date.now();
+            this.updateVectorDbInfoDisplay();
+            
             // Stop auto-refresh when disconnected
             this.stopAutoRefresh();
         });
@@ -94,8 +118,21 @@ class RAGmeAssistant {
                 console.log('Loaded documents:', this.documents.length);
                 this.renderDocuments();
                 this.updateVisualization();
+                
+                // Update connection status on success
+                this.connectionStatus.isConnected = true;
+                this.connectionStatus.lastSuccess = Date.now();
+                this.connectionStatus.failureCount = 0;
+                this.connectionStatus.lastFailure = null;
+                this.updateVectorDbInfoDisplay();
             } else {
                 console.error('Failed to list documents:', result.message);
+                
+                // Update connection status on failure
+                this.connectionStatus.isConnected = false;
+                this.connectionStatus.failureCount++;
+                this.connectionStatus.lastFailure = Date.now();
+                this.updateVectorDbInfoDisplay();
             }
         });
 
@@ -136,9 +173,51 @@ class RAGmeAssistant {
 
         document.addEventListener('click', () => {
             menuDropdown.classList.remove('show');
+            // Also close any open submenus
+            const submenus = document.querySelectorAll('.submenu');
+            const triggers = document.querySelectorAll('.submenu-trigger');
+            submenus.forEach(submenu => submenu.classList.remove('show'));
+            triggers.forEach(trigger => trigger.classList.remove('active'));
+        });
+
+        // Prevent submenu clicks from closing the main menu
+        document.getElementById('manageChatsSubmenu').addEventListener('click', (e) => {
+            e.stopPropagation();
         });
 
         // Menu items
+        const manageChatsTrigger = document.getElementById('manageChatsTrigger');
+        const manageChatsSubmenu = document.getElementById('manageChatsSubmenu');
+        let submenuTimeout;
+        
+        // Show submenu on hover
+        manageChatsTrigger.addEventListener('mouseenter', () => {
+            clearTimeout(submenuTimeout);
+            manageChatsSubmenu.classList.add('show');
+            manageChatsTrigger.classList.add('active');
+        });
+        
+        // Hide submenu when mouse leaves the trigger
+        manageChatsTrigger.addEventListener('mouseleave', () => {
+            submenuTimeout = setTimeout(() => {
+                manageChatsSubmenu.classList.remove('show');
+                manageChatsTrigger.classList.remove('active');
+            }, 100);
+        });
+        
+        // Keep submenu open when hovering over it
+        manageChatsSubmenu.addEventListener('mouseenter', () => {
+            clearTimeout(submenuTimeout);
+        });
+        
+        // Hide submenu when mouse leaves the submenu
+        manageChatsSubmenu.addEventListener('mouseleave', () => {
+            submenuTimeout = setTimeout(() => {
+                manageChatsSubmenu.classList.remove('show');
+                manageChatsTrigger.classList.remove('active');
+            }, 100);
+        });
+
         document.getElementById('newChat').addEventListener('click', () => {
             this.createNewChat();
         });
@@ -232,6 +311,11 @@ class RAGmeAssistant {
 
         document.getElementById('closeDocumentDetails').addEventListener('click', () => {
             this.hideModal('documentDetailsModal');
+            // Reset modal state when closed
+            this.documentDetailsModal.isOpen = false;
+            this.documentDetailsModal.currentDocId = null;
+            this.documentDetailsModal.summaryGenerated = false;
+            this.documentDetailsModal.summaryInProgress = false;
         });
 
         // Add content modal
@@ -279,6 +363,11 @@ class RAGmeAssistant {
         // Document details modal close
         document.getElementById('closeDocumentDetailsBtn').addEventListener('click', () => {
             this.hideModal('documentDetailsModal');
+            // Reset modal state when closed
+            this.documentDetailsModal.isOpen = false;
+            this.documentDetailsModal.currentDocId = null;
+            this.documentDetailsModal.summaryGenerated = false;
+            this.documentDetailsModal.summaryInProgress = false;
         });
 
         // Document details modal delete button
@@ -308,6 +397,14 @@ class RAGmeAssistant {
                 if (e.target === overlay) {
                     const modalId = overlay.id;
                     this.hideModal(modalId);
+                    
+                    // Reset document details modal state if it was closed
+                    if (modalId === 'documentDetailsModal') {
+                        this.documentDetailsModal.isOpen = false;
+                        this.documentDetailsModal.currentDocId = null;
+                        this.documentDetailsModal.summaryGenerated = false;
+                        this.documentDetailsModal.summaryInProgress = false;
+                    }
                 }
             });
         });
@@ -925,6 +1022,19 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         modal.classList.remove('show');
     }
 
+    toggleSubmenu(submenuId, triggerId) {
+        const submenu = document.getElementById(submenuId);
+        const trigger = document.getElementById(triggerId);
+        
+        if (submenu.classList.contains('show')) {
+            submenu.classList.remove('show');
+            trigger.classList.remove('active');
+        } else {
+            submenu.classList.add('show');
+            trigger.classList.add('active');
+        }
+    }
+
     switchTab(tabName) {
         // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1221,6 +1331,17 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
     }
 
     fetchDocumentSummary(doc) {
+        console.log('fetchDocumentSummary called for doc:', doc.id || doc.url);
+        
+        // Prevent multiple simultaneous summary requests
+        if (this.documentDetailsModal.summaryInProgress) {
+            console.log('Summary already in progress, skipping request');
+            return;
+        }
+        
+        // Mark summary as in progress
+        this.documentDetailsModal.summaryInProgress = true;
+        
         let docIndex = -1;
         
         // Handle chunked documents differently
@@ -1271,7 +1392,13 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             // Parse markdown and format the summary
             const formattedSummary = this.formatMarkdownSummary(summary);
             contentPreview.innerHTML = formattedSummary;
+            
+            // Mark summary as generated for the current document
+            this.documentDetailsModal.summaryGenerated = true;
         }
+        
+        // Reset the in-progress flag
+        this.documentDetailsModal.summaryInProgress = false;
     }
 
     formatMarkdownSummary(text) {
@@ -1301,6 +1428,14 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
     }
 
     renderDocuments() {
+        // Skip rendering if document details modal is open to prevent interference
+        if (this.documentDetailsModal.isOpen) {
+            console.log('Skipping document rendering - modal is open, currentDocId:', this.documentDetailsModal.currentDocId);
+            return;
+        }
+        
+        console.log('Rendering documents, modal state:', this.documentDetailsModal);
+
         const container = document.getElementById('documentsListContainer');
         container.innerHTML = '';
 
@@ -1444,6 +1579,21 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         const title = document.getElementById('documentDetailsTitle');
         const body = document.getElementById('documentDetailsBody');
 
+        // Generate a unique document ID for tracking
+        const docId = doc.id || doc.url || `doc_${Date.now()}`;
+        
+        // Check if this is the same document already open
+        const isSameDocument = this.documentDetailsModal.isOpen && 
+                              this.documentDetailsModal.currentDocId === docId;
+        
+        console.log('showDocumentDetails called:', {
+            docId,
+            isOpen: this.documentDetailsModal.isOpen,
+            currentDocId: this.documentDetailsModal.currentDocId,
+            isSameDocument,
+            summaryGenerated: this.documentDetailsModal.summaryGenerated
+        });
+        
         // Find the document index in the grouped documents array
         const groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
         const docIndex = groupedDocuments.findIndex(d => d.url === doc.url || d.id === doc.id);
@@ -1508,13 +1658,22 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         body.innerHTML = details;
         this.showModal('documentDetailsModal');
         
+        // Update modal state
+        this.documentDetailsModal.isOpen = true;
+        this.documentDetailsModal.currentDocId = docId;
+        
         // Check for text truncation in modal details
         setTimeout(() => {
             this.checkDetailValuesTruncation();
         }, 100);
         
-        // Fetch AI summary
-        this.fetchDocumentSummary(doc);
+        // Only fetch AI summary if this is a new document or summary hasn't been generated
+        if (!isSameDocument || !this.documentDetailsModal.summaryGenerated) {
+            console.log('Calling fetchDocumentSummary - conditions met');
+            this.fetchDocumentSummary(doc);
+        } else {
+            console.log('Skipping fetchDocumentSummary - same document and summary already generated');
+        }
     }
 
     formatDate(dateString) {
@@ -2185,6 +2344,13 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         if (!this.settings.showVectorDbInfo) {
             vectorDbInfoElement.style.display = 'none';
             return;
+        }
+        
+        // Update connection status styling
+        if (this.connectionStatus && !this.connectionStatus.isConnected) {
+            vectorDbInfoElement.classList.add('connection-error');
+        } else {
+            vectorDbInfoElement.classList.remove('connection-error');
         }
         
         if (this.vectorDbInfo) {
