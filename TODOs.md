@@ -4,42 +4,48 @@
 
 ### bugs
 * right pane shows as purple block when collapse on mobile (iPhone)
-
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and use
 
 ### frontend
-* [No current frontend items]
+* "recent / ideas" prompt popup button to give user auixk way to star their prompt
+* "toolbox" button to liat and Llow user ro enable MCP tool servers 
+* settings for MCP tools servers integration ans authentication process
 
 ### backend
-* [No current backend items]
+* MCP tool servers integration and authentication
+* MCP agent to call and use MCP server tools depending on prompts
+* gateway agent and prompt tuning to figure out if user promot should be handled by Quaery / Funxrion / MCP agent
+* graph db - build knowledge graph of documents / content
+* graph agent - queries graph db with text -> cypher query to complement query agenr results
 
 ### tests
-* Test with remote weaviate and with local milvus
+* test with loczl weaviate 
+* test with local milvus
 
 ### features
 
 #### content types
-* Images - add images from URLs and documents or individually JPEG files
-* Voice memos - `.wav` files and other formats
-* Podcasts - link to podcast files
-* Videos (YouTube) - link to youtube videos
-* Blogs (RSS) subscriptions - any RSS feed
+* images - add images from URLs and documents or individually JPEG files
+* voice memos - `.wav` files and other formats
+* podcasts - link to podcast files
+* blogs (RSS) subscriptions - any RSS feed
+* videos (YouTube) - link to youtube videos
 
 #### insights
-* Daily summaries - create a summary of a particular day's activity
-* Daily insights - generate insight from documents added in a particular day
-* Monthly versions - monthly versions of summaries and insights
+* daily summaries - create a summary of a particular day's activity
+* daily insights - generate insight from documents added in a particular day
+* monthly versions - monthly versions of summaries and insights
 
-#### services
-* Twilio (phone messages) - add documents and links using messages with a phone number
-* Slack channels - add documents and links using slack messages
+#### services (MCP servers)
+* mail - gmail suooort to read / write mails
+* todos - google task read / write
+* cloud drives - google drive / Microsoft onedribe / dropbox
+* twillio (phone messages) - add documents and links using messages with a phone number
+* slack channels - add documents and links using slack messages
 * X / Twitter - add documents and links from X account posts
 
 ### nice to have
-* [No current nice to have items]
-
-### integrations
-* A2A integration for A2A hackathon
+* A2A support and discover snd calling other external agents
 
 ---
 
