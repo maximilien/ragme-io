@@ -3,6 +3,8 @@
 ## **OPEN**
 
 ### bugs
+* query agebt should perform user query (not necessarily summarize socuemnte from semantic search)
+* queries for functional agent are not flowing to function /tool, e.g., "list", "list docs"
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and use
 
