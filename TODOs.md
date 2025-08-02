@@ -5,6 +5,7 @@
 ### bugs
 * query agebt should perform user query (not necessarily summarize socuemnte from semantic search)
 * queries for functional agent are not flowing to function /tool, e.g., "list", "list docs"
+* chat resoonses snd eoxumwnt details card include file link but does not work (need backend)
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and use
 
@@ -12,8 +13,11 @@
 * "recent / ideas" prompt popup button to give user auixk way to star their prompt
 * "toolbox" button to liat and Llow user ro enable MCP tool servers 
 * settings for MCP tools servers integration ans authentication process
+* settingd to enable / disable saving uoloaded document in soc server
+* doc details card should allow viewing of doc snd chunks
 
 ### backend
+* document server - for docuemts added vis upload keep copy on doc server
 * MCP tool servers integration and authentication
 * MCP agent to call and use MCP server tools depending on prompts
 * gateway agent and prompt tuning to figure out if user promot should be handled by Quaery / Funxrion / MCP agent
