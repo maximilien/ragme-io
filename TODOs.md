@@ -3,35 +3,66 @@
 ## **OPEN**
 
 ### bugs
-* query agebt should perform user query (not necessarily summarize socuemnte from semantic search)
-* queries for functional agent are not flowing to function /tool, e.g., "list", "list docs"
-* chat resoonses snd eoxumwnt details card include file link but does not work (need backend)
+* query agent should perform user query (not necessarily summarize results from semantic search)
+* queries for functional agent are not flowing to function / tool, e.g., "list", "list docs"
+* RAGme ideas and TODOs
+* make sure to confirm with user before executing delete docs tools 
+* add memory to chat agent
+* chat resoonses and document details card include file link but does not work (need doc backend)
 * right pane shows as purple block when collapse on mobile (iPhone)
-* the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and use
+* the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and usable
 
 ### frontend
-* "recent / ideas" prompt popup button to give user auixk way to star their prompt
-* "toolbox" button to liat and Llow user ro enable MCP tool servers 
+* "recent / ideas" prompt popup button to give user quick way to start their first prompts. Here are some details on implementation:
+- align button to the right of the chat input
+- use recent icon 
+- when click led on empty (new) chat then include these five sample prompts:
+- 1. list my recent document
+- 2. summarize my documents added this week
+- 3. give me a list of categories for my recent documents 
+- 4. what do you know about [document title]
+- 5. tell me about [document title]
+- when clicked on ongoing chat then include the most recent five prompts from user (in order they were submitted) and these three sample prompts (at bottom)
+- 1. give me a list of categories for my recent documents 
+- 2. what do you know about [document title]
+- 3. tell me about [document title]
+- when user selects one of the pop up prompts item then fill the chat input with value. User can then edit and submit
+- the size of the popup should be not more than 50% of chat input and height should be not more than 50% of the chat area
+- popup should appear to be coming from the recent button so positioned accordingly
+
+* "toolbox" button to pop checkable (selectable) list of enabled MCP tool servers 
 * settings for MCP tools servers integration ans authentication process
 * settingd to enable / disable saving uoloaded document in soc server
 * doc details card should allow viewing of doc snd chunks
 
 ### backend
-* document server - for docuemts added vis upload keep copy on doc server
+* document server - for docuemts added with “+ Add Content” upload keep copy on doc server. Add settings to enable / disable this
 * MCP tool servers integration and authentication
 * MCP agent to call and use MCP server tools depending on prompts
-* gateway agent and prompt tuning to figure out if user promot should be handled by Quaery / Funxrion / MCP agent
-* graph db - build knowledge graph of documents / content
-* graph agent - queries graph db with text -> cypher query to complement query agenr results
+* gateway agent and prompt tuning to figure out if user promot should be handled by Query / Function / MCP agent
+* graph db - build knowledge graph of documents / content via Neo4J
+* graph agent - queries graph db with text -> cypher query to complement query agent results
 
 ### tests
-* test with loczl weaviate 
+* test with local weaviate 
 * test with local milvus
 
 ### features
 
+#### generalization 
+* make RAGme work with configurable collection name
+* make other parts of RAGme that could be changed, e.g., name, query agent configurable
+* 
+
+#### use cases
+* support agent to collect images and docs for period of time and create report, eg, conference 
+
 #### content types
-* images - add images from URLs and documents or individually JPEG files
+* images - add images from URLs and upload
+* support extracting metadata from images
+* support extracting text from images and add to metadata, eg, image of a slide
+* extract images from documents and upload to ImagesDocs collection with metadata to link back to document 
+
 * voice memos - `.wav` files and other formats
 * podcasts - link to podcast files
 * blogs (RSS) subscriptions - any RSS feed
@@ -45,13 +76,14 @@
 #### services (MCP servers)
 * mail - gmail suooort to read / write mails
 * todos - google task read / write
-* cloud drives - google drive / Microsoft onedribe / dropbox
+* cloud drives - google drive / microsoft one drive/ dropbox
 * twillio (phone messages) - add documents and links using messages with a phone number
+* whatsapp integration (explore if possible)
 * slack channels - add documents and links using slack messages
 * X / Twitter - add documents and links from X account posts
 
 ### nice to have
-* A2A support and discover snd calling other external agents
+* a2a support to discover and call other external agents to do work
 
 ---
 
