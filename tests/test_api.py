@@ -117,3 +117,111 @@ def test_invalid_input(client):
     # Test invalid query input
     response = client.post("/query", json={"invalid_field": "test query"})
     assert response.status_code == 422
+
+
+def test_mcp_server_config_success(client):
+    """Test successful MCP server configuration update."""
+    test_config = {"servers": [{"server": "Google GDrive", "enabled": True}]}
+    response = client.post("/mcp-server-config", json=test_config)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["success"] is True
+    assert "1 MCP server(s)" in result["message"]
+    assert len(result["results"]) == 1
+    assert result["results"][0]["server"] == "Google GDrive"
+    assert result["results"][0]["enabled"] is True
+    assert result["total_updated"] == 1
+
+
+def test_mcp_server_config_multiple_servers(client):
+    """Test updating multiple MCP server configurations."""
+    test_config = {
+        "servers": [
+            {"server": "Google GDrive", "enabled": True},
+            {"server": "Dropbox Drive", "enabled": False},
+            {"server": "Google Mail", "enabled": True},
+        ]
+    }
+    response = client.post("/mcp-server-config", json=test_config)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["success"] is True
+    assert "3 MCP server(s)" in result["message"]
+    assert len(result["results"]) == 3
+    assert result["total_updated"] == 3
+
+    # Check individual results
+    servers = {r["server"]: r for r in result["results"]}
+    assert servers["Google GDrive"]["enabled"] is True
+    assert servers["Dropbox Drive"]["enabled"] is False
+    assert servers["Google Mail"]["enabled"] is True
+
+
+def test_mcp_server_config_disable(client):
+    """Test disabling MCP server configuration."""
+    test_config = {"servers": [{"server": "Dropbox Drive", "enabled": False}]}
+    response = client.post("/mcp-server-config", json=test_config)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["success"] is True
+    assert "1 MCP server(s)" in result["message"]
+    assert len(result["results"]) == 1
+    assert result["results"][0]["server"] == "Dropbox Drive"
+    assert result["results"][0]["enabled"] is False
+    assert result["total_updated"] == 1
+
+
+def test_mcp_server_config_invalid_input(client):
+    """Test invalid MCP server configuration input."""
+    # Test missing servers field
+    response = client.post("/mcp-server-config", json={"enabled": True})
+    assert response.status_code == 422
+
+    # Test empty servers list
+    response = client.post("/mcp-server-config", json={"servers": []})
+    assert response.status_code == 200  # Empty list is valid
+
+    # Test invalid server object (missing server field)
+    response = client.post("/mcp-server-config", json={"servers": [{"enabled": True}]})
+    assert response.status_code == 422
+
+    # Test invalid server object (missing enabled field)
+    response = client.post(
+        "/mcp-server-config", json={"servers": [{"server": "Test Server"}]}
+    )
+    assert response.status_code == 422
+
+    # Test invalid enabled field type
+    response = client.post(
+        "/mcp-server-config",
+        json={"servers": [{"server": "Test Server", "enabled": "not_boolean"}]},
+    )
+    assert response.status_code == 422
+
+
+def test_mcp_server_config_with_authentication(client):
+    """Test MCP server configuration with authentication."""
+    test_config = {
+        "servers": [
+            {"server": "Google GDrive", "enabled": True, "authenticated": True},
+            {"server": "Dropbox Drive", "enabled": False, "authenticated": False},
+        ]
+    }
+    response = client.post("/mcp-server-config", json=test_config)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["success"] is True
+    assert "2 MCP server(s)" in result["message"]
+    assert len(result["results"]) == 2
+    assert result["total_updated"] == 2
+
+    # Check individual results
+    servers = {r["server"]: r for r in result["results"]}
+    assert servers["Google GDrive"]["enabled"] is True
+    assert servers["Google GDrive"]["authenticated"] is True
+    assert servers["Dropbox Drive"]["enabled"] is False
+    assert servers["Dropbox Drive"]["authenticated"] is False

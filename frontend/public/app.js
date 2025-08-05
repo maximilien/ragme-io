@@ -30,6 +30,19 @@ class RAGmeAssistant {
             summaryInProgress: false
         };
         
+        // MCP Tools configuration
+        this.mcpServers = [
+            { name: 'Google GDrive', icon: 'fab fa-google-drive', enabled: false, authenticated: false },
+            { name: 'Dropbox Drive', icon: 'fab fa-dropbox', enabled: false, authenticated: false },
+            { name: 'Google Mail', icon: 'fas fa-envelope', enabled: false, authenticated: false },
+            { name: 'Twilio', icon: 'fas fa-phone', enabled: false, authenticated: false },
+            { name: 'RAGme Test', icon: 'fas fa-flask', enabled: false, authenticated: false }
+        ];
+        
+        // Track pending MCP server changes for batching
+        this.pendingMcpChanges = [];
+        this.mcpChangeTimeout = null;
+        
         this.init();
     }
 
@@ -289,6 +302,58 @@ class RAGmeAssistant {
             this.sendMessage();
         });
 
+        // MCP Tools button
+        const mcpToolsBtn = document.getElementById('mcpToolsBtn');
+        
+        mcpToolsBtn.addEventListener('click', (e) => {
+            console.log('MCP Tools button clicked!');
+            
+            // Prevent the click from bubbling up to the document
+            e.stopPropagation();
+            
+            this.toggleMcpToolsPopup();
+        });
+
+        // MCP Tools popup close handlers
+        const mcpBackdrop = document.getElementById('mcpToolsBackdrop');
+        const mcpCloseBtn = document.getElementById('mcpToolsClose');
+        
+        mcpBackdrop.addEventListener('click', () => {
+            this.hideMcpToolsPopup();
+        });
+        
+        mcpCloseBtn.addEventListener('click', () => {
+            this.hideMcpToolsPopup();
+        });
+
+        // Recent prompts button
+        const recentPromptsBtn = document.getElementById('recentPromptsBtn');
+        const recentPromptsPopup = document.getElementById('recentPromptsPopup');
+        
+        recentPromptsBtn.addEventListener('click', (e) => {
+            console.log('Recent prompts button clicked!');
+            console.log('Button element:', recentPromptsBtn);
+            console.log('Button visible:', recentPromptsBtn.offsetParent !== null);
+            console.log('Button disabled:', recentPromptsBtn.disabled);
+            
+            // Prevent the click from bubbling up to the document
+            e.stopPropagation();
+            
+            this.toggleRecentPromptsPopup();
+        });
+
+        // Close popup when clicking backdrop or close button
+        const backdrop = document.getElementById('recentPromptsBackdrop');
+        const closeBtn = document.getElementById('recentPromptsClose');
+        
+        backdrop.addEventListener('click', () => {
+            this.hideRecentPromptsPopup();
+        });
+        
+        closeBtn.addEventListener('click', () => {
+            this.hideRecentPromptsPopup();
+        });
+
         // Auto-resize textarea
         chatInput.addEventListener('input', () => {
             chatInput.style.height = 'auto';
@@ -325,6 +390,33 @@ class RAGmeAssistant {
 
         document.getElementById('cancelAddContent').addEventListener('click', () => {
             this.hideModal('addContentModal');
+        });
+
+        // MCP Servers menu item
+        document.getElementById('mcpServers').addEventListener('click', () => {
+            this.showMcpServersModal();
+        });
+
+        // MCP Servers modal
+        document.getElementById('closeMcpServers').addEventListener('click', () => {
+            this.hideModal('mcpServersModal');
+        });
+
+        document.getElementById('cancelMcpServers').addEventListener('click', () => {
+            this.hideModal('mcpServersModal');
+        });
+
+        // Authentication modal
+        document.getElementById('closeAuth').addEventListener('click', () => {
+            this.hideModal('authModal');
+        });
+
+        document.getElementById('cancelAuth').addEventListener('click', () => {
+            this.hideModal('authModal');
+        });
+
+        document.getElementById('confirmAuth').addEventListener('click', () => {
+            this.confirmAuthentication();
         });
 
         // Settings modal
@@ -492,6 +584,447 @@ class RAGmeAssistant {
             }
             this.currentThinkingId = null;
         }
+    }
+
+        toggleRecentPromptsPopup() {
+        console.log('toggleRecentPromptsPopup called');
+        const popup = document.getElementById('recentPromptsPopup');
+        const button = document.getElementById('recentPromptsBtn');
+        
+        console.log('Popup element:', popup);
+        console.log('Popup has show class:', popup.classList.contains('show'));
+        console.log('Popup display style before toggle:', window.getComputedStyle(popup).display);
+        console.log('Popup visibility before toggle:', window.getComputedStyle(popup).visibility);
+        console.log('Popup opacity before toggle:', window.getComputedStyle(popup).opacity);
+        
+        if (popup.classList.contains('show')) {
+            console.log('Hiding popup...');
+            this.hideRecentPromptsPopup();
+        } else {
+            console.log('Showing popup...');
+            this.showRecentPromptsPopup();
+        }
+    }
+
+    showRecentPromptsPopup() {
+        const popup = document.getElementById('recentPromptsPopup');
+        const backdrop = document.getElementById('recentPromptsBackdrop');
+        const button = document.getElementById('recentPromptsBtn');
+        const list = document.getElementById('recentPromptsList');
+        
+        // Check if list element exists
+        if (!list) {
+            console.error('recentPromptsList element not found!');
+            return;
+        }
+        
+        // Clear previous content
+        list.innerHTML = '';
+        
+        // Get current chat messages to determine if it's a new chat or ongoing
+        const chatMessages = document.getElementById('chatMessages');
+        const userMessages = chatMessages.querySelectorAll('.message.user .message-content');
+        const isNewChat = userMessages.length === 0;
+        
+        if (isNewChat) {
+            // Show sample prompts for new chat
+            this.addSamplePrompts(list);
+        } else {
+            // Show recent user prompts + sample prompts for ongoing chat
+            this.addRecentPrompts(list, userMessages);
+            this.addSamplePrompts(list);
+        }
+        
+        // Show backdrop and popup
+        backdrop.classList.add('show');
+        popup.classList.add('show');
+        button.classList.add('active');
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+    }
+
+    hideRecentPromptsPopup() {
+        const popup = document.getElementById('recentPromptsPopup');
+        const backdrop = document.getElementById('recentPromptsBackdrop');
+        const button = document.getElementById('recentPromptsBtn');
+        
+        // Hide backdrop and popup
+        backdrop.classList.remove('show');
+        popup.classList.remove('show');
+        button.classList.remove('active');
+        
+        // Restore body scroll
+        document.body.style.overflow = '';
+    }
+
+    addSamplePrompts(list) {
+        const samplePrompts = [
+            { text: 'list my recent documents', icon: 'fas fa-list' },
+            { text: 'summarize my documents added this week', icon: 'fas fa-calendar-week' },
+            { text: 'give me a list of categories for my recent documents', icon: 'fas fa-tags' },
+            { text: 'what do you know about [document title]', icon: 'fas fa-question-circle' },
+            { text: 'tell me about [document title]', icon: 'fas fa-info-circle' }
+        ];
+        
+        samplePrompts.forEach(prompt => {
+            const item = document.createElement('div');
+            item.className = 'recent-prompts-item sample';
+            item.innerHTML = `<i class="${prompt.icon}"></i>${prompt.text}`;
+            item.addEventListener('click', () => {
+                this.selectPrompt(prompt.text);
+            });
+            list.appendChild(item);
+        });
+    }
+
+    addRecentPrompts(list, userMessages) {
+        // Get the 5 most recent user prompts
+        const recentPrompts = [];
+        for (let i = userMessages.length - 1; i >= 0 && recentPrompts.length < 5; i--) {
+            const prompt = userMessages[i].textContent.trim();
+            if (prompt && !recentPrompts.includes(prompt)) {
+                recentPrompts.unshift(prompt);
+            }
+        }
+        
+        recentPrompts.forEach(prompt => {
+            const item = document.createElement('div');
+            item.className = 'recent-prompts-item recent';
+            item.innerHTML = `<i class="fas fa-history"></i>${prompt}`;
+            item.addEventListener('click', () => {
+                this.selectPrompt(prompt);
+            });
+            list.appendChild(item);
+        });
+    }
+
+    // MCP Tools popup methods
+    toggleMcpToolsPopup() {
+        console.log('toggleMcpToolsPopup called');
+        const popup = document.getElementById('mcpToolsPopup');
+        
+        if (popup.classList.contains('show')) {
+            console.log('Hiding MCP tools popup...');
+            this.hideMcpToolsPopup();
+        } else {
+            console.log('Showing MCP tools popup...');
+            this.showMcpToolsPopup();
+        }
+    }
+
+    showMcpToolsPopup() {
+        const popup = document.getElementById('mcpToolsPopup');
+        const backdrop = document.getElementById('mcpToolsBackdrop');
+        const button = document.getElementById('mcpToolsBtn');
+        const list = document.getElementById('mcpToolsList');
+        
+        // Check if list element exists
+        if (!list) {
+            console.error('mcpToolsList element not found!');
+            return;
+        }
+        
+        // Clear previous content
+        list.innerHTML = '';
+        
+        // Populate MCP servers list
+        this.renderMcpServers(list);
+        
+        // Show backdrop and popup
+        backdrop.classList.add('show');
+        popup.classList.add('show');
+        button.classList.add('active');
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+    }
+
+    hideMcpToolsPopup() {
+        const popup = document.getElementById('mcpToolsPopup');
+        const backdrop = document.getElementById('mcpToolsBackdrop');
+        const button = document.getElementById('mcpToolsBtn');
+        
+        // Hide backdrop and popup
+        backdrop.classList.remove('show');
+        popup.classList.remove('show');
+        button.classList.remove('active');
+        
+        // Restore body scroll
+        document.body.style.overflow = '';
+    }
+
+    renderMcpServers(list) {
+        this.mcpServers.forEach(server => {
+            const item = document.createElement('div');
+            item.className = 'mcp-tools-item';
+            
+            // Disable non-authenticated servers
+            const isDisabled = !server.authenticated;
+            const disabledClass = isDisabled ? 'disabled' : '';
+            
+            item.innerHTML = `
+                <div class="mcp-tools-item-info" title="${isDisabled ? 'Authenticate with MCP Servers menu to enable this server' : ''}">
+                    <div class="mcp-tools-item-icon">
+                        <i class="${server.icon}"></i>
+                    </div>
+                    <div class="mcp-tools-item-name">
+                        ${server.name}
+                        ${server.authenticated ? '<span style="color: #2563eb; font-size: 0.8em; margin-left: 0.5rem;">✓</span>' : ''}
+                    </div>
+                </div>
+                <div class="mcp-tools-toggle ${server.enabled ? 'enabled' : ''} ${disabledClass}" data-server="${server.name}" title="${isDisabled ? 'Authenticate with MCP Servers menu to enable this server' : ''}"></div>
+            `;
+            
+            // Add click handler for toggle (only for authenticated servers)
+            const toggle = item.querySelector('.mcp-tools-toggle');
+            if (!isDisabled) {
+                toggle.addEventListener('click', () => {
+                    this.toggleMcpServer(server.name);
+                });
+            }
+            
+            list.appendChild(item);
+        });
+    }
+
+    toggleMcpServer(serverName) {
+        const server = this.mcpServers.find(s => s.name === serverName);
+        if (!server) {
+            console.error('Server not found:', serverName);
+            return;
+        }
+        
+        // Prevent toggling non-authenticated servers
+        if (!server.authenticated) {
+            this.showNotification('warning', `${serverName} must be authenticated before it can be enabled/disabled`);
+            return;
+        }
+        
+        // Toggle the enabled state
+        server.enabled = !server.enabled;
+        
+        // Update the UI
+        const toggle = document.querySelector(`[data-server="${serverName}"]`);
+        if (toggle) {
+            toggle.classList.toggle('enabled', server.enabled);
+        }
+        
+        // Log the change
+        console.log(`MCP Server ${serverName} ${server.enabled ? 'enabled' : 'disabled'}`);
+        
+        // Add to pending changes for batching
+        this.addToPendingChanges(serverName, server.enabled);
+    }
+
+    addToPendingChanges(serverName, enabled) {
+        console.log('Adding to pending changes:', serverName, enabled);
+        
+        // Remove any existing change for this server
+        this.pendingMcpChanges = this.pendingMcpChanges.filter(change => change.server !== serverName);
+        
+        // Add the new change
+        this.pendingMcpChanges.push({
+            server: serverName,
+            enabled: enabled
+        });
+        
+        console.log('Current pending changes:', this.pendingMcpChanges);
+        
+        // Clear existing timeout and set new one
+        if (this.mcpChangeTimeout) {
+            clearTimeout(this.mcpChangeTimeout);
+        }
+        
+        // Send changes after a short delay (batching)
+        this.mcpChangeTimeout = setTimeout(() => {
+            console.log('Timeout triggered, sending changes...');
+            this.sendPendingMcpChanges();
+        }, 500); // 500ms delay for batching
+    }
+    
+    sendPendingMcpChanges() {
+        if (this.pendingMcpChanges.length === 0) {
+            return;
+        }
+        
+        const changes = [...this.pendingMcpChanges];
+        this.pendingMcpChanges = []; // Clear pending changes
+        
+        console.log('Sending MCP server changes:', changes);
+        
+        // Call the backend API to update MCP server configurations
+        fetch('http://localhost:8021/mcp-server-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                servers: changes
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('MCP Server configurations updated:', data);
+            // Show success notification
+            this.showNotification('success', data.message);
+        })
+        .catch(error => {
+            console.error('Error updating MCP server configurations:', error);
+            // Show error notification
+            this.showNotification('error', `Failed to update MCP server configurations: ${error.message}`);
+            
+            // Revert all changes on error
+            changes.forEach(change => {
+                const server = this.mcpServers.find(s => s.name === change.server);
+                if (server) {
+                    server.enabled = !change.enabled; // Revert to previous state
+                    const toggle = document.querySelector(`[data-server="${change.server}"]`);
+                    if (toggle) {
+                        toggle.classList.toggle('enabled', server.enabled);
+                    }
+                }
+            });
+        });
+    }
+    
+    updateMcpServerStatus(serverName, enabled) {
+        // Legacy method - now uses batching instead
+        this.addToPendingChanges(serverName, enabled);
+    }
+
+    // MCP Servers Modal methods
+    showMcpServersModal() {
+        this.showModal('mcpServersModal');
+        this.renderMcpServersList();
+    }
+
+    renderMcpServersList() {
+        const list = document.getElementById('mcpServersList');
+        if (!list) return;
+
+        list.innerHTML = '';
+        
+        this.mcpServers.forEach(server => {
+            const item = document.createElement('div');
+            item.className = 'mcp-server-item';
+            
+            item.innerHTML = `
+                <div class="mcp-server-info">
+                    <div class="mcp-server-icon">
+                        <i class="${server.icon}"></i>
+                    </div>
+                    <div class="mcp-server-name">${server.name}</div>
+                </div>
+                <div class="mcp-server-status">
+                    <div class="mcp-server-enabled ${server.enabled ? 'enabled' : 'disabled'}">
+                        ${server.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <div class="mcp-server-authenticated ${server.authenticated ? 'authenticated' : 'not-authenticated'}">
+                        ${server.authenticated ? 'Authenticated' : 'Not Authenticated'}
+                    </div>
+                    <button class="authenticate-btn" data-server="${server.name}" ${server.authenticated ? 'disabled' : ''}>
+                        ${server.authenticated ? 'Authenticated' : 'Authenticate'}
+                    </button>
+                </div>
+            `;
+            
+            // Add click handler for authenticate button
+            const authBtn = item.querySelector('.authenticate-btn');
+            if (!server.authenticated) {
+                authBtn.addEventListener('click', () => {
+                    this.showAuthenticationModal(server.name);
+                });
+            }
+            
+            list.appendChild(item);
+        });
+    }
+
+    showAuthenticationModal(serverName) {
+        const title = document.getElementById('authModalTitle');
+        const message = document.getElementById('authModalMessage');
+        
+        title.textContent = 'Authenticate';
+        message.textContent = `Authenticate with ${serverName}`;
+        
+        // Store the server name for the confirmation
+        this.currentAuthServer = serverName;
+        
+        this.showModal('authModal');
+    }
+
+    confirmAuthentication() {
+        if (!this.currentAuthServer) return;
+        
+        const server = this.mcpServers.find(s => s.name === this.currentAuthServer);
+        if (!server) return;
+        
+        // Mark as authenticated and enabled
+        server.authenticated = true;
+        server.enabled = true;
+        
+        // Update the API
+        this.updateMcpServerWithAuth(this.currentAuthServer, true, true);
+        
+        // Hide the auth modal
+        this.hideModal('authModal');
+        
+        // Re-render the MCP servers list
+        this.renderMcpServersList();
+        
+        // Show success notification
+        this.showNotification('success', `Successfully authenticated with ${this.currentAuthServer}`);
+        
+        this.currentAuthServer = null;
+    }
+
+    updateMcpServerWithAuth(serverName, enabled, authenticated) {
+        // Call the backend API to update MCP server configuration with authentication
+        fetch('http://localhost:8021/mcp-server-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                servers: [{
+                    server: serverName,
+                    enabled: enabled,
+                    authenticated: authenticated
+                }]
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('MCP Server authentication updated:', data);
+        })
+        .catch(error => {
+            console.error('Error updating MCP server authentication:', error);
+            this.showNotification('error', `Failed to update MCP server authentication: ${error.message}`);
+        });
+    }
+
+    selectPrompt(prompt) {
+        const chatInput = document.getElementById('chatInput');
+        chatInput.value = prompt;
+        chatInput.focus();
+        
+        // Auto-resize the textarea
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        
+        // Hide the popup
+        this.hideRecentPromptsPopup();
     }
 
     addMessage(type, content, id = null) {

@@ -13,6 +13,8 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### 🆕 Latest Features Documentation
+- **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
+- **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient bottom sheet interface
 - **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
 - **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
 - **Save and Email**: Save individual chat responses as markdown files or send via email
@@ -137,6 +139,10 @@ See [CI_CD.md](CI_CD.md) for detailed testing information.
 
 ### User Interfaces
 - **New Frontend**: Modern three-pane layout with real-time features ⭐ **DEFAULT**
+  - **MCP Server Tools**: Configure and enable/disable MCP tool servers
+  - **Recent Prompts & Ideas**: Quick access to sample prompts and chat history
+  - **Interactive Visualizations**: D3.js charts with click-to-scroll functionality
+  - **Smart Document Management**: Automatic chunking and grouped display
 
 - **Chrome Extension**: Browser integration for web content capture
 

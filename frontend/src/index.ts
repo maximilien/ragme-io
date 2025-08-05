@@ -81,10 +81,24 @@ interface MCPResponse {
 }
 
 // Middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        connectSrc: ["'self'", 'http://localhost:8021', 'ws://localhost:8021'],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        fontSrc: ["'self'", 'https:'],
+      },
+    },
+  })
+);
 app.use(compression());
 app.use(cors());
 app.use(express.json());
+
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Serve the main HTML file

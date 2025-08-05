@@ -98,6 +98,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 ### 4. **Modern Web Interface** ⭐ **ENHANCED!**
 - **Three-pane layout** with resizable and collapsible sidebars
 - **Real-time chat** with markdown support and copy functionality
+- **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history via bottom sheet interface
 - **Interactive document visualization** with D3.js charts (bar, pie, network graphs)
 - **Click-to-scroll functionality** - click visualization nodes to find documents
 - **Responsive design** that works on desktop and mobile
@@ -105,7 +106,15 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Smart document management** with chunked document grouping
 - **Bulk operations** for document deletion and management
 
-### 5. **Advanced Document Management** ⭐ **NEW!**
+### 5. **💡 Recent Prompts & Ideas** ⭐ **NEW!**
+- **Smart prompt suggestions**: Context-aware prompts based on chat state
+- **New chat experience**: 5 sample prompts to help users get started
+- **Ongoing chat support**: Shows 5 most recent user prompts + 3 sample prompts
+- **Bottom sheet interface**: Modern mobile-friendly popup design
+- **Quick access**: History button positioned for easy access
+- **Seamless integration**: Click to fill chat input, edit, and submit
+
+### 6. **Advanced Document Management** ⭐ **ENHANCED!**
 - **Automatic chunking**: Large documents split at sentence boundaries (1000 chars)
 - **Chunked document grouping**: Multiple chunks displayed as single documents
 - **Enhanced metadata**: Rich document information including chunk counts
@@ -113,7 +122,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Consistent processing**: Same chunking across upload, watch directory, and API
 - **Improved performance**: Better handling of large documents
 
-### 6. **Vector Database Flexibility** ⭐ **ENHANCED!**
+### 7. **Vector Database Flexibility** ⭐ **ENHANCED!**
 - **Milvus Lite Default**: Local development with no server setup required
 - **Local Weaviate Support**: Podman-based local deployment
 - **Agnostic Architecture**: Easy to switch between vector databases
