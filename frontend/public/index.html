@@ -70,6 +70,12 @@
                 </div>
                 <div class="chat-input-container">
                     <div class="chat-input-wrapper">
+                        <button class="mcp-tools-btn" id="mcpToolsBtn" title="MCP Server Tools">
+                            <i class="fas fa-toolbox"></i>
+                        </button>
+                        <button class="recent-prompts-btn" id="recentPromptsBtn" title="Recent prompts & ideas">
+                            <i class="fas fa-history"></i>
+                        </button>
                         <textarea 
                             id="chatInput" 
                             placeholder="Ask me about your documents or tell me URLs to RAG..."
@@ -79,6 +85,32 @@
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
+                                    <div class="recent-prompts-backdrop" id="recentPromptsBackdrop"></div>
+                <div class="recent-prompts-popup" id="recentPromptsPopup">
+                    <div class="recent-prompts-header">
+                        <div class="recent-prompts-title">Recent Prompts & Ideas</div>
+                        <button class="recent-prompts-close" id="recentPromptsClose">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="recent-prompts-list" id="recentPromptsList">
+                        <!-- Recent prompts will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- MCP Tools Popup -->
+                <div class="mcp-tools-backdrop" id="mcpToolsBackdrop"></div>
+                <div class="mcp-tools-popup" id="mcpToolsPopup">
+                    <div class="mcp-tools-header">
+                        <div class="mcp-tools-title">MCP Server Tools</div>
+                        <button class="mcp-tools-close" id="mcpToolsClose">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="mcp-tools-list" id="mcpToolsList">
+                        <!-- MCP servers will be populated here -->
+                    </div>
+                </div>
                 </div>
             </div>
 
@@ -177,6 +209,10 @@
             </div>
         </div>
         <div class="menu-divider"></div>
+        <div class="menu-item" id="mcpServers">
+            <i class="fas fa-server"></i>
+            MCP Servers
+        </div>
         <div class="menu-item" id="settings">
             <i class="fas fa-cog"></i>
             Settings
@@ -237,6 +273,45 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelAddContent">Cancel</button>
                 <button class="btn btn-primary" id="submitAddContent">Add Content</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP Servers Modal -->
+    <div class="modal-overlay" id="mcpServersModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>MCP Servers Integration</h3>
+                <button class="modal-close" id="closeMcpServers">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mcp-servers-list" id="mcpServersList">
+                    <!-- MCP servers will be populated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelMcpServers">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div class="modal-overlay" id="authModal">
+        <div class="modal-content auth-modal">
+            <div class="modal-header">
+                <h3 id="authModalTitle">Authenticate</h3>
+                <button class="modal-close" id="closeAuth">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="authModalMessage">Authenticate with the selected MCP server.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelAuth">Cancel</button>
+                <button class="btn btn-primary" id="confirmAuth">OK</button>
             </div>
         </div>
     </div>

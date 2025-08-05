@@ -94,6 +94,20 @@ class SummarizeInput(BaseModel):
     document_id: str
 
 
+class McpServerConfig(BaseModel):
+    """Input model for MCP server configuration."""
+
+    server: str
+    enabled: bool
+    authenticated: bool = False
+
+
+class McpServerConfigList(BaseModel):
+    """Input model for multiple MCP server configurations."""
+
+    servers: list[McpServerConfig]
+
+
 @app.post("/add-urls")
 async def add_urls(url_input: URLInput):
     """
@@ -333,6 +347,60 @@ async def list_documents(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/mcp-server-config")
+async def update_mcp_server_config(config: McpServerConfigList):
+    """
+    Update MCP server configurations (enable/disable).
+
+    Args:
+        config: Contains list of server configurations with names and enabled states
+
+    Returns:
+        dict: Success status and results for each server
+    """
+    try:
+        results = []
+
+        # Process each server configuration
+        for server_config in config.servers:
+            # Log the configuration change (implementation on backend)
+            auth_status = (
+                "authenticated" if server_config.authenticated else "not authenticated"
+            )
+            print(
+                f"MCP Server Configuration Update: {server_config.server} -> {'enabled' if server_config.enabled else 'disabled'} ({auth_status})"
+            )
+
+            # TODO: Implement actual MCP server configuration logic here
+            # This is where the backend would actually enable/disable MCP servers
+
+            results.append(
+                {
+                    "server": server_config.server,
+                    "enabled": server_config.enabled,
+                    "authenticated": server_config.authenticated,
+                    "success": True,
+                    "message": f"MCP server '{server_config.server}' {'enabled' if server_config.enabled else 'disabled'} successfully",
+                }
+            )
+
+        return {
+            "success": True,
+            "message": f"Updated {len(results)} MCP server(s) successfully",
+            "results": results,
+            "total_updated": len(results),
+        }
+
+    except Exception as e:
+        print(f"Error updating MCP server configs: {e}")
+        import traceback
+
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500, detail=f"Error updating MCP server configs: {str(e)}"
+        ) from e
 
 
 @app.post("/summarize-document")

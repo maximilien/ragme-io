@@ -12,6 +12,14 @@ Before contributing, please familiarize yourself with our documentation:
 
 ## 🆕 Recent Major Features
 
+### 💡 Recent Prompts & Ideas
+- **Smart prompt suggestions** with context-aware recommendations
+- **New chat experience** with 5 sample prompts to help users get started
+- **Ongoing chat support** showing 5 most recent user prompts + 3 sample prompts
+- **Bottom sheet interface** with modern mobile-friendly design
+- **Quick access** via history button positioned for easy reach
+- **Seamless integration** - click to fill chat input, edit, and submit
+
 ### Smart Document Chunking
 - **Automatic chunking** of large documents at sentence boundaries
 - **Consistent processing** across all input methods (upload, watch directory, API)

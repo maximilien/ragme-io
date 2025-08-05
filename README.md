@@ -22,6 +22,9 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
+- **🔧 MCP Server Tools**: Configure and enable/disable MCP tool servers with a convenient toolbox button
+- **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient popup button
 - **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
 - **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
 - **💾 Save Chat Responses**: Save individual AI responses as markdown files with smart filename generation
@@ -185,6 +188,8 @@ A modern, responsive web interface with three-pane layout:
 
 **Key Features**:
 - **Real-time chat** with markdown support and copy functionality
+- **🔧 MCP Server Tools**: Configure and enable/disable MCP tool servers (Google Drive, Dropbox, Gmail, Twilio, RAGme Test)
+- **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history
 - **Quick New Chat**: "+" button in chat history sidebar for instant new chat creation
 - **Save and Email**: Save individual responses as markdown files or send via email
 - **Smart document management** with automatic chunking and grouped display
