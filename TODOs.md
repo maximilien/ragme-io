@@ -2,13 +2,16 @@
 
 ## **OPEN**
 
+### chore
+
 ### bugs
 * query agent should perform user query (not necessarily summarize results from semantic search)
 * queries for functional agent are not flowing to function / tool, e.g., "list", "list docs"
-* RAGme ideas and TODOs
+
 * make sure to confirm with user before executing delete docs tools 
 * add memory to chat agent
-* chat resoonses and document details card include file link but does not work (need doc backend)
+* chat responses and document details card include file link but does not work (need doc backend)
+
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and usable
 
@@ -55,7 +58,7 @@
 * 
 
 #### use cases
-* support agent to collect images and docs for period of time and create report, eg, conference 
+* support agent to collect images and docs for period of time and create report, e.g., conference slide photos
 
 #### content types
 * images - add images from URLs and upload
@@ -463,6 +466,83 @@ Successfully created `./tools/tail-logs.sh` for comprehensive debugging and log 
 The debugging script is now ready for use and documented in the README!
 
 * ✅ **COMPLETED** - Add TypeScript linting
+
+* ✅ **COMPLETED** - add subcommands to test.sh
+
+Successfully improved `test.sh` with comprehensive subcommands for different test categories:
+
+### ✅ Implemented Features:
+- **Subcommand Support**: Added `unit`, `api`, `mcp`, `integration`, `all`, and `help` commands
+- **Colored Output**: Beautiful colored status messages with emojis for better UX
+- **Comprehensive Help**: Detailed help system with examples and test category descriptions
+- **Error Handling**: Proper error messages and help display for invalid commands
+- **Test Categorization**: Organized tests into logical categories (unit, API, MCP, integration)
+- **Default Behavior**: Runs unit tests by default when no command is specified
+
+### ✅ Available Commands:
+- `./test.sh unit` - Run only unit tests (Python pytest)
+- `./test.sh api` - Run only API tests (FastAPI endpoints)
+- `./test.sh mcp` - Run only MCP server tests (Model Context Protocol)
+- `./test.sh integration` - Run only integration tests (end-to-end system tests)
+- `./test.sh all` - Run all tests (unit + api + mcp + integration)
+- `./test.sh help` - Show detailed help message
+- `./test.sh` - Run unit tests (default behavior)
+
+### ✅ Test Categories:
+- **Unit Tests**: Core functionality, vector databases, agents, utilities
+- **API Tests**: FastAPI endpoints, response validation, request handling
+- **MCP Tests**: Model Context Protocol server, endpoint validation, protocol compliance
+- **Integration Tests**: End-to-end system testing, service communication, file monitoring
+
+### ✅ Technical Implementation:
+- **Bash Script Structure**: Clean, modular functions for each test type
+- **Environment Setup**: Proper test environment variables for each category
+- **Pytest Integration**: Uses pytest with appropriate filters and file selections
+- **Integration Test Support**: Calls existing `test-integration.sh` script
+- **Error Handling**: Comprehensive error handling with helpful messages
+
+### 🎯 Key Benefits:
+1. **Selective Testing**: Run only the tests you need for faster development
+2. **Better Organization**: Clear separation of test types and purposes
+3. **Improved UX**: Colored output and helpful error messages
+4. **Development Efficiency**: Quick feedback on specific components
+5. **CI/CD Ready**: Easy to integrate into automated testing pipelines
+
+The improved test.sh script is now ready for use with comprehensive subcommand support!
+
+* ✅ **COMPLETED** - `test.sh integration` still poluting the RagMeDocs collection with test_integration.pdf -- not cleaning up
+
+**Root Cause**: The cleanup function in `test-integration.sh` was only removing test files from the `watch_directory` but not cleaning up documents that were already added to the vector database collection.
+
+**Solution Implemented**:
+1. **Enhanced Cleanup Function**: Added `cleanup_test_documents()` function that uses the API to identify and delete test documents
+2. **API Integration**: Uses the `/list-documents` endpoint to retrieve all documents and `/delete-document/{id}` to remove test documents
+3. **Pattern Matching**: Identifies test documents by looking for patterns like "test_integration", "test.pdf", and "test.*integration" in document metadata
+4. **Comprehensive Cleanup**: Now cleans up both file system (watch_directory) and vector database (RagMeDocs collection)
+5. **Success Tracking**: Provides detailed feedback on cleanup operations with counts of deleted documents
+
+**Key Improvements**:
+- **Complete Cleanup**: Removes test documents from both file system and vector database
+- **API-Based Deletion**: Uses proper API endpoints to delete documents from the collection
+- **Pattern Recognition**: Intelligently identifies test documents based on filename patterns
+- **Detailed Logging**: Shows exactly which documents are being deleted and provides success/failure feedback
+- **Robust Error Handling**: Gracefully handles API failures and provides informative messages
+
+**Testing**: Verified that integration tests now properly clean up all test documents, preventing pollution of the RagMeDocs collection.
+
+* ✅ **COMPLETED** - refactor `src/ragme` code to organize code into:
+    - `src/ragme/vdbs` for all vector database code
+    - `src/ragme/agents` for all agents code
+    - `src/ragme/apis` for all MCPs and APIs
+    - `src/ragme/utils` for all utility code
+
+**Implementation Details**:
+- **Modular Structure**: Created organized subdirectories with proper `__init__.py` files
+- **Import Updates**: Updated all import statements throughout the codebase to use new module paths
+- **Backward Compatibility**: Maintained backward compatibility through proper module exports
+- **Test Updates**: Updated all test files to use new import paths and patch statements
+- **Documentation Updates**: Updated documentation to reflect new module structure
+- **Code Quality**: All tests passing and linting clean after refactor
 
 ### integrations
 * [No completed integration items]

@@ -8,7 +8,7 @@ import warnings
 
 import streamlit as st
 
-from src.ragme import RagMe
+from src.ragme.ragme import RagMe
 
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(

@@ -54,8 +54,8 @@ show_recent_logs() {
     echo ""
     
     # Show recent system logs that might be related to RAGme
-    echo -e "${YELLOW}Recent system logs containing 'ragme', 'uvicorn', 'streamlit', or 'node':${NC}"
-    log show --predicate 'eventMessage CONTAINS "ragme" OR eventMessage CONTAINS "uvicorn" OR eventMessage CONTAINS "streamlit" OR eventMessage CONTAINS "node"' --last 5m 2>/dev/null | tail -50 | while read line; do
+    echo -e "${YELLOW}Recent system logs containing 'ragme', 'uvicorn', or 'node':${NC}"
+log show --predicate 'eventMessage CONTAINS "ragme" OR eventMessage CONTAINS "uvicorn" OR eventMessage CONTAINS "node"' --last 5m 2>/dev/null | tail -50 | while read line; do
         echo "[SYS] $line"
     done
     

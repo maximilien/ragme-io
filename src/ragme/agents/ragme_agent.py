@@ -7,7 +7,7 @@ from typing import Any
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 
-from src.ragme.common import crawl_webpage
+from src.ragme.utils.common import crawl_webpage
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(

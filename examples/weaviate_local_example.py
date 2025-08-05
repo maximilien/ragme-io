@@ -18,7 +18,7 @@ import asyncio
 import os
 import time
 
-from src.ragme import RagMe
+from src.ragme.ragme import RagMe
 
 
 def wait_for_weaviate():

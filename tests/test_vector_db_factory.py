@@ -25,7 +25,7 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.vector_db_factory import create_vector_database
+from src.ragme.vdbs.vector_db_factory import create_vector_database
 
 
 class TestCreateVectorDatabase:
@@ -34,7 +34,7 @@ class TestCreateVectorDatabase:
     def test_create_weaviate_database(self):
         """Test creating a Weaviate vector database."""
         with patch(
-            "src.ragme.vector_db_factory.WeaviateVectorDatabase"
+            "src.ragme.vdbs.vector_db_factory.WeaviateVectorDatabase"
         ) as mock_weaviate_db:
             mock_instance = MagicMock()
             mock_weaviate_db.return_value = mock_instance
@@ -47,7 +47,7 @@ class TestCreateVectorDatabase:
     def test_create_milvus_database(self):
         """Test creating a Milvus vector database."""
         with patch(
-            "src.ragme.vector_db_factory.MilvusVectorDatabase"
+            "src.ragme.vdbs.vector_db_factory.MilvusVectorDatabase"
         ) as mock_milvus_db:
             mock_instance = MagicMock()
             mock_milvus_db.return_value = mock_instance
@@ -65,7 +65,7 @@ class TestCreateVectorDatabase:
     def test_create_database_case_insensitive(self):
         """Test that database type is case insensitive."""
         with patch(
-            "src.ragme.vector_db_factory.WeaviateVectorDatabase"
+            "src.ragme.vdbs.vector_db_factory.WeaviateVectorDatabase"
         ) as mock_weaviate_db:
             mock_instance = MagicMock()
             mock_weaviate_db.return_value = mock_instance
@@ -79,7 +79,7 @@ class TestCreateVectorDatabase:
         """Test creating a database with environment variable default."""
         with (
             patch(
-                "src.ragme.vector_db_factory.WeaviateVectorDatabase"
+                "src.ragme.vdbs.vector_db_factory.WeaviateVectorDatabase"
             ) as mock_weaviate_db,
             patch.dict("os.environ", {"VECTOR_DB_TYPE": "weaviate"}),
         ):

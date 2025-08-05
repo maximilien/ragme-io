@@ -13,6 +13,8 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### 🆕 Latest Features Documentation
+- **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
+- **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
 - **Save and Email**: Save individual chat responses as markdown files or send via email
 - **Smart Document Chunking**: Automatic splitting of large documents at sentence boundaries
 - **Enhanced UI**: Interactive visualizations with click-to-scroll functionality
@@ -36,7 +38,7 @@ RagMe is built with a modular, vector database agnostic architecture:
 - **REST API**: FastAPI-based API for programmatic access
 - **File Monitoring**: Automatic processing of PDF and DOCX files
 - **New Frontend**: Modern TypeScript/Express interface with three-pane layout ⭐ **DEFAULT**
-- **Legacy UI**: Streamlit interface for easy interaction
+
 - **Chrome Extension**: Browser integration for web content
 - **CI/CD Pipeline**: Automated testing across multiple Python versions
 
@@ -69,7 +71,9 @@ The project includes comprehensive testing and code quality enforcement:
 
 ### Testing
 
-- **72 tests** covering all major functionality
+- **Enhanced Test Suite**: 71+ tests covering all major functionality with organized subcommands
+- **Test Categories**: Unit, API, MCP, and Integration tests with clear separation
+- **Smart Cleanup**: Integration tests properly clean up test documents from vector database
 - **Modular test organization** with separate test files for each component
 - **Automated CI/CD** with GitHub Actions
 - **Multi-Python version support** (3.10, 3.11, 3.12)
@@ -90,15 +94,28 @@ The project includes comprehensive testing and code quality enforcement:
 
 ### Test Structure
 
-The test suite is organized to match the modular code structure:
+The test suite is organized with clear categories and subcommands:
 
+```bash
+./test.sh unit         # Unit tests (core functionality, vector databases, agents)
+./test.sh api          # API tests (FastAPI endpoints, response validation)
+./test.sh mcp          # MCP tests (Model Context Protocol server)
+./test.sh integration  # Integration tests (end-to-end system testing)
+./test.sh all          # Run all test categories
+./test.sh help         # Show detailed help and test categories
+```
+
+**Test Organization**:
 ```
 tests/
 ├── test_vector_db_base.py      # Tests for abstract base class
 ├── test_vector_db_weaviate.py  # Tests for Weaviate implementation
 ├── test_vector_db_milvus.py    # Tests for Milvus implementation
 ├── test_vector_db_factory.py   # Tests for factory function
-└── test_vector_db.py           # Compatibility layer (imports from above)
+├── test_api.py                 # API endpoint tests
+├── test_ragme_agent.py         # Agent functionality tests
+├── test_local_agent.py         # File monitoring tests
+└── test-integration.sh         # End-to-end integration tests
 ```
 
 Each test file focuses on its specific component, making it easy to:
@@ -106,6 +123,7 @@ Each test file focuses on its specific component, making it easy to:
 - Add new tests when adding new database support
 - Maintain clean separation of test concerns
 - Debug issues in specific components
+- Clean up test artifacts automatically
 
 See [CI_CD.md](CI_CD.md) for detailed testing information.
 
@@ -119,7 +137,7 @@ See [CI_CD.md](CI_CD.md) for detailed testing information.
 
 ### User Interfaces
 - **New Frontend**: Modern three-pane layout with real-time features ⭐ **DEFAULT**
-- **Legacy UI**: Streamlit-based interface for traditional interaction
+
 - **Chrome Extension**: Browser integration for web content capture
 
 ### Process Management

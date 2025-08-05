@@ -15,7 +15,7 @@ Prerequisites:
 import asyncio
 import os
 
-from src.ragme import RagMe
+from src.ragme.ragme import RagMe
 
 
 def main():

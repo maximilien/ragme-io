@@ -149,7 +149,7 @@ ragme-ai/
 │   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
-│   ├── ui.py               # Legacy Streamlit UI
+
 │   ├── socket_manager.py   # WebSocket management
 │   └── common.py           # Common utilities
 ├── frontend/               # 🌐 New frontend (TypeScript/Express)
@@ -383,7 +383,7 @@ This section lists the labels we use to help us track and manage issues and pull
 
 Before submitting a pull request, please ensure that:
 
-1. **All unit tests pass** (`./test.sh`)
+1. **All tests pass** (`./test.sh all`) - **REQUIRED**
 2. **All linting checks pass** (`./tools/lint.sh`) - **REQUIRED**
 3. **Code is properly formatted** (`uv run ruff format src/ tests/ examples/`)
 4. **Documentation is updated** for any new features or changes
@@ -391,23 +391,34 @@ Before submitting a pull request, please ensure that:
 6. **Warning filters are included** for clean test output
 7. **No linting errors** in source files
 8. **Consistent code style** throughout the codebase
-9. **Integration tests pass** (`./test-integration.sh`) - **For major changes**
+9. **Integration tests pass** (`./test.sh integration`) - **For major changes**
 10. **Frontend builds successfully** (`cd frontend && npm run build`) - **For frontend changes**
 
 ### Test Organization
 
-The test suite follows the modular structure:
+The test suite is organized with clear categories and subcommands:
 
-- **Base tests**: `test_vector_db_base.py` - Tests for abstract base class
-- **Implementation tests**: `test_vector_db_[name].py` - Tests for specific implementations
-- **Factory tests**: `test_vector_db_factory.py` - Tests for factory function
-- **Compatibility tests**: `test_vector_db.py` - Tests for compatibility layer
+```bash
+./test.sh unit         # Unit tests (core functionality, vector databases, agents)
+./test.sh api          # API tests (FastAPI endpoints, response validation)
+./test.sh mcp          # MCP tests (Model Context Protocol server)
+./test.sh integration  # Integration tests (end-to-end system testing)
+./test.sh all          # Run all test categories
+./test.sh help         # Show detailed help and test categories
+```
+
+**Test Structure**:
+- **Unit tests**: `test_vector_db_*.py`, `test_ragme_*.py`, `test_common.py` - Core functionality
+- **API tests**: `test_api.py` - FastAPI endpoints and response validation
+- **MCP tests**: MCP server functionality and protocol compliance
+- **Integration tests**: `test-integration.sh` - End-to-end system testing with cleanup
 
 Each test file should:
 - Include appropriate warning filters
 - Use mocking to avoid external dependencies
 - Test both success and error cases
 - Include proper cleanup in teardown methods
+- Clean up test artifacts automatically (especially for integration tests)
 
 ### Process Management Testing
 

@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.vector_db_weaviate import WeaviateVectorDatabase
+from src.ragme.vdbs.vector_db_weaviate import WeaviateVectorDatabase
 
 
 class TestWeaviateVectorDatabase:

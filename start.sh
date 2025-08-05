@@ -70,19 +70,19 @@ start_core_services() {
     
     # Start api.py
     echo "Starting api.py..."
-    uv run uvicorn src.ragme.api:app --reload --host 0.0.0.0 --port 8021 > logs/api.log 2>&1 &
+    uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port 8021 > logs/api.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
     # Start mcp.py
     echo "Starting mcp.py..."
-    uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022 > logs/mcp.log 2>&1 &
+    uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port 8022 > logs/mcp.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
     # Start local_agent.py
     echo "Starting local_agent.py..."
-    uv run python -m src.ragme.local_agent > logs/agent.log 2>&1 &
+    uv run python -m src.ragme.agents.local_agent > logs/agent.log 2>&1 &
     echo $! >> .pid
     sleep 3
 }

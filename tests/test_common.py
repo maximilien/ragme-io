@@ -25,7 +25,7 @@ import requests_mock
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.common import crawl_webpage
+from src.ragme.utils.common import crawl_webpage
 
 
 def test_crawl_webpage():

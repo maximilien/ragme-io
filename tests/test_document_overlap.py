@@ -27,8 +27,8 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.api import add_json
-from src.ragme.local_agent import RagMeLocalAgent
+from src.ragme.agents.local_agent import RagMeLocalAgent
+from src.ragme.apis.api import add_json
 from src.ragme.ragme import RagMe
 
 
@@ -123,11 +123,11 @@ class TestDocumentOverlap:
         }
 
         # Add the URL document
-        from src.ragme.api import JSONInput
+        from src.ragme.apis.api import JSONInput
 
         url_input = JSONInput(data=url_document_data, metadata={"source": "test"})
 
-        with patch("src.ragme.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.ragme", mock_ragme):
             result = await add_json(url_input)
 
         # Verify URL document was added
@@ -160,7 +160,7 @@ class TestDocumentOverlap:
         # Add the PDF document
         pdf_input = JSONInput(data=pdf_document_data, metadata={"source": "test"})
 
-        with patch("src.ragme.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.ragme", mock_ragme):
             result = await add_json(pdf_input)
 
         # Verify PDF document was added
@@ -240,11 +240,11 @@ class TestDocumentOverlap:
         }
 
         # Add the PDF documents
-        from src.ragme.api import JSONInput
+        from src.ragme.apis.api import JSONInput
 
         pdf_input = JSONInput(data=pdf_documents_data, metadata={"source": "test"})
 
-        with patch("src.ragme.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.ragme", mock_ragme):
             result = await add_json(pdf_input)
 
         # Verify all PDF documents were added
@@ -322,11 +322,11 @@ class TestDocumentOverlap:
         }
 
         # Add the URL documents
-        from src.ragme.api import JSONInput
+        from src.ragme.apis.api import JSONInput
 
         url_input = JSONInput(data=url_documents_data, metadata={"source": "test"})
 
-        with patch("src.ragme.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.ragme", mock_ragme):
             result = await add_json(url_input)
 
         # Verify all URL documents were added
@@ -403,11 +403,11 @@ class TestDocumentOverlap:
         }
 
         # Add the mixed documents
-        from src.ragme.api import JSONInput
+        from src.ragme.apis.api import JSONInput
 
         mixed_input = JSONInput(data=mixed_documents_data, metadata={"source": "test"})
 
-        with patch("src.ragme.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.ragme", mock_ragme):
             result = await add_json(mixed_input)
 
         # Verify all documents were added
@@ -441,7 +441,7 @@ class TestDocumentOverlap:
         ]
         assert len(web_docs) == 1  # Webpage
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     @patch("src.ragme.ragme.RagMe")
     def test_pdf_file_processing_doesnt_overlap_urls(self, mock_ragme_class, mock_post):
         """Test that processing PDF files doesn't overlap with existing URL documents."""

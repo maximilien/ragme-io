@@ -202,7 +202,7 @@ open http://localhost:3020
 ```bash
 # If normal stop doesn't work
 pkill -f "ragme"
-pkill -f "streamlit"
+
 pkill -f "uvicorn"
 pkill -f "node"
 ```
@@ -231,7 +231,7 @@ cd ..
 ### Resource Usage
 ```bash
 # Check process resource usage
-ps aux | grep -E "(ragme|streamlit|uvicorn|node)" | grep -v grep
+ps aux | grep -E "(ragme|uvicorn|node)" | grep -v grep
 
 # Check port usage
 lsof -i :3020 -i :8020 -i :8021 -i :8022
@@ -240,7 +240,7 @@ lsof -i :3020 -i :8020 -i :8021 -i :8022
 ### Memory and CPU
 ```bash
 # Monitor system resources
-top -p $(pgrep -f "ragme|streamlit|uvicorn|node" | tr '\n' ',' | sed 's/,$//')
+top -p $(pgrep -f "ragme|uvicorn|node" | tr '\n' ',' | sed 's/,$//')
 ```
 
 ## 🔧 Configuration
