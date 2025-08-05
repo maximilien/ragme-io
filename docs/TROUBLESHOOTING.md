@@ -59,28 +59,7 @@ Cannot connect to http://localhost:3020
    npm start
    ```
 
-### Legacy UI Not Loading
 
-**Problem**: Legacy Streamlit UI (port 8020) is not accessible.
-
-**Symptoms**:
-```
-Cannot connect to http://localhost:8020
-```
-
-**Solution**:
-1. **Start with legacy UI**:
-   ```bash
-   ./start.sh legacy-ui
-   ```
-2. **Check legacy UI logs**:
-   ```bash
-   ./tools/tail-logs.sh legacy-ui
-   ```
-3. **Check if port is in use**:
-   ```bash
-   lsof -i :8020
-   ```
 
 ### ResourceWarning: unclosed file
 

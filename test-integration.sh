@@ -328,8 +328,7 @@ main() {
         all_tests_passed=false
     fi
     
-    # Skip Streamlit UI test since we're using the new frontend by default
-    echo -e "  ${YELLOW}⚠️ Streamlit UI: SKIP (using new frontend on port 3020)${NC}"
+
     
     # Test 2: Vector Database Connection
     echo -e "\n${BLUE}📋 Test 2: Vector Database Connection${NC}"
@@ -405,11 +404,72 @@ main() {
     fi
 }
 
+# Function to clean up test documents from vector database
+cleanup_test_documents() {
+    echo -e "  🗄️ Cleaning up test documents from vector database..."
+    
+    # Get list of documents from API
+    local response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=100" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        # Use jq if available for proper JSON parsing, otherwise use a more robust grep approach
+        if command -v jq &> /dev/null; then
+            # Use jq to extract ONLY test_integration documents based on filename in metadata
+            # Be very specific to only match test_integration.pdf or similar patterns
+            local test_doc_ids=$(echo "$response" | jq -r '.documents[] | select(.metadata.filename | test("^test_integration.*\\.pdf$|^test.*integration.*\\.pdf$")) | .id' 2>/dev/null)
+        else
+            # Fallback: Use a more precise grep approach to find ONLY test_integration documents
+            local test_doc_ids=""
+            # Extract each document block and check if it contains test_integration patterns
+            while IFS= read -r line; do
+                if echo "$line" | grep -q '"id":'; then
+                    local doc_id=$(echo "$line" | grep -o '"id":"[^"]*"' | sed 's/"id":"//g' | sed 's/"//g')
+                    if [ -n "$doc_id" ]; then
+                        # Check if this document block contains test_integration patterns in filename
+                        # Be very specific to only match test_integration.pdf
+                        if echo "$response" | grep -A 50 -B 5 "\"id\":\"$doc_id\"" | grep -q '"filename".*"test_integration.*\.pdf"'; then
+                            test_doc_ids="$test_doc_ids $doc_id"
+                        fi
+                    fi
+                fi
+            done < <(echo "$response" | grep -A 1 -B 1 '"id":')
+        fi
+        
+        if [ -n "$test_doc_ids" ]; then
+            local deleted_count=0
+            for doc_id in $test_doc_ids; do
+                echo -e "    🗑️ Deleting test document: $doc_id"
+                local delete_response=$(curl -s --max-time 10 -X DELETE "$API_URL/delete-document/$doc_id" 2>/dev/null || echo "{}")
+                
+                if echo "$delete_response" | grep -q "status.*success"; then
+                    echo -e "      ✅ Successfully deleted document: $doc_id"
+                    ((deleted_count++))
+                else
+                    echo -e "      ⚠️ Failed to delete document: $doc_id"
+                fi
+            done
+            
+            if [ $deleted_count -gt 0 ]; then
+                echo -e "    ✅ Cleaned up $deleted_count test documents from vector database"
+            else
+                echo -e "    ℹ️ No test documents found to clean up"
+            fi
+        else
+            echo -e "    ℹ️ No test documents found to clean up"
+        fi
+    else
+        echo -e "    ⚠️ Could not retrieve documents for cleanup"
+    fi
+}
+
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
     
-    # Remove test files if they exist
+    # First, clean up test documents from vector database
+    cleanup_test_documents
+    
+    # Then remove test files from watch directory
     local test_files=(
         "$WATCH_DIR/test_integration.pdf"
         "$WATCH_DIR/test.pdf"

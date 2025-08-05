@@ -23,7 +23,7 @@ from unittest.mock import Mock
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.ragme_agent import RagMeAgent
+from src.ragme.agents.ragme_agent import RagMeAgent
 
 
 class TestRagMeAgent:

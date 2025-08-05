@@ -27,7 +27,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Patch weaviate.connect_to_weaviate_cloud before importing the app
 with patch("weaviate.connect_to_weaviate_cloud", return_value=MagicMock()):
-    from src.ragme.api import app
+    from src.ragme.apis.api import app
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def client():
 @pytest.fixture
 def mock_ragme():
     """Mock the RagMe instance."""
-    with patch("src.ragme.api.ragme") as mock:
+    with patch("src.ragme.apis.api.ragme") as mock:
         # Setup mock methods
         mock.write_json_to_weaviate = MagicMock()
         mock.run = MagicMock()

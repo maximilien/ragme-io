@@ -15,7 +15,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .ragme import RagMe
+from ..ragme import RagMe
 
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(

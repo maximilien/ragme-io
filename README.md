@@ -22,6 +22,8 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
+- **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
 - **💾 Save Chat Responses**: Save individual AI responses as markdown files with smart filename generation
 - **📧 Email Chat Responses**: Send AI responses via email with pre-filled subject and content
 - **📄 Smart Document Chunking**: Large documents are automatically split into manageable chunks while preserving readability
@@ -314,15 +316,27 @@ uv run ruff format src/ tests/ examples/
 ### Testing
 
 ```bash
-# Run unit tests
-./test.sh
+# Run all tests (unit + API + MCP + integration)
+./test.sh all
+
+# Run specific test categories
+./test.sh unit         # Unit tests only
+./test.sh api          # API tests only  
+./test.sh mcp          # MCP server tests only
+./test.sh integration  # Integration tests only
 
 # Run tests with coverage
 uv run pytest --cov=src/ragme tests/
 
-# Run integration tests (requires services to be running)
-./test-integration.sh
+# Show test help
+./test.sh help
 ```
+
+**Test Categories**:
+- **Unit Tests**: Core functionality, vector databases, agents, utilities
+- **API Tests**: FastAPI endpoints, response validation, request handling
+- **MCP Tests**: Model Context Protocol server, endpoint validation, protocol compliance
+- **Integration Tests**: End-to-end system testing, service communication, file monitoring
 
 For detailed development guidelines, see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 

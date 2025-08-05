@@ -24,7 +24,7 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.vector_db_base import VectorDatabase
+from src.ragme.vdbs.vector_db_base import VectorDatabase
 
 
 class TestVectorDatabase:

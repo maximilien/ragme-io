@@ -38,13 +38,19 @@ The main test job runs the complete test suite:
 - **Matrix Strategy**: Tests against Python 3.10, 3.11, and 3.12
 - **Platform**: Ubuntu Latest
 - **Dependencies**: Uses `uv` for fast dependency management
-- **Test Command**: Runs `./test.sh` script
+- **Test Command**: Runs `./test.sh all` script (unit + API + MCP + integration)
 - **Caching**: Caches virtual environment and dependencies for faster builds
 
 #### Test Coverage
 
-The CI runs **72 tests** covering:
+The CI runs **71+ tests** covering all categories:
 
+- ✅ **Unit Tests**: Core functionality, vector databases, agents, utilities
+- ✅ **API Tests**: FastAPI endpoints, response validation, request handling
+- ✅ **MCP Tests**: Model Context Protocol server, endpoint validation, protocol compliance
+- ✅ **Integration Tests**: End-to-end system testing, service communication, file monitoring
+
+**Test Files**:
 - ✅ API endpoints (`test_api.py`)
 - ✅ JSON processing (`test_add_json.py`)
 - ✅ Web crawling (`test_common.py`)
@@ -66,8 +72,14 @@ The CI pipeline uploads test artifacts:
 ### Running Tests Locally
 
 ```bash
-# Run unit tests
-./test.sh
+# Run all tests (unit + API + MCP + integration)
+./test.sh all
+
+# Run specific test categories
+./test.sh unit         # Unit tests only
+./test.sh api          # API tests only
+./test.sh mcp          # MCP tests only
+./test.sh integration  # Integration tests only
 
 # Run specific test file
 uv run pytest tests/test_api.py
@@ -78,8 +90,8 @@ uv run pytest -v
 # Run with coverage
 uv run pytest --cov=src/ragme
 
-# Run integration tests (requires services to be running)
-./test-integration.sh
+# Show test help
+./test.sh help
 ```
 
 ### Running Linting Locally
@@ -158,7 +170,7 @@ The project includes comprehensive integration testing via `test-integration.sh`
 4. **RagMe API** - Endpoints and functionality
 5. **Local Agent** - File monitoring and processing
 6. **RagMe Agent** - Query processing and responses
-7. **Streamlit UI** - Web interface accessibility
+
 8. **New Frontend** - Modern web interface accessibility
 9. **File Monitoring** - PDF/DOCX file processing (optional)
 

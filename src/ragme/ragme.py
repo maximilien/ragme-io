@@ -11,8 +11,8 @@ from typing import Any
 import dotenv
 from llama_index.readers.web import SimpleWebPageReader
 
-from src.ragme.ragme_agent import RagMeAgent
-from src.ragme.vector_db import VectorDatabase, create_vector_database
+from src.ragme.agents.ragme_agent import RagMeAgent
+from src.ragme.vdbs.vector_db import VectorDatabase, create_vector_database
 
 # Get environment variables
 dotenv.load_dotenv()

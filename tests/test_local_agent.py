@@ -27,14 +27,14 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.local_agent import DirectoryMonitor, FileHandler, RagMeLocalAgent
+from src.ragme.agents.local_agent import DirectoryMonitor, FileHandler, RagMeLocalAgent
 
 
 class TestRagMeLocalAgent:
     """Test cases for RagMeLocalAgent class"""
 
-    @patch("src.ragme.local_agent.RAGME_API_URL", "http://test-api.com")
-    @patch("src.ragme.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
+    @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
+    @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
     def test_init_with_default_urls(self):
         """Test initialization with default URLs from environment"""
         agent = RagMeLocalAgent()
@@ -49,8 +49,8 @@ class TestRagMeLocalAgent:
         assert agent.api_url == "http://custom-api.com"
         assert agent.mcp_url == "http://custom-mcp.com"
 
-    @patch("src.ragme.local_agent.RAGME_API_URL", None)
-    @patch("src.ragme.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
+    @patch("src.ragme.agents.local_agent.RAGME_API_URL", None)
+    @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
     def test_init_missing_api_url(self):
         """Test initialization fails when API URL is missing"""
         with pytest.raises(
@@ -58,8 +58,8 @@ class TestRagMeLocalAgent:
         ):
             RagMeLocalAgent()
 
-    @patch("src.ragme.local_agent.RAGME_API_URL", "http://test-api.com")
-    @patch("src.ragme.local_agent.RAGME_MCP_URL", None)
+    @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
+    @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", None)
     def test_init_missing_mcp_url(self):
         """Test initialization fails when MCP URL is missing"""
         with pytest.raises(
@@ -67,7 +67,7 @@ class TestRagMeLocalAgent:
         ):
             RagMeLocalAgent()
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     def test_add_to_rag_success(self, mock_post):
         """Test successful addition to RAG"""
         mock_response = MagicMock()
@@ -96,7 +96,7 @@ class TestRagMeLocalAgent:
         call_args = mock_post.call_args
         assert call_args[0][0] == "http://test-api.com/add-json"
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     def test_add_to_rag_api_error(self, mock_post):
         """Test RAG addition with API error"""
         mock_response = MagicMock()
@@ -113,7 +113,7 @@ class TestRagMeLocalAgent:
 
         assert result is False
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     def test_add_to_rag_response_error(self, mock_post):
         """Test RAG addition with response error"""
         mock_response = MagicMock()
@@ -133,7 +133,7 @@ class TestRagMeLocalAgent:
 
         assert result is False
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     def test_add_to_rag_exception(self, mock_post):
         """Test RAG addition with exception"""
         mock_post.side_effect = Exception("Network error")
@@ -147,7 +147,7 @@ class TestRagMeLocalAgent:
 
         assert result is False
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     def test_process_pdf_file_success(self, mock_post):
         """Test successful PDF processing"""
         # Create a temporary PDF file
@@ -202,7 +202,7 @@ class TestRagMeLocalAgent:
         finally:
             temp_file_path.unlink()
 
-    @patch("src.ragme.local_agent.requests.post")
+    @patch("src.ragme.agents.local_agent.requests.post")
     def test_process_docx_file_success(self, mock_post):
         """Test successful DOCX processing"""
         # Create a temporary DOCX file
@@ -256,8 +256,8 @@ class TestRagMeLocalAgent:
 
             mock_process_pdf.assert_called_once_with(file_path)
 
-    @patch("src.ragme.local_agent.RAGME_API_URL", "http://test-api.com")
-    @patch("src.ragme.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
+    @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
+    @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
     def test_process_file_docx(self):
         """Test processing a DOCX file."""
         mock_ragme = RagMeLocalAgent()
@@ -268,8 +268,8 @@ class TestRagMeLocalAgent:
         assert result is None  # process_file doesn't return anything
         mock_ragme._process_docx_file.assert_called_once_with(Path("test.docx"))
 
-    @patch("src.ragme.local_agent.RAGME_API_URL", "http://test-api.com")
-    @patch("src.ragme.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
+    @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
+    @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
     def test_file_type_metadata_setting(self):
         """Test that file type is correctly set in metadata."""
         mock_ragme = RagMeLocalAgent()
@@ -311,7 +311,7 @@ class TestRagMeLocalAgent:
             api_url="http://test-api.com", mcp_url="http://test-mcp.com"
         )
 
-        with patch("src.ragme.local_agent.logging") as mock_logging:
+        with patch("src.ragme.agents.local_agent.logging") as mock_logging:
             file_path = Path("test.txt")
             agent.process_file(file_path)
 
@@ -446,13 +446,13 @@ class TestDirectoryMonitor:
         callback = Mock()
         monitor = DirectoryMonitor("/nonexistent/directory", callback)
 
-        with patch("src.ragme.local_agent.logging") as mock_logging:
+        with patch("src.ragme.agents.local_agent.logging") as mock_logging:
             monitor.start()
             mock_logging.error.assert_called_once_with(
                 "Directory does not exist: /nonexistent/directory"
             )
 
-    @patch("src.ragme.local_agent.Observer")
+    @patch("src.ragme.agents.local_agent.Observer")
     def test_start_success(self, mock_observer_class):
         """Test successful start"""
         mock_observer = Mock()
@@ -463,10 +463,10 @@ class TestDirectoryMonitor:
             monitor = DirectoryMonitor(temp_dir, callback)
 
             # Mock the infinite loop to break after a short time
-            with patch("src.ragme.local_agent.time.sleep") as mock_sleep:
+            with patch("src.ragme.agents.local_agent.time.sleep") as mock_sleep:
                 mock_sleep.side_effect = KeyboardInterrupt()
 
-                with patch("src.ragme.local_agent.logging") as mock_logging:
+                with patch("src.ragme.agents.local_agent.logging") as mock_logging:
                     monitor.start()
 
                     mock_observer.schedule.assert_called_once()
@@ -488,7 +488,7 @@ class TestDirectoryMonitor:
             mock_observer = Mock()
             monitor.observer = mock_observer
 
-            with patch("src.ragme.local_agent.logging") as mock_logging:
+            with patch("src.ragme.agents.local_agent.logging") as mock_logging:
                 monitor.stop()
 
                 mock_observer.stop.assert_called_once()

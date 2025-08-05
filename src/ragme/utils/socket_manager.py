@@ -5,16 +5,23 @@
 Socket manager for emitting events from the API to connected frontend clients.
 """
 
-import socketio
+try:
+    import socketio
+
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    socketio = None
 
 # Global socket manager instance
-_sio: socketio.AsyncServer | None = None
+_sio = None
 
 
-def set_socket_manager(sio: socketio.AsyncServer):
+def set_socket_manager(sio):
     """Set the global socket manager instance."""
     global _sio
-    _sio = sio
+    if SOCKETIO_AVAILABLE:
+        _sio = sio
 
 
 def emit_document_added(doc_type: str, count: int):
@@ -26,7 +33,7 @@ def emit_document_added(doc_type: str, count: int):
         count: Number of documents added
     """
     global _sio
-    if _sio is not None:
+    if SOCKETIO_AVAILABLE and _sio is not None:
         try:
             # Emit to all connected clients
             _sio.emit(

@@ -13,7 +13,7 @@ This example shows how to:
 import asyncio
 
 from src.ragme.ragme import RagMe
-from src.ragme.vector_db import WeaviateVectorDatabase, create_vector_database
+from src.ragme.vdbs.vector_db import WeaviateVectorDatabase, create_vector_database
 
 
 def example_default_weaviate():

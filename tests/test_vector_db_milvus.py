@@ -37,7 +37,7 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ragme.vector_db_milvus import MilvusVectorDatabase
+from src.ragme.vdbs.vector_db_milvus import MilvusVectorDatabase
 
 # Check if pymilvus is available
 try:

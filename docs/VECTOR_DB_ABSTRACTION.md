@@ -143,9 +143,9 @@ ragme.cleanup()
 
 ```python
 from src.ragme.ragme import RagMe
-from src.ragme.vector_db_weaviate import WeaviateVectorDatabase
-from src.ragme.vector_db_milvus import MilvusVectorDatabase
-from src.ragme.vector_db_weaviate_local import WeaviateLocalVectorDatabase
+from src.ragme.vdbs.vector_db_weaviate import WeaviateVectorDatabase
+from src.ragme.vdbs.vector_db_milvus import MilvusVectorDatabase
+from src.ragme.vdbs.vector_db_weaviate_local import WeaviateLocalVectorDatabase
 
 # Create custom Weaviate Cloud database
 weaviate_db = WeaviateVectorDatabase("MyWeaviateCollection")
@@ -164,7 +164,7 @@ ragme = RagMe(vector_db=milvus_db)
 
 ```python
 from src.ragme.ragme import RagMe
-from src.ragme.vector_db_factory import create_vector_database
+from src.ragme.vdbs.vector_db_factory import create_vector_database
 
 # Create Weaviate Cloud database using factory
 weaviate_db = create_vector_database("weaviate", "FactoryCollection")
@@ -308,10 +308,10 @@ ragme = RagMe()
 ragme = RagMe(vector_db=MilvusVectorDatabase("CustomCollection"))
 
 # New modular imports (recommended)
-from src.ragme.vector_db_weaviate import WeaviateVectorDatabase
-from src.ragme.vector_db_weaviate_local import WeaviateLocalVectorDatabase
-from src.ragme.vector_db_milvus import MilvusVectorDatabase
-from src.ragme.vector_db_factory import create_vector_database
+from src.ragme.vdbs.vector_db_weaviate import WeaviateVectorDatabase
+from src.ragme.vdbs.vector_db_weaviate_local import WeaviateLocalVectorDatabase
+from src.ragme.vdbs.vector_db_milvus import MilvusVectorDatabase
+from src.ragme.vdbs.vector_db_factory import create_vector_database
 ```
 
 ## Environment Variables

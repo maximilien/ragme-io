@@ -31,10 +31,10 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from the new modular structure
-from src.ragme.vector_db_base import VectorDatabase
-from src.ragme.vector_db_factory import create_vector_database
-from src.ragme.vector_db_milvus import MilvusVectorDatabase
-from src.ragme.vector_db_weaviate import WeaviateVectorDatabase
+from src.ragme.vdbs.vector_db_base import VectorDatabase
+from src.ragme.vdbs.vector_db_factory import create_vector_database
+from src.ragme.vdbs.vector_db_milvus import MilvusVectorDatabase
+from src.ragme.vdbs.vector_db_weaviate import WeaviateVectorDatabase
 
 # Check if pymilvus is available
 try:

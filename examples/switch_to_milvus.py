@@ -36,7 +36,7 @@ def switch_to_milvus():
         project_root = os.path.dirname(current_dir)
         sys.path.insert(0, project_root)
 
-        from src.ragme import RagMe
+        from src.ragme.ragme import RagMe
 
         # Initialize RagMe with Milvus
         print("\n🔄 Initializing RagMe with Milvus...")
