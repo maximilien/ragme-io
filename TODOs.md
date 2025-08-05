@@ -3,25 +3,34 @@
 ## **OPENED**
 
 ### bugs
+* only open the Manage Chats sub-menus when user clicks since otherwise hard to select the other menu items
+
 * query agent should perform user query (not necessarily summarize results from semantic search)
+* add memory to chat agent
+
 * queries for functional agent are not flowing to function / tool, e.g., "list", "list docs"
 * make sure to confirm with user before executing delete docs tools 
-* add memory to chat agent
+
 * chat responses and document details card include file link but does not work (need doc backend)
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and usable
 
 ### frontend
+* complete MCP authentication flow
+
 * settings to enable / disable saving uploaded documents in doc server
 * doc details card should allow viewing of doc and chunks
 
 ### backend
-* document server - for documents added with "+ Add Content" upload keep copy on doc server. Add settings to enable / disable this
 * MCP tool servers integration and authentication
 * MCP agent to call and use MCP server tools depending on prompts
+
 * gateway agent and prompt tuning to figure out if user prompt should be handled by Query / Function / MCP agent
+
 * graph db - build knowledge graph of documents / content via Neo4J
 * graph agent - queries graph db with text -> cypher query to complement query agent results
+
+* document server - for documents added with "+ Add Content" upload keep copy on doc server. Add settings to enable / disable this
 
 ### tests
 * test with local weaviate 
@@ -30,7 +39,7 @@
 ### features
 
 #### generalization 
-* make RAGme work with configurable collection name
+* make RAGme work with configurable collection name(s) and LLMs
 * make other parts of RAGme that could be changed, e.g., name, query agent configurable
 
 #### use cases
@@ -41,9 +50,12 @@
 * support extracting metadata from images
 * support extracting text from images and add to metadata, eg, image of a slide
 * extract images from documents and upload to ImagesDocs collection with metadata to link back to document 
+
 * voice memos - `.wav` files and other formats
 * podcasts - link to podcast files
+
 * blogs (RSS) subscriptions - any RSS feed
+
 * videos (YouTube) - link to youtube videos
 
 #### insights
@@ -56,6 +68,7 @@
 * todos - google task read / write
 * cloud drives - google drive / microsoft one drive/ dropbox
 * twillio (phone messages) - add documents and links using messages with a phone number
+
 * whatsapp integration (explore if possible)
 * slack channels - add documents and links using slack messages
 * X / Twitter - add documents and links from X account posts
