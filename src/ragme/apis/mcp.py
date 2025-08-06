@@ -13,6 +13,8 @@ import PyPDF2
 from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel
 
+from ..utils.config_manager import config
+
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(
     "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*"
@@ -38,7 +40,13 @@ warnings.filterwarnings(
     "ignore", category=ResourceWarning
 )  # General ResourceWarning suppression
 
-app = FastAPI(title="RagMe MCP Server")
+# Get application configuration
+app_config = config.get("application", {})
+app = FastAPI(
+    title=f"{app_config.get('name', 'RAGme')} MCP Server",
+    description="MCP (Model Context Protocol) Server for document processing",
+    version=app_config.get("version", "1.0.0"),
+)
 
 
 # Cleanup function
@@ -321,4 +329,10 @@ async def process_docx_base64(request: Base64FileRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8022)
+    # Get network configuration
+    network_config = config.get_network_config()
+    mcp_config = network_config.get("mcp", {})
+    host = mcp_config.get("host", "0.0.0.0")
+    port = mcp_config.get("port", 8022)
+
+    uvicorn.run(app, host=host, port=port)

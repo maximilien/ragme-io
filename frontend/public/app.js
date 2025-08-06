@@ -5,6 +5,7 @@ class RAGmeAssistant {
         this.documents = [];
         this.chatHistory = [];
         this.currentChatId = null;
+        // Default settings - will be overridden by configuration
         this.settings = {
             maxDocuments: 50,
             autoRefresh: true,
@@ -31,7 +32,7 @@ class RAGmeAssistant {
             summaryInProgress: false
         };
         
-        // MCP Tools configuration
+        // Default MCP Tools configuration - will be overridden by configuration
         this.mcpServers = [
             { name: 'Google GDrive', icon: 'fab fa-google-drive', enabled: false, authenticated: false },
             { name: 'Dropbox Drive', icon: 'fab fa-dropbox', enabled: false, authenticated: false },
@@ -40,6 +41,9 @@ class RAGmeAssistant {
             { name: 'RAGme Test', icon: 'fas fa-flask', enabled: false, authenticated: false }
         ];
         
+        // Configuration loaded from backend
+        this.config = null;
+        
         // Track pending MCP server changes for batching
         this.pendingMcpChanges = [];
         this.mcpChangeTimeout = null;
@@ -47,7 +51,10 @@ class RAGmeAssistant {
         this.init();
     }
 
-    init() {
+    async init() {
+        // Load configuration first
+        await this.loadConfiguration();
+        
         this.connectSocket();
         this.setupEventListeners();
         this.setupResizeDivider();
@@ -63,6 +70,62 @@ class RAGmeAssistant {
         setTimeout(() => {
             this.updateVisualization();
         }, 100);
+    }
+
+    async loadConfiguration() {
+        try {
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                this.config = await response.json();
+                console.log('Configuration loaded:', this.config);
+                
+                // Update settings from configuration
+                if (this.config.frontend && this.config.frontend.settings) {
+                    const configSettings = this.config.frontend.settings;
+                    this.settings = {
+                        maxDocuments: configSettings.max_documents || this.settings.maxDocuments,
+                        autoRefresh: configSettings.auto_refresh !== undefined ? configSettings.auto_refresh : this.settings.autoRefresh,
+                        refreshInterval: configSettings.refresh_interval_ms || this.settings.refreshInterval,
+                        maxTokens: configSettings.max_tokens || this.settings.maxTokens,
+                        temperature: configSettings.temperature || this.settings.temperature
+                    };
+                }
+                
+                // Update MCP servers from configuration
+                if (this.config.mcp_servers && this.config.mcp_servers.length > 0) {
+                    this.mcpServers = this.config.mcp_servers.map(server => ({
+                        name: server.name,
+                        icon: server.icon || 'fas fa-server',
+                        enabled: server.enabled || false,
+                        authenticated: false // Will be updated based on actual status
+                    }));
+                }
+                
+                // Update UI settings
+                if (this.config.frontend && this.config.frontend.ui) {
+                    const uiConfig = this.config.frontend.ui;
+                    this.currentDateFilter = uiConfig.default_date_filter || this.currentDateFilter;
+                    this.currentVisualizationType = uiConfig.default_visualization || this.currentVisualizationType;
+                    this.isVisualizationVisible = uiConfig.visualization_visible !== undefined ? uiConfig.visualization_visible : this.isVisualizationVisible;
+                }
+                
+                // Update page title and branding
+                if (this.config.application && this.config.application.title) {
+                    document.title = this.config.application.title;
+                    
+                    // Update header title as well
+                    const headerTitle = document.querySelector('.header .title');
+                    if (headerTitle) {
+                        headerTitle.textContent = this.config.application.title;
+                    }
+                }
+                
+            } else {
+                console.warn('Could not load configuration from server, using defaults');
+            }
+        } catch (error) {
+            console.warn('Failed to load configuration:', error);
+        }
     }
 
     connectSocket() {
@@ -1049,7 +1112,8 @@ class RAGmeAssistant {
     }
 
     addWelcomeMessage() {
-        const welcomeMessage = `Welcome to **🤖 RAGme.ai Assistant**! 
+        const appTitle = this.config?.application?.title || '🤖 RAGme.ai Assistant';
+        const welcomeMessage = `Welcome to **${appTitle}**! 
 
 I can help you with:
 
@@ -3181,7 +3245,7 @@ ${userMessage ? `**Query:** ${userMessage.content}
 ${message.content}
 
 ---
-*Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}*
+*Generated by ${this.config?.application?.title || 'RAGme.ai Assistant'} on ${new Date().toLocaleString()}*
 `;
 
         // Create and download the file
@@ -3301,7 +3365,7 @@ ${message.content}
         }
 
         fileContent += `---
-*Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}*
+*Generated by ${this.config?.application?.title || 'RAGme.ai Assistant'} on ${new Date().toLocaleString()}*
 `;
 
         // Create and download the file
@@ -3357,7 +3421,7 @@ ${message.content}
         }
 
         emailBody += `---
-Generated by RAGme.ai Assistant on ${new Date().toLocaleString()}`;
+Generated by ${this.config?.application?.title || 'RAGme.ai Assistant'} on ${new Date().toLocaleString()}`;
         
         bodyInput.value = emailBody;
         toInput.value = '';

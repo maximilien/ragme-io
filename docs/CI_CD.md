@@ -161,7 +161,7 @@ tests/
 
 #### Integration Tests
 
-The project includes comprehensive integration testing via `test-integration.sh`:
+The project includes comprehensive integration testing via `tools/test-integration.sh`:
 
 **What it tests:**
 1. **Service Status** - All services (API, MCP, UI) are running and accessible
@@ -180,7 +180,7 @@ The project includes comprehensive integration testing via `test-integration.sh`
 ./start.sh
 
 # Run integration tests
-./test-integration.sh
+./tools/test-integration.sh
 ```
 
 **Integration test features:**
@@ -311,7 +311,7 @@ Before committing code:
 2. ✅ **Run linting**: `./tools/lint.sh`
 3. ✅ **Format code**: `uv run ruff format src/ tests/ examples/`
 4. ✅ **Build frontend**: `cd frontend && npm run build`
-5. ✅ **Check integration**: `./test-integration.sh` (if services are running)
+5. ✅ **Check integration**: `./tools/test-integration.sh` (if services are running)
 
 ### Pull Request Requirements
 

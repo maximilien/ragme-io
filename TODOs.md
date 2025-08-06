@@ -8,7 +8,19 @@
 * add memory to chat agent
 * make sure to confirm with user before executing delete docs tools 
 
-* chat responses and document details card include file link but does not work (need doc backend)
+* URL link in chat responses is incorrect when fetching from URL documents
+* chat responses and document details card include file or URK links but they do not work (need doc backend for PDFs and others) and use URL as link for URL docs
+* when searching for "who is maximilien" with maximilien.org URL and ragme-ai.pdf the response header URL is incorrect but the rest of response is OK: 
+
+```md
+Based on the stored documents, here's what I found:
+
+URL: file://ragme-ai.pdf#20250805_100725_984382 (Chunked document with 9 chunks)
+
+Answer: Based on the documents provided, there is no specific information regarding an individual named "Maximilien" that can be definitively identified.
+
+However, one of the documents (Document 2)...
+```
 
 ### bugs - mobile
 * right pane shows as purple block when collapse on mobile (iPhone)
@@ -16,9 +28,9 @@
 
 ### features
 
-#### generalization 
-* make RAGme work with configurable collection name(s) and LLMs, and MCP servers
-* make other parts of RAGme that could be changed, e.g., name, query agent configurable
+#### agents
+* implement OpenAI agents version of the current agents
+* allow new OpenAI agents to be configurable vs LlamaIndex agents
 
 #### frontend
 * complete MCP authentication flow
@@ -93,6 +105,16 @@
 ---
 
 ## **COMPLETED**
+
+### features
+
+* ✅ **COMPLETED** - Make RAGme work with configurable collection name(s) and LLMs, and MCP servers [Comprehensive configuration system implemented with config.yaml supporting multiple vector databases (Weaviate local/cloud, Milvus local/cloud), configurable LLM models for different agents, MCP server configurations, and complete environment variable support]
+
+* ✅ **COMPLETED** - Make other active parts of RAGme that could be changed configurable (e.g., name, query agent) [Full application generalization implemented: configurable app name/title/description, network ports, frontend UI settings, client branding, feature flags, security settings, and all agent configurations. Includes config validation tool and comprehensive documentation]
+
+* ✅ **COMPLETED** - Add compile-frontend command to start.sh script [Added `./start.sh compile-frontend` command to easily recompile frontend TypeScript after configuration or code changes, without needing to restart the server. Includes helpful usage documentation and examples.]
+
+* ✅ **COMPLETED** - Move test-integration.sh to tools directory for better organization [Organizational improvement to consolidate all utility scripts in tools/ directory, updated all references in documentation and test scripts]
 
 * ✅ **COMPLETED** - README and other docs seems to have repetitions
 
@@ -355,12 +377,12 @@ Successfully improved `test.sh` with comprehensive subcommands for different tes
 - **Bash Script Structure**: Clean, modular functions for each test type
 - **Environment Setup**: Proper test environment variables for each category
 - **Pytest Integration**: Uses pytest with appropriate filters and file selections
-- **Integration Test Support**: Calls existing `test-integration.sh` script
+- **Integration Test Support**: Calls existing `tools/test-integration.sh` script
 - **Error Handling**: Comprehensive error handling with helpful messages
 
 * ✅ **COMPLETED** - `test.sh integration` still polluting the RagMeDocs collection with test_integration.pdf -- not cleaning up
 
-**Root Cause**: The cleanup function in `test-integration.sh` was only removing test files from the `watch_directory` but not cleaning up documents that were already added to the vector database collection.
+**Root Cause**: The cleanup function in `tools/test-integration.sh` was only removing test files from the `watch_directory` but not cleaning up documents that were already added to the vector database collection.
 
 **Solution Implemented**:
 1. **Enhanced Cleanup Function**: Added `cleanup_test_documents()` function that uses the API to identify and delete test documents

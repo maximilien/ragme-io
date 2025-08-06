@@ -117,7 +117,8 @@ tests/
 ├── test_api.py                 # API endpoint tests
 ├── test_ragme_agent.py         # Agent functionality tests
 ├── test_local_agent.py         # File monitoring tests
-└── test-integration.sh         # End-to-end integration tests
+└── tools/
+    └── test-integration.sh     # End-to-end integration tests
 ```
 
 Each test file focuses on its specific component, making it easy to:

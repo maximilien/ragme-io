@@ -43,25 +43,46 @@ logging.basicConfig(
 # Load environment variables
 dotenv.load_dotenv()
 
-# Get MCP server URL from environment variables
-RAGME_API_URL = os.getenv("RAGME_API_URL")
-RAGME_MCP_URL = os.getenv("RAGME_MCP_URL")
+# Import configuration manager
+try:
+    from ..utils.config_manager import config
+
+    # Get configuration from config.yaml
+    network_config = config.get_network_config()
+    RAGME_API_URL = (
+        f"http://localhost:{network_config.get('api', {}).get('port', 8021)}"
+    )
+    RAGME_MCP_URL = (
+        f"http://localhost:{network_config.get('mcp', {}).get('port', 8022)}"
+    )
+
+    # Get chunk size from agent configuration
+    agent_config = config.get_agent_config("local-agent")
+    DEFAULT_CHUNK_SIZE = agent_config.get("chunk_size", 1000) if agent_config else 1000
+
+except ImportError:
+    # Fallback to environment variables if config manager not available
+    RAGME_API_URL = os.getenv("RAGME_API_URL")
+    RAGME_MCP_URL = os.getenv("RAGME_MCP_URL")
+    DEFAULT_CHUNK_SIZE = 1000
 
 # Global reference to monitor for cleanup
 _monitor = None
 
 
-def chunkText(text: str, chunk_size: int = 1000) -> list[str]:
+def chunkText(text: str, chunk_size: int = None) -> list[str]:
     """
     Split text into chunks of specified size.
 
     Args:
         text: The text to chunk
-        chunk_size: Maximum size of each chunk in characters
+        chunk_size: Maximum size of each chunk in characters. If None, uses DEFAULT_CHUNK_SIZE
 
     Returns:
         List of text chunks
     """
+    if chunk_size is None:
+        chunk_size = DEFAULT_CHUNK_SIZE
     if len(text) <= chunk_size:
         return [text]
 
@@ -319,7 +340,7 @@ class RagMeLocalAgent:
                 metadata["type"] = "unknown"
 
             # Chunk the text if it's large
-            chunks = chunkText(text, chunk_size=1000)
+            chunks = chunkText(text)
 
             # Generate unique URL to prevent overwriting
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")

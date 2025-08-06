@@ -8,6 +8,7 @@ from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 
 from src.ragme.utils.common import crawl_webpage
+from src.ragme.utils.config_manager import config
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(
@@ -34,7 +35,20 @@ class RagMeAgent:
             ragme_instance: The RagMe instance that provides access to Weaviate client and methods
         """
         self.ragme = ragme_instance
-        self.llm = OpenAI(model="gpt-4o-mini")
+
+        # Get agent configuration
+        agent_config = config.get_agent_config("ragme-agent")
+        llm_model = (
+            agent_config.get("llm_model", "gpt-4o-mini")
+            if agent_config
+            else "gpt-4o-mini"
+        )
+
+        # Get LLM configuration
+        llm_config = config.get_llm_config()
+        temperature = llm_config.get("temperature", 0.7)
+
+        self.llm = OpenAI(model=llm_model, temperature=temperature)
         self.agent = self._create_agent()
 
     def _create_agent(self):

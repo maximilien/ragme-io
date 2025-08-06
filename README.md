@@ -22,6 +22,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment ⭐ **NEW!**
 - **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
 - **🔧 MCP Server Tools**: Configure and enable/disable MCP tool servers with a convenient toolbox button
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient popup button
@@ -42,6 +43,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 📖 **Complete documentation is available in the [docs/](docs/) directory:**
 
 - **[📋 Project Overview](docs/PRESENTATION.md)** - Complete project overview with examples
+- **[🎛️ Configuration Guide](docs/CONFIG.md)** - Comprehensive configuration system for client customization ⭐ **NEW!**
 - **[🔧 Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture  
 - **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
 - **[📖 Documentation Index](docs/README.md)** - Full documentation structure
@@ -124,7 +126,39 @@ WEAVIATE_URL=*****.weaviate.cloud
 
 RAGME_API_URL=http://localhost:8021
 RAGME_MCP_URL=http://localhost:8022
+
+# Optional: Custom ports for services
+RAGME_API_PORT=8021
+RAGME_MCP_PORT=8022
+RAGME_FRONTEND_PORT=3020
 ```
+
+### 🎛️ Advanced Configuration (NEW!)
+
+RAGme now supports comprehensive configuration management through `config.yaml` for easy customization and client deployment:
+
+```bash
+# Copy the example configuration to project root
+cp config.yaml.example config.yaml
+
+# Edit the configuration file (located in project root)
+nano config.yaml
+```
+
+> **📁 Developer Note:** The `config.yaml` file is located in the project root and is automatically ignored by git (added to `.gitignore`), allowing each developer to maintain their own local configuration without affecting the repository.
+
+The configuration system allows you to customize:
+
+- **🌐 Network settings** (ports, CORS, hosts)
+- **🗄️ Vector database configurations** (multiple databases, connection settings)
+- **🤖 LLM settings** (models, temperature, tokens)
+- **🔧 MCP server configurations** (authentication, enabled services)
+- **🎨 Frontend customization** (UI settings, branding, colors)
+- **🚩 Feature flags** (enable/disable functionality)
+- **🔒 Security settings** (file upload limits, CSP)
+- **📊 Client branding** (logos, colors, welcome messages)
+
+**📚 Complete Configuration Guide:** See **[docs/CONFIG.md](docs/CONFIG.md)** for detailed configuration options, examples, and best practices.
 
 ## 🏃‍♂️ Run RAGme.ai
 
@@ -151,6 +185,24 @@ This will start all services and you can access the **new frontend** at `http://
 # Check service status
 ./stop.sh status
 ```
+
+### Frontend Development
+
+```bash
+# Compile frontend after configuration or code changes
+./start.sh compile-frontend
+
+# Restart only the frontend server
+./start.sh restart-frontend
+
+# Restart only backend services (API, MCP, Agent)
+./start.sh restart-backend
+```
+
+**Use Cases:**
+- **Configuration Changes**: After modifying `config.yaml`, run `./start.sh compile-frontend` to rebuild the frontend
+- **Frontend Development**: Use `compile-frontend` for faster iteration when working on UI changes
+- **Selective Restarts**: Restart only the services you need without affecting others
 
 ### Debugging and Log Monitoring
 
@@ -316,6 +368,9 @@ uv run ruff check --fix src/ tests/
 
 # Format code
 uv run ruff format src/ tests/ examples/
+
+# Validate configuration file
+./tools/config-validator.sh
 ```
 
 ### Testing

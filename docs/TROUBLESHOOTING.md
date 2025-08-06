@@ -31,12 +31,14 @@ ConnectionError: Failed to connect to vector database
 
 ### Frontend Not Loading
 
-**Problem**: New frontend (port 3020) is not accessible.
+**Problem**: New frontend (default port 3020) is not accessible.
 
 **Symptoms**:
 ```
 Cannot connect to http://localhost:3020
 ```
+
+**Note**: The frontend port can be customized using the `RAGME_FRONTEND_PORT` environment variable.
 
 **Solution**:
 1. **Check if frontend is running**:
@@ -80,12 +82,14 @@ DeprecationWarning: pkg_resources is deprecated as an API
 
 ### API Server Not Responding
 
-**Problem**: API server (port 8021) is not responding to requests.
+**Problem**: API server (default port 8021) is not responding to requests.
 
 **Symptoms**:
 ```
 Connection refused on port 8021
 ```
+
+**Note**: The API port can be customized using the `RAGME_API_PORT` environment variable.
 
 **Solution**:
 1. **Check API server status**:
@@ -107,7 +111,9 @@ Connection refused on port 8021
 
 ### MCP Server Issues
 
-**Problem**: MCP server (port 8022) is not processing documents.
+**Problem**: MCP server (default port 8022) is not processing documents.
+
+**Note**: The MCP port can be customized using the `RAGME_MCP_PORT` environment variable.
 
 **Symptoms**:
 ```

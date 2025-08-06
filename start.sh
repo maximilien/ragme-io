@@ -6,7 +6,7 @@ set -a
 set +a
 
 # RAGme Process Management Script
-# Usage: ./start.sh [default|restart-frontend]
+# Usage: ./start.sh [default|compile-frontend|restart-frontend|restart-backend]
 
 # Function to check if a port is in use and kill the process
 check_port() {
@@ -56,9 +56,9 @@ stop_existing() {
     fi
     
     # Also kill any processes using our ports
-    check_port 3020  # New Frontend
-    check_port 8021  # API
-    check_port 8022  # MCP
+    check_port ${RAGME_FRONTEND_PORT:-3020}  # New Frontend
+    check_port ${RAGME_API_PORT:-8021}  # API
+    check_port ${RAGME_MCP_PORT:-8022}  # MCP
 }
 
 # Function to start core services (API, MCP, Agent)
@@ -70,13 +70,13 @@ start_core_services() {
     
     # Start api.py
     echo "Starting api.py..."
-    uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port 8021 > logs/api.log 2>&1 &
+    uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
     # Start mcp.py
     echo "Starting mcp.py..."
-    uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port 8022 > logs/mcp.log 2>&1 &
+    uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port ${RAGME_MCP_PORT:-8022} > logs/mcp.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
@@ -93,7 +93,7 @@ start_new_frontend() {
     cd frontend
     npm install
     npm run build
-    RAGME_API_URL=http://localhost:8021 npm start > ../logs/frontend.log 2>&1 &
+    RAGME_API_URL=http://localhost:${RAGME_API_PORT:-8021} npm start > ../logs/frontend.log 2>&1 &
     echo $! >> ../.pid
     cd ..
 }
@@ -105,20 +105,20 @@ start_service() {
     
     case $service in
         "frontend")
-            check_port 3020
+            check_port ${RAGME_FRONTEND_PORT:-3020}
             start_new_frontend
             ;;
         "api")
-            check_port 8021
+            check_port ${RAGME_API_PORT:-8021}
             echo "Starting api.py..."
-            uv run uvicorn src.ragme.api:app --reload --host 0.0.0.0 --port 8021 > logs/api.log 2>&1 &
+            uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
             echo $! >> .pid
             sleep 3
             ;;
         "mcp")
-            check_port 8022
+            check_port ${RAGME_MCP_PORT:-8022}
             echo "Starting mcp.py..."
-            uv run uvicorn src.ragme.mcp:app --reload --host 0.0.0.0 --port 8022 > logs/mcp.log 2>&1 &
+            uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port ${RAGME_MCP_PORT:-8022} > logs/mcp.log 2>&1 &
             echo $! >> .pid
             sleep 3
             ;;
@@ -146,6 +146,35 @@ start_default() {
     start_new_frontend
     
     echo "✅ All services started successfully!"
+}
+
+# Function to compile frontend only (no restart)
+compile_frontend() {
+    echo "🔨 Compiling frontend..."
+    
+    cd frontend
+    
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ]; then
+        echo "📦 Installing npm dependencies..."
+        npm install
+    else
+        echo "📦 Ensuring npm dependencies are up to date..."
+        npm install
+    fi
+    
+    # Build/compile the frontend
+    echo "🏗️ Building TypeScript..."
+    npm run build
+    
+    cd ..
+    
+    echo "✅ Frontend compiled successfully!"
+    echo "   • TypeScript compiled to JavaScript"
+    echo "   • Ready for deployment"
+    echo ""
+    echo "💡 To restart the frontend server with new changes:"
+    echo "   ./start.sh restart-frontend"
 }
 
 # Function to restart frontend only
@@ -205,6 +234,9 @@ case "${1:-default}" in
     "default"|"")
         start_default
         ;;
+    "compile-frontend")
+        compile_frontend
+        ;;
     "restart-frontend")
         restart_frontend
         ;;
@@ -215,16 +247,18 @@ case "${1:-default}" in
         start_service "$1"
         ;;
     *)
-        echo "Usage: $0 [default|restart-frontend|restart-backend|frontend|api|mcp]"
+        echo "Usage: $0 [default|compile-frontend|restart-frontend|restart-backend|frontend|api|mcp]"
         echo ""
         echo "Commands:"
         echo "  default           - Start core services + new frontend (default)"
+        echo "  compile-frontend  - Compile/build frontend TypeScript only (no restart)"
         echo "  restart-frontend  - Restart only the new frontend"
         echo "  restart-backend   - Restart backend services (API, MCP, Agent)"
         echo ""
         echo "Examples:"
         echo "  ./start.sh              # Start with new frontend (default)"
         echo "  ./start.sh default      # Start with new frontend"
+        echo "  ./start.sh compile-frontend  # Compile frontend after config/code changes"
         echo "  ./start.sh restart-frontend # Restart frontend only"
         echo "  ./start.sh restart-backend  # Restart backend services only"
         exit 1
