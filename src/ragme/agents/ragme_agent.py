@@ -263,13 +263,11 @@ class RagMeAgent:
                     if "score" in most_relevant:
                         score_info = f" (Similarity: {most_relevant['score']:.3f})"
 
-                    # Use LLM to summarize the relevant content
+                    # Use LLM to answer the query with the relevant content
                     # Call the method on the class instance using the captured reference
-                    summary = agent_instance._summarize_chunks_with_llm(
-                        query, documents
-                    )
+                    answer = agent_instance._answer_query_with_chunks(query, documents)
 
-                    result = f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}{score_info}\n\nSummary: {summary}"
+                    result = f"**Based on the stored documents, here's what I found:**\n\n**URL:** [{url}]({url}){chunk_info}{score_info}\n\n**Answer:** {answer}"
 
                     # If we have multiple relevant documents, mention them
                     if len(documents) > 1:
@@ -413,7 +411,7 @@ class RagMeAgent:
         except Exception as e:
             return f"Error searching documents: {str(e)}"
 
-    def _summarize_chunks_with_llm(self, query: str, documents: list[dict]) -> str:
+    def _answer_query_with_chunks(self, query: str, documents: list[dict]) -> str:
         """
         Use LLM to summarize relevant chunks in the context of the query.
 
