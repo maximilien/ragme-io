@@ -3,22 +3,21 @@
 ## **OPENED**
 
 ### bugs
-* only open the Manage Chats sub-menus when user clicks since otherwise hard to select the other menu items
-
-* query agent should perform user query (not necessarily summarize results from semantic search)
-* add memory to chat agent
-
 * queries for functional agent are not flowing to function / tool, e.g., "list", "list docs"
+
+* add memory to chat agent
 * make sure to confirm with user before executing delete docs tools 
 
 * chat responses and document details card include file link but does not work (need doc backend)
+
+### bugs - mobile
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and usable
 
 ### features
 
 #### generalization 
-* make RAGme work with configurable collection name(s) and LLMs
+* make RAGme work with configurable collection name(s) and LLMs, and MCP servers
 * make other parts of RAGme that could be changed, e.g., name, query agent configurable
 
 #### frontend
@@ -27,7 +26,15 @@
 * settings to enable / disable saving uploaded documents in doc server
 * doc details card should allow viewing of doc and chunks
 
+#### MCP servers
+* mail - gmail support to read / write mails
+* todos - google task read / write
+* cloud drives - google drive / microsoft one drive/ dropbox
+* twillio (phone messages) - add documents and links using messages with a phone number
+
 #### backend
+* add sqllite to store and retrieve user preferences
+
 * MCP tool servers integration and authentication
 * MCP agent to call and use MCP server tools depending on prompts
 
@@ -38,19 +45,27 @@
 
 * document server - for documents added with "+ Add Content" upload keep copy on doc server. Add settings to enable / disable this
 
-#### tests
-* test with local weaviate 
-* test with local milvus
-
-#### use cases
-* support agent to collect images and docs for period of time and create report, e.g., conference slide photos
-
 #### content types
 * images - add images from URLs and upload
 * support extracting metadata from images
 * support extracting text from images and add to metadata, eg, image of a slide
 * extract images from documents and upload to ImagesDocs collection with metadata to link back to document 
 
+#### use cases
+* support agent to collect images and docs for period of time and create report, e.g., conference slide photos
+
+#### saas
+* support multiple users 
+* authorize and authenticate users with OAuth -- Google and Github
+* store authenticated user's preferences
+* allow non-authenticated users limited access: 10 documents and 10 queries per day
+
+#### cloud deployment
+* containerize different services: create Dockerfile
+* create basic k8s deployment with services on kind
+* test k8s deployment on cloud: AWS or GCP
+
+#### more content types
 * voice memos - `.wav` files and other formats
 * podcasts - link to podcast files
 
@@ -63,15 +78,14 @@
 * daily insights - generate insight from documents added in a particular day
 * monthly versions - monthly versions of summaries and insights
 
-#### services (MCP servers)
-* mail - gmail support to read / write mails
-* todos - google task read / write
-* cloud drives - google drive / microsoft one drive/ dropbox
-* twillio (phone messages) - add documents and links using messages with a phone number
-
+#### more MCP servers
 * whatsapp integration (explore if possible)
 * slack channels - add documents and links using slack messages
 * X / Twitter - add documents and links from X account posts
+
+#### tests
+* test with local weaviate 
+* test with local milvus
 
 ### nice to have
 * a2a support to discover and call other external agents to do work
@@ -80,7 +94,6 @@
 
 ## **COMPLETED**
 
-### bugs
 * ✅ **COMPLETED** - README and other docs seems to have repetitions
 
 * ✅ **COMPLETED** - Adding large PDF doc via + Add Content seem to cause new doc to not be queryable. Implement semantic search
@@ -123,7 +136,6 @@
 - **Render Interference Prevention**: Document list rendering is skipped when modal is open
 - **Timeout Management**: Proper timeout handling prevents conflicting messages
 
-### frontend
 * ✅ **COMPLETED** - New frontend UI
 
 Successfully created a new modern UI for RAGme.ai Assistant with the following features:
@@ -261,7 +273,6 @@ Successfully reorganized the hamburger menu to improve organization and prepare 
 - **Tooltip Guidance**: Added helpful tooltips for disabled servers directing users to authenticate via MCP Servers menu
 - All tests passing and linting clean
 
-### backend
 * ✅ **COMPLETED** - Local Weaviate support for development
 
 Successfully added local Weaviate support for development and testing:
@@ -382,5 +393,39 @@ Successfully improved `test.sh` with comprehensive subcommands for different tes
   - `src/ragme/apis` for all MCPs and APIs
   - `src/ragme/utils` for all utility code
 
-### integrations
-* [No completed integration items]
+* ✅ **COMPLETED** - only open the Manage Chats sub-menus when user clicks since otherwise hard to select the other menu items
+
+**Implementation Details**:
+- **Click-based Navigation**: Changed from hover-based to click-based submenu activation
+- **Event Handling**: Replaced `mouseenter`/`mouseleave` events with `click` event
+- **Toggle Functionality**: Uses existing `toggleSubmenu()` method for consistent behavior
+- **Event Propagation**: Added `stopPropagation()` to prevent menu closure when clicking trigger
+- **User Experience**: Submenu now only opens when user explicitly clicks "Manage Chats"
+- **Accessibility**: Improved navigation for users who have difficulty with hover interactions
+
+* ✅ **COMPLETED** - selecting a new Documents Overview drop down list the visualization does not refresh
+
+**Implementation Details**:
+- **Initialization Fix**: Added `isVisualizationVisible` property initialization in constructor (default: true)
+- **Event Listener Fix**: Modified visualization type selector to always call `updateVisualization()` regardless of visibility state
+- **State Persistence**: Added localStorage support for visualization visibility state (`ragme-visualization-visible`)
+- **Settings Loading**: Enhanced `loadSettings()` to restore visualization visibility preference
+- **Initialization**: Added visualization update call in `init()` method to ensure proper initialization
+- **User Experience**: Visualization now refreshes immediately when dropdown selection changes
+- **Data Preparation**: Visualization data is always prepared and ready when user makes it visible
+
+* ✅ **COMPLETED** - nicer formating of chat answer header
+
+**Implementation Details**:
+- **Markdown**: added markdown to answer header including URL
+
+* ✅ **COMPLETED** - add easy way to restart-backend from start.sh script
+
+**Implementation Details**:
+- **New Command**: Added `restart-backend` option to `start.sh` script
+- **Backend Services**: Restarts API (port 8021), MCP (port 8022), and Local Agent
+- **Frontend Preservation**: Keeps frontend running while restarting backend services
+- **PID Management**: Properly manages process IDs to avoid conflicts
+- **Port Cleanup**: Kills existing processes on backend ports before restarting
+- **User Experience**: Provides clear feedback and service URLs after restart
+- **Documentation**: Updated help text and usage examples

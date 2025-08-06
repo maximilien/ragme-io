@@ -169,6 +169,37 @@ restart_frontend() {
     echo "   • New Frontend: http://localhost:3020"
 }
 
+# Function to restart backend services only (API, MCP, Agent)
+restart_backend() {
+    echo "🔄 Restarting backend services only..."
+    
+    # Kill existing backend processes
+    check_port 8021  # API
+    check_port 8022  # MCP
+    
+    # Remove backend PIDs from .pid file if it exists
+    if [ -f .pid ]; then
+        # Create a temporary file keeping only frontend PIDs
+        # This is a simple approach - we'll just keep the last PID (frontend)
+        # and remove the first 3 PIDs (api, mcp, agent)
+        if [ $(wc -l < .pid) -ge 3 ]; then
+            tail -n +4 .pid > .pid.tmp 2>/dev/null || true
+            mv .pid.tmp .pid
+        else
+            # If less than 3 PIDs, just clear the file
+            rm -f .pid
+        fi
+    fi
+    
+    # Start core backend services
+    start_core_services
+    
+    echo "✅ Backend services restarted successfully!"
+    echo "   • API: http://localhost:8021"
+    echo "   • MCP: http://localhost:8022"
+    echo "   • Local Agent: Running in background"
+}
+
 # Main script logic
 case "${1:-default}" in
     "default"|"")
@@ -177,20 +208,25 @@ case "${1:-default}" in
     "restart-frontend")
         restart_frontend
         ;;
+    "restart-backend")
+        restart_backend
+        ;;
     "frontend"|"api"|"mcp")
         start_service "$1"
         ;;
     *)
-        echo "Usage: $0 [default|restart-frontend|frontend|api|mcp]"
+        echo "Usage: $0 [default|restart-frontend|restart-backend|frontend|api|mcp]"
         echo ""
         echo "Commands:"
         echo "  default           - Start core services + new frontend (default)"
         echo "  restart-frontend  - Restart only the new frontend"
+        echo "  restart-backend   - Restart backend services (API, MCP, Agent)"
         echo ""
         echo "Examples:"
         echo "  ./start.sh              # Start with new frontend (default)"
         echo "  ./start.sh default      # Start with new frontend"
         echo "  ./start.sh restart-frontend # Restart frontend only"
+        echo "  ./start.sh restart-backend  # Restart backend services only"
         exit 1
         ;;
 esac
@@ -205,6 +241,7 @@ if [ "$1" = "default" ] || [ -z "$1" ]; then
     echo "  ./stop.sh restart      # Restart all processes"
     echo "  ./stop.sh status       # Show process status"
     echo "  ./start.sh restart-frontend # Restart frontend only"
+    echo "  ./start.sh restart-backend  # Restart backend services only"
     echo ""
     echo "Access your RAGme services:"
     echo "  • New Frontend: http://localhost:3020"

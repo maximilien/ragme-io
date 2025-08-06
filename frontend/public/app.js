@@ -14,6 +14,7 @@ class RAGmeAssistant {
         };
         this.currentDateFilter = 'current';
         this.currentVisualizationType = 'graph'; // Default to Network Graph
+        this.isVisualizationVisible = true; // Default to visible
         this.vectorDbInfo = null;
         this.autoRefreshInterval = null;
         this.lastDocumentCount = 0;
@@ -56,6 +57,12 @@ class RAGmeAssistant {
         this.renderChatHistory(); // Render chat history after loading
         this.loadVectorDbInfo();
         this.startAutoRefresh();
+        
+        // Initialize visualization after settings are loaded
+        // This ensures the visualization type selector reflects the saved preference
+        setTimeout(() => {
+            this.updateVisualization();
+        }, 100);
     }
 
     connectSocket() {
@@ -201,34 +208,11 @@ class RAGmeAssistant {
         // Menu items
         const manageChatsTrigger = document.getElementById('manageChatsTrigger');
         const manageChatsSubmenu = document.getElementById('manageChatsSubmenu');
-        let submenuTimeout;
         
-        // Show submenu on hover
-        manageChatsTrigger.addEventListener('mouseenter', () => {
-            clearTimeout(submenuTimeout);
-            manageChatsSubmenu.classList.add('show');
-            manageChatsTrigger.classList.add('active');
-        });
-        
-        // Hide submenu when mouse leaves the trigger
-        manageChatsTrigger.addEventListener('mouseleave', () => {
-            submenuTimeout = setTimeout(() => {
-                manageChatsSubmenu.classList.remove('show');
-                manageChatsTrigger.classList.remove('active');
-            }, 100);
-        });
-        
-        // Keep submenu open when hovering over it
-        manageChatsSubmenu.addEventListener('mouseenter', () => {
-            clearTimeout(submenuTimeout);
-        });
-        
-        // Hide submenu when mouse leaves the submenu
-        manageChatsSubmenu.addEventListener('mouseleave', () => {
-            submenuTimeout = setTimeout(() => {
-                manageChatsSubmenu.classList.remove('show');
-                manageChatsTrigger.classList.remove('active');
-            }, 100);
+        // Show/hide submenu on click
+        manageChatsTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleSubmenu('manageChatsSubmenu', 'manageChatsTrigger');
         });
 
         document.getElementById('newChat').addEventListener('click', () => {
@@ -444,9 +428,9 @@ class RAGmeAssistant {
         document.getElementById('visualizationTypeSelector').addEventListener('change', (e) => {
             this.currentVisualizationType = e.target.value;
             localStorage.setItem('ragme-visualization-type', this.currentVisualizationType);
-            if (this.isVisualizationVisible) {
-                this.updateVisualization();
-            }
+            // Always update visualization when type changes, regardless of visibility
+            // This ensures the visualization is ready when made visible
+            this.updateVisualization();
         });
 
         // Resize divider
@@ -1793,6 +1777,12 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             this.currentVisualizationType = savedVisualizationType;
         }
         
+        // Load visualization visibility preference
+        const savedVisualizationVisible = localStorage.getItem('ragme-visualization-visible');
+        if (savedVisualizationVisible !== null) {
+            this.isVisualizationVisible = savedVisualizationVisible === 'true';
+        }
+        
         // Update the visualization type selector to reflect the saved preference
         const visualizationTypeSelector = document.getElementById('visualizationTypeSelector');
         if (visualizationTypeSelector) {
@@ -2317,6 +2307,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         const toggleBtn = document.getElementById('visualizationToggleBtn');
         
         this.isVisualizationVisible = !this.isVisualizationVisible;
+        localStorage.setItem('ragme-visualization-visible', this.isVisualizationVisible.toString());
         
         if (this.isVisualizationVisible) {
             visualizationContent.style.display = 'block';
@@ -2351,6 +2342,8 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             console.error('Visualization container not found');
             return;
         }
+
+
 
         // D3.js is now loaded synchronously, so it should always be available
         if (typeof d3 === 'undefined') {
