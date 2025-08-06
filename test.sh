@@ -182,16 +182,16 @@ run_mcp_tests() {
 run_integration_tests() {
     print_header "Running Integration Tests..."
     
-    if [ -f "./test-integration.sh" ]; then
+    if [ -f "./tools/test-integration.sh" ]; then
         print_status "Running integration test suite..."
-        if ./test-integration.sh; then
+        if ./tools/test-integration.sh; then
             print_status "✓ Integration tests passed"
         else
             print_error "Integration tests failed"
             exit 1
         fi
     else
-        print_warning "test-integration.sh not found, skipping integration tests"
+        print_warning "tools/test-integration.sh not found, skipping integration tests"
     fi
     
     print_header "Integration Tests Completed Successfully! 🎉"

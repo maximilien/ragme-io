@@ -17,15 +17,76 @@ const io = new Server(server, {
   },
 });
 
-const PORT = process.env.PORT || 3020;
-const RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8000';
+// TypeScript interfaces for configuration
+interface AppConfig {
+  application?: {
+    name?: string;
+    title?: string;
+    description?: string;
+    version?: string;
+  };
+  network?: {
+    frontend?: {
+      port?: number;
+    };
+    api?: {
+      port?: number;
+      url?: string;
+    };
+  };
+  security?: {
+    file_upload?: {
+      max_file_size_mb?: number;
+    };
+  };
+  frontend?: Record<string, unknown>;
+  client?: Record<string, unknown>;
+  features?: Record<string, unknown>;
+  mcp_servers?: Array<{
+    name?: string;
+    icon?: string;
+    enabled?: boolean;
+    description?: string;
+  }>;
+}
+
+// Load configuration from backend or environment variables
+let appConfig: AppConfig = {};
+let RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8021';
+
+// Try to load configuration from the backend
+async function loadConfiguration() {
+  try {
+    const response = await fetch(`${RAGME_API_URL}/config`);
+    if (response.ok) {
+      appConfig = (await response.json()) as AppConfig;
+      logger.info('Configuration loaded from backend');
+
+      // Update RAGME_API_URL if different in config
+      const configApiUrl = `http://localhost:${appConfig.network?.api?.port || 8021}`;
+      if (configApiUrl !== RAGME_API_URL) {
+        RAGME_API_URL = configApiUrl;
+        logger.info(`Updated API URL to: ${RAGME_API_URL}`);
+      }
+    } else {
+      logger.warn('Could not load configuration from backend, using defaults');
+    }
+  } catch (error) {
+    logger.warn('Could not connect to backend for configuration, using defaults');
+  }
+}
 
 // Configure multer for file uploads
+const getFileUploadLimits = () => {
+  const maxSizeMB = appConfig.security?.file_upload?.max_file_size_mb || 50;
+  return {
+    fileSize: maxSizeMB * 1024 * 1024, // Convert MB to bytes
+  };
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-  },
+  limits: getFileUploadLimits(),
 });
 
 // Logger function to replace console statements
@@ -608,8 +669,50 @@ io.on('connection', socket => {
   });
 });
 
-server.listen(PORT, () => {
-  logger.info(`🤖 RAGme.ai Assistant Frontend running on port ${PORT}`);
-  logger.info(`Open http://localhost:${PORT} in your browser`);
-  logger.info(`RAGme API: http://localhost:8021`);
+// Add configuration endpoint for frontend
+app.get('/api/config', (req, res) => {
+  // Filter out any potentially sensitive data before sending to frontend
+  const safeConfig = {
+    application: {
+      name: appConfig.application?.name || 'RAGme',
+      title: appConfig.application?.title || 'RAGme.ai Assistant',
+      version: appConfig.application?.version || '1.0.0',
+    },
+    frontend: appConfig.frontend || {},
+    client: appConfig.client || {},
+    mcp_servers: (appConfig.mcp_servers || []).map(server => ({
+      name: server.name,
+      icon: server.icon,
+      enabled: server.enabled || false,
+      description: server.description,
+      // Note: authentication_type and url are excluded for security
+    })),
+    features: appConfig.features || {},
+    api_url: RAGME_API_URL,
+  };
+
+  res.json(safeConfig);
+});
+
+// Start server with configuration loading
+async function startServer() {
+  await loadConfiguration();
+
+  const finalPort =
+    process.env.PORT ||
+    process.env.RAGME_FRONTEND_PORT ||
+    appConfig.network?.frontend?.port ||
+    3020;
+
+  server.listen(finalPort, () => {
+    const appName = appConfig.application?.name || 'RAGme.ai Assistant';
+    logger.info(`🤖 ${appName} Frontend running on port ${finalPort}`);
+    logger.info(`Open http://localhost:${finalPort} in your browser`);
+    logger.info(`RAGme API: ${RAGME_API_URL}`);
+  });
+}
+
+startServer().catch(error => {
+  logger.error('Failed to start server:', error);
+  process.exit(1);
 });

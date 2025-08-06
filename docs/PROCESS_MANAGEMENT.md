@@ -249,6 +249,9 @@ top -p $(pgrep -f "ragme|uvicorn|node" | tr '\n' ',' | sed 's/,$//')
 The process management system respects these environment variables:
 - `RAGME_API_URL`: API server URL (default: http://localhost:8021)
 - `RAGME_MCP_URL`: MCP server URL (default: http://localhost:8022)
+- `RAGME_API_PORT`: API server port (default: 8021)
+- `RAGME_MCP_PORT`: MCP server port (default: 8022)
+- `RAGME_FRONTEND_PORT`: Frontend port (default: 3020)
 - `VECTOR_DB_TYPE`: Vector database type (default: milvus)
 
 ### PID File Management
@@ -259,11 +262,11 @@ The system uses a `.pid` file to track running processes:
 - Used for graceful shutdowns
 
 ### Port Management
-The system manages these ports:
-- **3020**: New frontend (default)
+The system manages these ports (configurable via RAGME_*_PORT environment variables):
+- **3020**: New frontend (default, configurable via `RAGME_FRONTEND_PORT`)
 - **8020**: Legacy UI (optional)
-- **8021**: API server (required)
-- **8022**: MCP server (required)
+- **8021**: API server (required, configurable via `RAGME_API_PORT`)
+- **8022**: MCP server (required, configurable via `RAGME_MCP_PORT`)
 
 ## 🚀 Quick Reference
 

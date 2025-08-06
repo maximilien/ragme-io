@@ -419,7 +419,7 @@ The test suite is organized with clear categories and subcommands:
 - **Unit tests**: `test_vector_db_*.py`, `test_ragme_*.py`, `test_common.py` - Core functionality
 - **API tests**: `test_api.py` - FastAPI endpoints and response validation
 - **MCP tests**: MCP server functionality and protocol compliance
-- **Integration tests**: `test-integration.sh` - End-to-end system testing with cleanup
+- **Integration tests**: `tools/test-integration.sh` - End-to-end system testing with cleanup
 
 Each test file should:
 - Include appropriate warning filters

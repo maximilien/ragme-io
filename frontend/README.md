@@ -110,7 +110,7 @@ The frontend communicates with the RAGme.ai backend API via WebSocket events:
 
 ## Configuration
 
-The frontend runs on port 3020 by default and connects to the RAGme.ai API on `http://localhost:8021` by default. To change these, modify the `PORT` and `RAGME_API_URL` constants in `src/index.ts`.
+The frontend runs on port 3020 by default and connects to the RAGme.ai API on `http://localhost:8021` by default. To change these, set the `RAGME_FRONTEND_PORT` and `RAGME_API_URL` environment variables, or modify the constants in `src/index.ts`.
 
 ## Browser Support
 

@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import os
+
+from ..utils.config_manager import config
 from .vector_db_base import VectorDatabase
 from .vector_db_milvus import MilvusVectorDatabase
 from .vector_db_weaviate import WeaviateVectorDatabase
@@ -8,20 +11,104 @@ from .vector_db_weaviate_local import WeaviateLocalVectorDatabase
 
 
 def create_vector_database(
-    db_type: str = None, collection_name: str = "RagMeDocs"
+    db_type: str | None = None, collection_name: str | None = None
 ) -> VectorDatabase:
     """
     Factory function to create vector database instances.
+
     Args:
-        db_type: Type of vector database ("weaviate", "milvus", etc.)
-        collection_name: Name of the collection to use
+        db_type: Type of vector database ("weaviate", "milvus", etc.).
+                If None, uses the default from config.yaml
+        collection_name: Name of the collection to use.
+                        If None, uses the collection name from config.yaml
+
     Returns:
         VectorDatabase instance
     """
-    import os
-
+    # Get database configuration
     if db_type is None:
-        db_type = os.getenv("VECTOR_DB_TYPE", "milvus")  # Changed default to milvus
+        # First try environment variable for backward compatibility
+        db_type = os.getenv("VECTOR_DB_TYPE")
+        if db_type is None:
+            # Use default from config
+            db_type = config.get("vector_databases.default", "weaviate-local")
+
+    # Get database configuration
+    db_config = config.get_database_config(db_type)
+    if db_config is None:
+        # Fallback to environment variables for backward compatibility
+        return _create_database_legacy(db_type, collection_name)
+
+    # Use collection name from config if not provided
+    if collection_name is None:
+        collection_name = db_config.get("collection_name", "RagMeDocs")
+
+    db_type_normalized = db_config.get("type", db_type).lower()
+
+    if db_type_normalized == "weaviate":
+        return _create_weaviate_cloud(db_config, collection_name)
+    elif db_type_normalized == "weaviate-local":
+        return _create_weaviate_local(db_config, collection_name)
+    elif db_type_normalized == "milvus":
+        return _create_milvus(db_config, collection_name)
+    else:
+        raise ValueError(f"Unsupported vector database type: {db_type_normalized}")
+
+
+def _create_weaviate_cloud(db_config: dict, collection_name: str) -> VectorDatabase:
+    """Create Weaviate Cloud instance."""
+    api_key = db_config.get("api_key")
+    url = db_config.get("url")
+
+    if not api_key or not url or "${" in str(api_key) or "${" in str(url):
+        print("⚠️  Weaviate Cloud credentials not configured in config.yaml.")
+        print("   Set WEAVIATE_API_KEY and WEAVIATE_URL environment variables.")
+        print("   Falling back to default database.")
+        # Fall back to default database
+        default_db = config.get("vector_databases.default", "weaviate-local")
+        if default_db != "weaviate-cloud":
+            fallback_config = config.get_database_config(default_db)
+            if fallback_config:
+                return create_vector_database(default_db, collection_name)
+        return MilvusVectorDatabase(collection_name)
+
+    try:
+        return WeaviateVectorDatabase(collection_name)
+    except Exception as e:
+        print(f"⚠️  Failed to connect to Weaviate Cloud: {e}")
+        print("   Falling back to local database.")
+        return _create_fallback_database(collection_name)
+
+
+def _create_weaviate_local(db_config: dict, collection_name: str) -> VectorDatabase:
+    """Create local Weaviate instance."""
+    try:
+        return WeaviateLocalVectorDatabase(collection_name)
+    except Exception as e:
+        print(f"⚠️  Failed to connect to local Weaviate: {e}")
+        print(
+            "   Make sure local Weaviate is running (see tools/podman-compose.weaviate.yml)"
+        )
+        print("   Falling back to Milvus.")
+        return _create_fallback_database(collection_name)
+
+
+def _create_milvus(db_config: dict, collection_name: str) -> VectorDatabase:
+    """Create Milvus instance."""
+    return MilvusVectorDatabase(collection_name)
+
+
+def _create_fallback_database(collection_name: str) -> VectorDatabase:
+    """Create fallback database (Milvus)."""
+    return MilvusVectorDatabase(collection_name)
+
+
+def _create_database_legacy(
+    db_type: str, collection_name: str | None
+) -> VectorDatabase:
+    """Legacy database creation using environment variables."""
+    if collection_name is None:
+        collection_name = "RagMeDocs"
 
     if db_type.lower() == "weaviate":
         # Check if Weaviate credentials are properly configured

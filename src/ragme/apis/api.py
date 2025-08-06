@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from ..ragme import RagMe
+from ..utils.config_manager import config
 
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(
@@ -49,17 +50,24 @@ async def lifespan(app: FastAPI):
     ragme.cleanup()
 
 
+# Get application configuration
+app_config = config.get("application", {})
+network_config = config.get_network_config()
+cors_origins = network_config.get("api", {}).get("cors_origins", ["*"])
+
 app = FastAPI(
-    title="RagMe API",
-    description="API for RAG operations with web content using a Vector Database",
-    version="1.0.0",
+    title=app_config.get("title", "RagMe API"),
+    description=app_config.get(
+        "description", "API for RAG operations with web content using a Vector Database"
+    ),
+    version=app_config.get("version", "1.0.0"),
     lifespan=lifespan,
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -444,9 +452,14 @@ async def summarize_document(input_data: SummarizeInput):
         # Use a direct LLM call for faster summarization
         from llama_index.llms.openai import OpenAI
 
+        # Get LLM configuration from config
+        llm_config = config.get_llm_config()
+        summarization_config = llm_config.get("summarization", {})
+
         llm = OpenAI(
-            model="gpt-4o-mini", temperature=0.1
-        )  # Lower temperature for more consistent summaries
+            model=summarization_config.get("model", "gpt-4o-mini"),
+            temperature=summarization_config.get("temperature", 0.1),
+        )
 
         summary_prompt = f"""Please provide a brief summary of the following document content in 1-2 sentences maximum.
         Focus on the main topic and key points.
@@ -625,7 +638,50 @@ async def delete_document(document_id: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/config")
+async def get_frontend_config():
+    """
+    Get frontend configuration settings.
+
+    Returns configuration needed by the frontend application including:
+    - UI settings
+    - MCP servers
+    - Client customization
+    - Feature flags
+
+    SECURITY: This endpoint filters out sensitive data like API keys, tokens, etc.
+    """
+    try:
+        # Use safe configuration method to prevent secret leakage
+        safe_config = config.get_safe_frontend_config()
+
+        # Add feature flags (these are safe to expose)
+        safe_config["features"] = {
+            "document_summarization": config.is_feature_enabled(
+                "document_summarization"
+            ),
+            "mcp_integration": config.is_feature_enabled("mcp_integration"),
+            "real_time_updates": config.is_feature_enabled("real_time_updates"),
+            "file_upload": config.is_feature_enabled("file_upload"),
+            "url_crawling": config.is_feature_enabled("url_crawling"),
+            "json_ingestion": config.is_feature_enabled("json_ingestion"),
+            "pattern_deletion": config.is_feature_enabled("pattern_deletion"),
+        }
+
+        return safe_config
+
+    except Exception as e:
+        print(f"Error getting frontend configuration: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8021)
+    # Get network configuration
+    api_config = network_config.get("api", {})
+    host = api_config.get("host", "0.0.0.0")
+    port = api_config.get("port", 8021)
+
+    uvicorn.run(app, host=host, port=port)

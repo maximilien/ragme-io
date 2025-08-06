@@ -198,3 +198,6 @@ milvus_demo.db
 
 # Ngrok
 ngrok.yml
+
+# RAGme Configuration
+config.yaml
