@@ -108,6 +108,7 @@ llm:
 # Query Configuration
 query:
   top_k: 5  # Number of most relevant documents to retrieve for queries
+  include_citations: false  # Always include citations regardless of query type
 
 # Agent Configuration
 agents:

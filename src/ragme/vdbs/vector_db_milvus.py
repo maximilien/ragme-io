@@ -364,17 +364,26 @@ class MilvusVectorDatabase(VectorDatabase):
             warnings.warn(f"Fallback keyword search also failed: {e}")
             return []
 
-    def create_query_agent(self):
+    def create_query_agent(self, llm=None):
         """Create a query agent for Milvus."""
 
         # Create a simple query agent that can perform vector similarity search
         class MilvusQueryAgent:
-            def __init__(self, vector_db):
+            def __init__(self, vector_db, llm=None):
                 self.vector_db = vector_db
                 self.client = vector_db.client
                 self.collection_name = vector_db.collection_name
+                self.llm = llm  # Store the LLM instance for detailed query detection
 
-            def run(self, query: str):
+                # Get query configuration
+                from src.ragme.utils.config_manager import config
+
+                self.top_k = config.get("query.top_k", 5)
+
+                # Get citation configuration
+                self.include_citations = config.get("query.include_citations", False)
+
+            async def run(self, query: str, is_detailed: bool = None):
                 """Run a query using vector similarity search."""
                 try:
                     # For now, use simple keyword matching as fallback
@@ -394,9 +403,6 @@ class MilvusVectorDatabase(VectorDatabase):
                     for doc in documents:
                         text = doc.get("text", "").lower()
                         url = doc.get("url", "").lower()
-
-                        # Check if any query word appears in text or URL
-                        # Also check metadata for chunked documents
                         metadata = doc.get("metadata", {})
                         metadata_text = str(metadata).lower()
 
@@ -438,14 +444,64 @@ class MilvusVectorDatabase(VectorDatabase):
                         if len(content) > 2000:
                             content = content[:2000] + "..."
 
-                        return f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}\n\nContent: {content}"
+                        # Format URL as a proper markdown link
+                        url_link = f"[{url}]({url})" if url else "No URL available"
+
+                        result = f"**Based on the stored documents, here's what I found:**\n\n**URL:** {url_link}{chunk_info}\n\n**Answer:** {content}"
+
+                        # Add citations based on configuration and query type
+                        # Use the passed is_detailed parameter, or default to False if not provided
+                        if is_detailed is None:
+                            is_detailed = False
+
+                        # If include_citations is True, always include citations
+                        # If include_citations is False, only include for detailed queries or multiple documents
+                        should_include_citations = (
+                            self.include_citations
+                            or is_detailed
+                            or len(relevant_docs) > 1
+                        )
+
+                        if should_include_citations:
+                            citations = self._generate_citations(
+                                [rd["doc"] for rd in relevant_docs[:3]]
+                            )
+                            result += f"\n\n**Citations:**\n{citations}"
+
+                        return result
                     else:
                         return f"I couldn't find any relevant information about '{query}' in the stored documents."
 
                 except Exception as e:
                     return f"Error performing query: {str(e)}"
 
-        return MilvusQueryAgent(self)
+            def _generate_citations(self, documents: list[dict]) -> str:
+                """
+                Generate citations for the top documents used in the response.
+
+                Args:
+                    documents (list): List of documents to cite
+
+                Returns:
+                    str: Formatted citations
+                """
+                citations = []
+                for i, doc in enumerate(documents, 1):
+                    url = doc.get("url", "")
+                    metadata = doc.get("metadata", {})
+                    filename = metadata.get("filename", "Unknown Document")
+
+                    # Format URL as markdown link
+                    if url:
+                        url_link = f"[{url}]({url})"
+                    else:
+                        url_link = "No URL available"
+
+                    citations.append(f"{i}. **{filename}** - {url_link}")
+
+                return "\n".join(citations)
+
+        return MilvusQueryAgent(self, llm)
 
     def cleanup(self):
         """Clean up Milvus client."""

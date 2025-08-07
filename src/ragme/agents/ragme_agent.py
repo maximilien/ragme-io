@@ -11,7 +11,6 @@ from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 
 from src.ragme.agents.functional_agent import FunctionalAgent
-from src.ragme.agents.query_agent import QueryAgent
 from src.ragme.utils.config_manager import config
 
 # Set up logging
@@ -45,7 +44,8 @@ class RagMeAgent:
 
         # Initialize the specialized agents
         self.functional_agent = FunctionalAgent(ragme_instance)
-        self.query_agent = QueryAgent(ragme_instance)
+        # Use the QueryAgent from ragme_instance to ensure it has LLM-based detailed query detection
+        self.query_agent = ragme_instance.query_agent
 
         # Get agent configuration
         agent_config = config.get_agent_config("ragme-agent")
@@ -217,6 +217,152 @@ JSON response:"""
 
         return False, ""
 
+    def _is_detailed_query(self, query: str) -> bool:
+        """
+        Use LLM to determine if a query is asking for a detailed response or report.
+
+        Args:
+            query (str): The user query
+
+        Returns:
+            bool: True if the query is asking for a detailed response
+        """
+        try:
+            # Create a prompt for the LLM to determine if this is a detailed query
+            prompt = f"""Analyze the following user query and determine if it's asking for detailed information, a comprehensive response, or a report.
+
+User Query: "{query}"
+
+Consider the following:
+- Is the user asking for a detailed explanation, analysis, or overview?
+- Is the user requesting a comprehensive response or report?
+- Is the user asking "what", "how", "why", "when", "where", "who", "which" questions?
+- Is the user asking for explanations, descriptions, or detailed information?
+- Is this a functional query (like "list", "add", "delete") or an informational query?
+
+Respond with ONLY "YES" if the query is asking for detailed information, or "NO" if it's a simple functional query.
+
+Response:"""
+
+            # Use the LLM to determine if this is a detailed query
+            response = self.llm.complete(prompt)
+            result = response.text.strip().upper()
+
+            # Return True if LLM says YES, False otherwise
+            return result == "YES"
+
+        except Exception as e:
+            # Fallback to keyword-based detection if LLM fails
+            logger.warning(
+                f"LLM-based detailed query detection failed, falling back to keyword detection: {e}"
+            )
+            return self._fallback_detailed_query_detection(query)
+
+    def _fallback_detailed_query_detection(self, query: str) -> bool:
+        """
+        Fallback keyword-based detection for detailed queries.
+
+        Args:
+            query (str): The user query
+
+        Returns:
+            bool: True if the query is asking for a detailed response
+        """
+        query_lower = query.lower()
+
+        # Keywords that indicate a request for detailed information
+        detailed_keywords = [
+            "report",
+            "detailed",
+            "comprehensive",
+            "complete",
+            "full",
+            "thorough",
+            "analysis",
+            "overview",
+            "summary",
+            "explain",
+            "describe",
+            "tell me about",
+            "what is",
+            "how does",
+            "why",
+            "when",
+            "where",
+            "who",
+            "which",
+            "compare",
+            "contrast",
+            "evaluate",
+            "assess",
+            "review",
+            "examine",
+            "investigate",
+            "explore",
+            "discuss",
+            "elaborate",
+            "expand",
+            "provide",
+            "give me",
+            "show me",
+            "help me understand",
+            "break down",
+            "outline",
+        ]
+
+        # Check if any detailed keywords are present
+        for keyword in detailed_keywords:
+            if keyword in query_lower:
+                return True
+
+        # Check for question words that typically indicate detailed responses
+        question_words = ["what", "how", "why", "when", "where", "who", "which"]
+        if any(word in query_lower for word in question_words):
+            return True
+
+        return False
+
+    def _is_content_query(self, query: str) -> bool:
+        """
+        Determine if a query is asking for content information.
+
+        Args:
+            query (str): The user query
+
+        Returns:
+            bool: True if the query is asking for content information
+        """
+        query_lower = query.lower().strip()
+
+        # Keywords that indicate content queries
+        content_keywords = [
+            "what is",
+            "what are",
+            "tell me about",
+            "explain",
+            "describe",
+            "how does",
+            "what does",
+            "summarize",
+            "summarise",
+            "overview",
+            "information about",
+            "details about",
+            "tell me",
+            "what can you tell me",
+        ]
+
+        # Check if the query contains content keywords
+        for keyword in content_keywords:
+            if keyword in query_lower:
+                return True
+
+        # Check if it's a question (ends with ?)
+        if query_lower.endswith("?"):
+            return True
+
+        return False
+
     def _requires_confirmation(self, operation_type: str) -> bool:
         """
         Determine if an operation requires confirmation.
@@ -317,7 +463,22 @@ JSON response:"""
             - Any questions that require searching through document content
             """
             logger.info(f"Dispatching to QueryAgent: '{query}'")
-            return await self.query_agent.run(query)
+
+            # Determine if this is a detailed query before dispatching
+            is_detailed = self._is_detailed_query(query)
+            logger.info(f"Query '{query}' is detailed: {is_detailed}")
+
+            try:
+                # Pass the detailed query information to the QueryAgent
+                logger.info(
+                    f"Calling QueryAgent.run with query: '{query}', is_detailed: {is_detailed}"
+                )
+                result = await self.query_agent.run(query, is_detailed=is_detailed)
+                logger.info(f"QueryAgent returned: {result[:100]}...")
+                return result
+            except Exception as e:
+                logger.error(f"Error calling QueryAgent: {e}")
+                return f"Error processing query: {str(e)}"
 
         return [
             FunctionTool.from_defaults(
@@ -368,6 +529,10 @@ Examples:
 - "Delete all documents" → use functional_operations
 - "Summarize the main points" → use content_questions
 """
+
+        logger.info(f"Creating ReActAgent with {len(self.dispatch_tools)} tools")
+        for i, tool in enumerate(self.dispatch_tools):
+            logger.info(f"Tool {i}: {type(tool)}")
 
         return ReActAgent(
             name="RagMeAgent",
@@ -436,6 +601,13 @@ Examples:
                 and not self._is_cancellation_response(query)
             ):
                 self.confirmation_state["pending_delete_operation"] = None
+
+            # For content queries, call QueryAgent directly to avoid ReActAgent issues
+            if self._is_content_query(query):
+                logger.info(f"Directly calling QueryAgent for content query: '{query}'")
+                is_detailed = self._is_detailed_query(query)
+                logger.info(f"Query '{query}' is detailed: {is_detailed}")
+                return await self.query_agent.run(query, is_detailed=is_detailed)
 
             # Use the ReActAgent to intelligently dispatch the query with memory
             response = await self.agent.run(query, memory=self.memory)

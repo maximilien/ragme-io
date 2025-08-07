@@ -81,8 +81,20 @@ class RagMe:
         # Set up the database
         self.vector_db.setup()
 
+        # Initialize LLM for query agents
+        from llama_index.llms.openai import OpenAI
+
+        from src.ragme.utils.config_manager import config
+
+        # Get LLM configuration
+        llm_config = config.get_llm_config()
+        llm_model = llm_config.get("model", "gpt-4o-mini")
+        temperature = llm_config.get("temperature", 0.7)
+
+        self.llm = OpenAI(model=llm_model, temperature=temperature)
+
         # Initialize agents
-        self.query_agent = self.vector_db.create_query_agent()
+        self.query_agent = self.vector_db.create_query_agent(self.llm)
         self.ragme_agent = RagMeAgent(self)
 
     # public methods

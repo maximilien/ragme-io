@@ -2,14 +2,16 @@
 
 ## **OPENED**
 
-### bugs 
-* URL link in chat responses is incorrect when fetching from URL documents
+### bugs
 
 ### bugs - mobile
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and usable
 
 ### features
+
+#### tests
+* add a set of common docs, queries, and expected responses and use this a a smoke test. Then cleanup
 
 #### agents
 * implement OpenAI agents version of the current agents
@@ -88,6 +90,8 @@
 ---
 
 ## **COMPLETED**
+
+* ✅ **COMPLETED** - URLs in responses & citations [Fixed URL link formatting in chat responses and implemented intelligent citations for the top 3 documents used in queries. Enhanced all vector database implementations (Weaviate, Weaviate Local, Milvus) to properly format URLs as clickable markdown links and provide comprehensive citations with document names, URLs, and similarity scores. Added LLM-based intelligent query detection to include citations for detailed responses and reports even with single documents, while short functional queries still forego citations as requested. The LLM-based approach is much more flexible and accurate than keyword matching, understanding context and intent rather than just specific words. Fixed RagMeAgent to use the same QueryAgent instance with LLM-based detection instead of creating its own instance. Replaced Weaviate's built-in QueryAgent with custom implementation to ensure LLM-based detection works across all vector database types. Refactored architecture to centralize detailed query detection in RagMeAgent and pass simple boolean flag to QueryAgents, eliminating code duplication and improving maintainability. Added include_citations configuration option to allow users to control citation behavior - when true, always include citations; when false, only include for detailed queries or multiple documents. Fixed async/await issues in vector database query agents and implemented direct QueryAgent routing for content queries to bypass ReActAgent tool calling issues]
 
 * ✅ **COMPLETED** - deleting non existing (or already deleted doc) should result in a message that doc is not in collection [Fixed URL-based document deletion by implementing proper find_document_by_url method that handles Weaviate API changes and URL fragments. Enhanced matching logic to support exact matches, base URL matches (without fragments), and filename-only matches for file:// URLs. Now properly finds and deletes documents by URL with accurate error messages when documents don't exist]
 

@@ -284,11 +284,112 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             print(f"Fallback keyword search also failed: {str(e)}")
             return []
 
-    def create_query_agent(self):
+    def create_query_agent(self, llm=None):
         """Create a local Weaviate query agent."""
-        from weaviate.agents.query import QueryAgent
 
-        return QueryAgent(client=self.client, collections=[self.collection_name])
+        # Create a custom query agent that ensures proper URL formatting and citations
+        class WeaviateLocalQueryAgent:
+            def __init__(self, vector_db, llm=None):
+                self.vector_db = vector_db
+                self.client = vector_db.client
+                self.collection_name = vector_db.collection_name
+                self.llm = llm  # Store the LLM instance for detailed query detection
+
+                # Get query configuration
+                from src.ragme.utils.config_manager import config
+
+                self.top_k = config.get("query.top_k", 5)
+
+                # Get citation configuration
+                self.include_citations = config.get("query.include_citations", False)
+
+            async def run(self, query: str, is_detailed: bool = None):
+                """Run a query using vector similarity search."""
+                try:
+                    # Use the vector database search method
+                    documents = self.vector_db.search(query, limit=5)
+
+                    if documents:
+                        # Get the most relevant document
+                        most_relevant = documents[0]
+                        content = most_relevant.get("text", "")
+                        url = most_relevant.get("url", "")
+                        metadata = most_relevant.get("metadata", {})
+
+                        # For chunked documents, provide more context
+                        if metadata.get("is_chunked") or metadata.get("is_chunk"):
+                            chunk_info = f" (Chunked document with {metadata.get('total_chunks', 'unknown')} chunks)"
+                        else:
+                            chunk_info = ""
+
+                        # Include similarity score if available
+                        score_info = ""
+                        if "score" in most_relevant:
+                            score_info = f" (Similarity: {most_relevant['score']:.3f})"
+
+                        # Truncate content if too long
+                        if len(content) > 2000:
+                            content = content[:2000] + "..."
+
+                        # Format URL as a proper markdown link
+                        url_link = f"[{url}]({url})" if url else "No URL available"
+
+                        result = f"**Based on the stored documents, here's what I found:**\n\n**URL:** {url_link}{chunk_info}{score_info}\n\n**Answer:** {content}"
+
+                        # Add citations based on configuration and query type
+                        # Use the passed is_detailed parameter, or default to False if not provided
+                        if is_detailed is None:
+                            is_detailed = False
+
+                        # If include_citations is True, always include citations
+                        # If include_citations is False, only include for detailed queries or multiple documents
+                        should_include_citations = (
+                            self.include_citations or is_detailed or len(documents) > 1
+                        )
+
+                        if should_include_citations:
+                            citations = self._generate_citations(documents[:3])
+                            result += f"\n\n**Citations:**\n{citations}"
+
+                        return result
+                    else:
+                        return f"I couldn't find any relevant information about '{query}' in the stored documents."
+
+                except Exception as e:
+                    return f"Error performing query: {str(e)}"
+
+            def _generate_citations(self, documents: list[dict]) -> str:
+                """
+                Generate citations for the top documents used in the response.
+
+                Args:
+                    documents (list): List of documents to cite
+
+                Returns:
+                    str: Formatted citations
+                """
+                citations = []
+                for i, doc in enumerate(documents, 1):
+                    url = doc.get("url", "")
+                    metadata = doc.get("metadata", {})
+                    filename = metadata.get("filename", "Unknown Document")
+
+                    # Format URL as markdown link
+                    if url:
+                        url_link = f"[{url}]({url})"
+                    else:
+                        url_link = "No URL available"
+
+                    # Add similarity score if available
+                    score_info = ""
+                    if "score" in doc:
+                        score_info = f" (Similarity: {doc['score']:.3f})"
+
+                    citations.append(f"{i}. **{filename}** - {url_link}{score_info}")
+
+                return "\n".join(citations)
+
+        return WeaviateLocalQueryAgent(self, llm)
 
     def cleanup(self):
         """Clean up local Weaviate client."""
