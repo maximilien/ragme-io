@@ -201,3 +201,6 @@ ngrok.yml
 
 # RAGme Configuration
 config.yaml
+
+# RAGme dev
+.ragme-prompts.txt

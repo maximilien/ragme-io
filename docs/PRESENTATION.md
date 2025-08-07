@@ -133,17 +133,21 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 
 ## 🏗️ Architecture Overview
 
-### Multi-Service Architecture
+### Multi-Service Architecture with Three-Agent System
 
 ```mermaid
 flowchart TB
     new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
-    new-ui[New Frontend<br/>Port 3020] --> agent-query[Query Agent]
+    new-ui[New Frontend<br/>Port 3020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
     chrome[Chrome Extension] --> api
     subgraph "AI Agent Layer"
       agent-local[File Monitor Local Agent] --> mcp[MCP Server<br/>Port 8022]
-      agent-query[Query Agent] --> mcp[MCP Server<br/>Port 8022]
-      agent-query[Query Agent] --> openai[OpenAI LLM]
+      subgraph "Three-Agent System"
+        ragme-agent --> functional-agent[FunctionalAgent<br/>Tool Operations]
+        ragme-agent --> query-agent[QueryAgent<br/>Content Queries]
+        functional-agent --> ragme-tools[RagMeTools<br/>Tool Collection]
+        query-agent --> openai[OpenAI LLM]
+      end
     end
     mcp --> api
     api --> ragme[RAGme Core]
@@ -155,6 +159,32 @@ flowchart TB
     end
 ```
 
+### Three-Agent Architecture ⭐ **NEW!**
+
+RAGme.ai features a sophisticated three-agent system that provides intelligent query routing and specialized processing:
+
+#### **RagMeAgent (Dispatcher)**
+- Routes user queries to appropriate specialized agents
+- Intelligent query classification (functional vs. content queries)
+- Seamless agent coordination and information provision
+
+#### **FunctionalAgent**
+- Handles tool-based operations and document management
+- Document collection operations (add, delete, list, reset)
+- URL crawling and vector database management
+- Uses LlamaIndex FunctionAgent for reliable tool execution
+
+#### **QueryAgent**
+- Answers questions about document content using advanced RAG
+- Vector similarity search and LLM-powered summarization
+- Intelligent document retrieval and context building
+- Configurable document retrieval (top-k documents)
+
+#### **RagMeTools**
+- Centralized tool collection for all RagMe operations
+- Unified tool interface with clean separation from agent logic
+- Easy extensibility for new tools and operations
+
 ### Core Components
 
 | Component | Port | Purpose |
@@ -163,7 +193,9 @@ flowchart TB
 | **API Server** | 8021 | REST API for content ingestion |
 | **MCP Server** | 8022 | Document processing (PDF/DOCX) |
 | **File Monitor Local Agent** | - | Watches directory for new files |
-| **Query Agent** | - | Handles user queries and LLM interactions |
+| **RagMeAgent (Dispatcher)** | - | Routes queries to specialized agents ⭐ **NEW!** |
+| **FunctionalAgent** | - | Handles tool-based operations ⭐ **NEW!** |
+| **QueryAgent** | - | Handles content queries and RAG ⭐ **NEW!** |
 | **Chrome Extension** | - | Browser integration for web content capture |
 | **RAGme Core** | - | Main RAG processing logic using LlamaIndex |
 | **AI Agent Layer** | - | Orchestrates AI interactions and document processing |

@@ -8,14 +8,9 @@ This package provides a modular architecture for RAG (Retrieval-Augmented Genera
 with support for multiple vector databases, agents, and APIs.
 """
 
-# Import submodules for easy access
-from . import agents, apis, utils, vdbs
+# Import main RagMe class
 from .ragme import RagMe
 
 __all__ = [
     "RagMe",
-    "vdbs",
-    "agents",
-    "apis",
-    "utils",
 ]

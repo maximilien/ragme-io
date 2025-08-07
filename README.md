@@ -14,7 +14,10 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
   <a href="images/ragme3.png" target="_blank">
     <img src="images/ragme3.png" alt="RAGme.ai Interface - Visualizations" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
   </a>
-</div>
+  <a href="images/ragme4.png" target="_blank">
+    <img src="images/ragme4.png" alt="RAGme.ai Interface - Prompt Ideas" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  </a>
+  </div>
 
 *Click any image to view full size*
 
@@ -22,7 +25,8 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
-- **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment ⭐ **NEW!**
+- **🤖 Three-Agent Architecture**: Sophisticated agent system with intelligent query routing and specialized processing ⭐ **NEW!**
+- **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment
 - **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
 - **🔧 MCP Server Tools**: Configure and enable/disable MCP tool servers with a convenient toolbox button
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient popup button
@@ -44,6 +48,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 - **[📋 Project Overview](docs/PRESENTATION.md)** - Complete project overview with examples
 - **[🎛️ Configuration Guide](docs/CONFIG.md)** - Comprehensive configuration system for client customization ⭐ **NEW!**
+- **[🤖 Agent Architecture](docs/AGENT_REFACTOR.md)** - Three-agent architecture design and implementation ⭐ **NEW!**
 - **[🔧 Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture  
 - **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
 - **[📖 Documentation Index](docs/README.md)** - Full documentation structure
@@ -300,17 +305,21 @@ The system can automatically process PDF and DOCX files by monitoring a watch di
 
 ## 🏗️ Architecture
 
-RAGme.ai uses a multi-service architecture:
+RAGme.ai uses a multi-service architecture with a sophisticated three-agent system:
 
 ```mermaid
 flowchart TB
     new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
-    new-ui[New Frontend<br/>Port 3020] --> agent-query[Query Agent]
+    new-ui[New Frontend<br/>Port 3020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
     chrome[Chrome Extension] --> api
     subgraph "AI Agent Layer"
       agent-local[File Monitor Local Agent] --> mcp[MCP Server<br/>Port 8022]
-      agent-query[Query Agent] --> mcp[MCP Server<br/>Port 8022]
-      agent-query[Query Agent] --> openai[OpenAI LLM]
+      subgraph "Three-Agent System"
+        ragme-agent --> functional-agent[FunctionalAgent<br/>Tool Operations]
+        ragme-agent --> query-agent[QueryAgent<br/>Content Queries]
+        functional-agent --> ragme-tools[RagMeTools<br/>Tool Collection]
+        query-agent --> openai[OpenAI LLM]
+      end
     end
     mcp --> api
     api --> ragme[RAGme Core]
@@ -321,6 +330,60 @@ flowchart TB
         vector-db --> milvus[(Milvus Lite)]
     end
 ```
+
+### Three-Agent Architecture ⭐ **NEW!**
+
+RAGme.ai now features a sophisticated three-agent architecture that provides intelligent query routing and specialized processing:
+
+#### 1. **RagMeAgent (Dispatcher)**
+- **Purpose**: Routes user queries to appropriate specialized agents
+- **Capabilities**: 
+  - Intelligent query classification (functional vs. content queries)
+  - Seamless routing to specialized agents
+  - Provides agent information and capabilities
+- **Location**: `src/ragme/agents/ragme_agent.py`
+
+#### 2. **FunctionalAgent**
+- **Purpose**: Handles tool-based operations and document management
+- **Capabilities**:
+  - Document collection operations (add, delete, list, reset)
+  - URL crawling and web page processing
+  - Vector database management
+  - Uses LlamaIndex FunctionAgent for reliable tool execution
+- **Location**: `src/ragme/agents/functional_agent.py`
+
+#### 3. **QueryAgent**
+- **Purpose**: Answers questions about document content using advanced RAG
+- **Capabilities**:
+  - Vector similarity search across documents
+  - LLM-powered content summarization and question answering
+  - Intelligent document retrieval and context building
+  - Configurable document retrieval (top-k documents)
+- **Location**: `src/ragme/agents/query_agent.py`
+
+#### 4. **RagMeTools**
+- **Purpose**: Centralized tool collection for all RagMe operations
+- **Capabilities**:
+  - Unified tool interface for all operations
+  - Clean separation of tools from agent logic
+  - Easy extensibility for new tools
+- **Location**: `src/ragme/agents/tools.py`
+
+### Query Routing Intelligence
+
+The system automatically routes queries based on content:
+
+- **Functional Queries** → FunctionalAgent
+  - "add this URL to my collection"
+  - "list all documents"
+  - "delete document 123"
+  - "reset the collection"
+
+- **Content Queries** → QueryAgent
+  - "who is maximilien"
+  - "what is the content of this document"
+  - "explain the architecture"
+  - "summarize the project"
 
 ### Components
 
