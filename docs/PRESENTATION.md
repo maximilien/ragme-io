@@ -53,6 +53,8 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Smart Chunking**: Large documents automatically split at sentence boundaries
 - **Date Filtering**: Filter by Current, This Month, This Year, or All
 - **Bulk Operations**: Delete entire chunked documents with one click
+- **Enhanced URL-Based Deletion**: Delete documents by URL with support for various formats (full URLs, filenames, file:// URLs) and confirmation prompts for destructive operations
+- **Destructive Operation Confirmation**: All destructive operations require user confirmation before execution to prevent accidental data loss
 - **Enhanced Metadata**: Rich document information and chunk counts
 
 ---

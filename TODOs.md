@@ -2,23 +2,8 @@
 
 ## **OPENED**
 
-### bugs
-* add memory to chat agent
-* make sure to confirm with user before executing delete docs tools 
-
+### bugs 
 * URL link in chat responses is incorrect when fetching from URL documents
-* chat responses and document details card include file or URK links but they do not work (need doc backend for PDFs and others) and use URL as link for URL docs
-* when searching for "who is maximilien" with maximilien.org URL and ragme-ai.pdf the response header URL is incorrect but the rest of response is OK: 
-
-```md
-Based on the stored documents, here's what I found:
-
-URL: file://ragme-ai.pdf#20250805_100725_984382 (Chunked document with 9 chunks)
-
-Answer: Based on the documents provided, there is no specific information regarding an individual named "Maximilien" that can be definitively identified.
-
-However, one of the documents (Document 2)...
-```
 
 ### bugs - mobile
 * right pane shows as purple block when collapse on mobile (iPhone)
@@ -103,6 +88,14 @@ However, one of the documents (Document 2)...
 ---
 
 ## **COMPLETED**
+
+* ✅ **COMPLETED** - deleting non existing (or already deleted doc) should result in a message that doc is not in collection [Fixed URL-based document deletion by implementing proper find_document_by_url method that handles Weaviate API changes and URL fragments. Enhanced matching logic to support exact matches, base URL matches (without fragments), and filename-only matches for file:// URLs. Now properly finds and deletes documents by URL with accurate error messages when documents don't exist]
+
+* ✅ **COMPLETED** - Enhanced delete operation detection with LLM-based approach [Replaced keyword-based detection with intelligent LLM-based analysis that can understand context and various phrasings. Features include: JSON-structured LLM responses for operation classification, fallback to keyword detection if LLM fails, support for abbreviated forms like "del", "rm", etc., comprehensive test coverage with mocked LLM responses, and robust error handling]
+
+* ✅ **COMPLETED** - make sure to confirm with user before executing delete docs tools [Implemented comprehensive confirmation system for delete operations in RagMeAgent. Features include: confirmation tracking per chat session, different confirmation levels for single documents vs collections/multiple documents, automatic confirmation state reset on new chat sessions, clear warning messages with emoji indicators, and proper API integration with frontend chat management]
+
+* ✅ **COMPLETED** - add memory to chat agent [Implemented LlamaIndex ReActAgent with ChatMemoryBuffer for intelligent query routing and conversation memory]
 
 * ✅ **COMPLETED** - refactor: RagMeAgent to make tools, and agents explicit and separated from the RagMeAgent [Implemented three-agent architecture: RagMeAgent (dispatcher), FunctionalAgent (tool operations), QueryAgent (content queries)]
 

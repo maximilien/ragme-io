@@ -652,8 +652,18 @@ io.on('connection', socket => {
   });
 
   // Handle new chat creation
-  socket.on('new_chat', () => {
+  socket.on('new_chat', async () => {
     logger.info('New chat requested');
+
+    try {
+      // Reset the chat session on the backend to clear confirmation state
+      await callRAGmeAPI('/reset-chat-session', {}, '', false, 'POST');
+      logger.info('Chat session reset successfully');
+    } catch (error) {
+      logger.error('Failed to reset chat session:', error);
+      // Continue anyway as this is not critical
+    }
+
     socket.emit('chat_cleared');
   });
 
