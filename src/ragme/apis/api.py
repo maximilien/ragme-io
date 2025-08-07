@@ -640,40 +640,54 @@ async def delete_document(document_id: str):
 
 @app.get("/config")
 async def get_frontend_config():
-    """
-    Get frontend configuration settings.
-
-    Returns configuration needed by the frontend application including:
-    - UI settings
-    - MCP servers
-    - Client customization
-    - Feature flags
-
-    SECURITY: This endpoint filters out sensitive data like API keys, tokens, etc.
-    """
+    """Get frontend configuration."""
     try:
-        # Use safe configuration method to prevent secret leakage
-        safe_config = config.get_safe_frontend_config()
+        # Get application configuration
+        app_config = config.get("application", {})
+        frontend_config = config.get("frontend", {})
+        client_config = config.get("client", {})
+        features_config = config.get("features", {})
 
-        # Add feature flags (these are safe to expose)
-        safe_config["features"] = {
-            "document_summarization": config.is_feature_enabled(
-                "document_summarization"
-            ),
-            "mcp_integration": config.is_feature_enabled("mcp_integration"),
-            "real_time_updates": config.is_feature_enabled("real_time_updates"),
-            "file_upload": config.is_feature_enabled("file_upload"),
-            "url_crawling": config.is_feature_enabled("url_crawling"),
-            "json_ingestion": config.is_feature_enabled("json_ingestion"),
-            "pattern_deletion": config.is_feature_enabled("pattern_deletion"),
+        # Get MCP servers configuration (filtered for security)
+        mcp_servers = config.get("mcp_servers", [])
+        safe_mcp_servers = []
+        for server in mcp_servers:
+            safe_server = {
+                "name": server.get("name", ""),
+                "icon": server.get("icon", ""),
+                "enabled": server.get("enabled", False),
+                "description": server.get("description", ""),
+                # Exclude sensitive fields like authentication_type and url
+            }
+            safe_mcp_servers.append(safe_server)
+
+        # Build safe configuration for frontend
+        frontend_config_data = {
+            "application": {
+                "name": app_config.get("name", "RAGme"),
+                "title": app_config.get("title", "RAGme.ai Assistant"),
+                "version": app_config.get("version", "1.0.0"),
+            },
+            "frontend": frontend_config,
+            "client": client_config,
+            "features": features_config,
+            "mcp_servers": safe_mcp_servers,
         }
 
-        return safe_config
+        return {"status": "success", "config": frontend_config_data}
 
     except Exception as e:
-        print(f"Error getting frontend configuration: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        return {"status": "error", "message": f"Failed to get configuration: {str(e)}"}
+
+
+@app.post("/reset-chat-session")
+async def reset_chat_session():
+    """Reset the chat session, clearing memory and confirmation state."""
+    try:
+        ragme.reset_chat_session()
+        return {"status": "success", "message": "Chat session reset successfully"}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to reset chat session: {str(e)}"}
 
 
 if __name__ == "__main__":

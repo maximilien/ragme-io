@@ -167,31 +167,76 @@ class WeaviateVectorDatabase(VectorDatabase):
         try:
             collection = self.client.collections.get(self.collection_name)
 
-            # Query for documents with the specific URL
-            result = collection.query.fetch_objects(
-                limit=1,
-                where={"path": ["url"], "operator": "Equal", "valueString": url},
+            # Get all documents and search manually since the where clause doesn't work
+            all_docs = collection.query.fetch_objects(
+                limit=100,  # Get more documents to search through
                 include_vector=False,
             )
 
-            if result.objects:
-                obj = result.objects[0]
-                doc = {
-                    "id": obj.uuid,
-                    "url": obj.properties.get("url", ""),
-                    "text": obj.properties.get("text", ""),
-                    "metadata": obj.properties.get("metadata", "{}"),
-                }
+            # Search through all documents for a matching URL
+            for obj in all_docs.objects:
+                stored_url = obj.properties.get("url", "")
 
-                # Try to parse metadata if it's a JSON string
-                try:
-                    doc["metadata"] = json.loads(doc["metadata"])
-                except json.JSONDecodeError:
-                    pass
+                # Try exact match first
+                if stored_url == url:
+                    doc = {
+                        "id": obj.uuid,
+                        "url": stored_url,
+                        "text": obj.properties.get("text", ""),
+                        "metadata": obj.properties.get("metadata", "{}"),
+                    }
 
-                return doc
+                    # Try to parse metadata if it's a JSON string
+                    try:
+                        doc["metadata"] = json.loads(doc["metadata"])
+                    except json.JSONDecodeError:
+                        pass
+
+                    return doc
+
+                # Try matching without fragments (remove everything after #)
+                stored_url_base = stored_url.split("#")[0]
+                url_base = url.split("#")[0]
+
+                if stored_url_base == url_base:
+                    doc = {
+                        "id": obj.uuid,
+                        "url": stored_url,
+                        "text": obj.properties.get("text", ""),
+                        "metadata": obj.properties.get("metadata", "{}"),
+                    }
+
+                    # Try to parse metadata if it's a JSON string
+                    try:
+                        doc["metadata"] = json.loads(doc["metadata"])
+                    except json.JSONDecodeError:
+                        pass
+
+                    return doc
+
+                # Try matching filename only (for file:// URLs)
+                if stored_url.startswith("file://"):
+                    # Extract filename from stored URL (remove file:// and fragments)
+                    stored_filename = stored_url.replace("file://", "").split("#")[0]
+                    # If user provided just filename, try to match
+                    if stored_filename == url or stored_filename.endswith("/" + url):
+                        doc = {
+                            "id": obj.uuid,
+                            "url": stored_url,
+                            "text": obj.properties.get("text", ""),
+                            "metadata": obj.properties.get("metadata", "{}"),
+                        }
+
+                        # Try to parse metadata if it's a JSON string
+                        try:
+                            doc["metadata"] = json.loads(doc["metadata"])
+                        except json.JSONDecodeError:
+                            pass
+
+                        return doc
 
             return None
+
         except Exception as e:
             warnings.warn(f"Failed to find document by URL {url}: {e}")
             return None

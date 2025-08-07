@@ -72,6 +72,33 @@ class RagMeTools:
         except Exception as e:
             return f"Error deleting document {doc_id}: {str(e)}"
 
+    def delete_document_by_url(self, url: str) -> str:
+        """
+        Delete a specific document from the RagMeDocs collection by URL.
+        Args:
+            url (str): The document URL to delete
+        Returns:
+            str: Success or error message
+        """
+        try:
+            # First find the document by URL
+            document = self.ragme.vector_db.find_document_by_url(url)
+            if document is None:
+                return f"Document with URL {url} not found in the collection"
+
+            # Delete the document using its ID
+            doc_id = document.get("id")
+            if not doc_id:
+                return f"Document with URL {url} found but has no valid ID"
+
+            success = self.ragme.delete_document(doc_id)
+            if success:
+                return f"Document with URL {url} deleted successfully"
+            else:
+                return f"Document with URL {url} could not be deleted"
+        except Exception as e:
+            return f"Error deleting document with URL {url}: {str(e)}"
+
     def delete_all_documents(self) -> str:
         """
         Delete all documents from the RagMeDocs collection.
@@ -246,6 +273,7 @@ class RagMeTools:
             self.write_to_ragme_collection,
             self.delete_ragme_collection,
             self.delete_document,
+            self.delete_document_by_url,
             self.delete_all_documents,
             self.delete_documents_by_pattern,
             self.list_ragme_collection,

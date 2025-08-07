@@ -41,6 +41,8 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **🗑️ Bulk Document Operations**: Delete entire chunked documents with a single click
 - **🔍 Pattern-Based Document Deletion**: Delete documents matching regex patterns
 - **📱 Responsive Design**: Better mobile and desktop experience with collapsible sidebars
+- **🔗 Enhanced URL-Based Document Deletion**: Improved document deletion by URL with support for various formats (full URLs, filenames, file:// URLs), confirmation prompts for destructive operations, and proper error handling
+- **⚠️ Destructive Operation Confirmation**: All destructive operations (delete document, delete collection, etc.) now require user confirmation before execution to prevent accidental data loss
 
 ## 📚 Documentation
 

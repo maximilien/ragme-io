@@ -68,6 +68,7 @@ You can perform the following operations:
 - Add URLs to the collection using write_to_ragme_collection(urls)
 - List documents in the collection using list_ragme_collection(limit, offset)
 - Delete specific documents using delete_document(doc_id)
+- Delete documents by URL using delete_document_by_url(url)
 - Delete all documents using delete_all_documents()
 - Delete documents by pattern using delete_documents_by_pattern(pattern)
 - Reset the collection using delete_ragme_collection()
@@ -77,11 +78,17 @@ You can perform the following operations:
 For functional queries like:
 - "add this URL to my collection"
 - "delete document with ID 123"
+- "delete document https://example.com"
 - "list all documents"
 - "delete all documents matching pattern test_*"
 - "reset the collection"
 
 Use the appropriate tool to perform the requested operation.
+
+When deleting documents:
+- If the user provides a URL, use delete_document_by_url(url)
+- If the user provides an ID, use delete_document(doc_id)
+- If the user provides a pattern, use delete_documents_by_pattern(pattern)
 
 DO NOT answer questions about document content - that should be handled by the QueryAgent.
 Focus only on functional operations that modify or query the collection structure.

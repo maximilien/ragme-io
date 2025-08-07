@@ -225,3 +225,33 @@ def test_mcp_server_config_with_authentication(client):
     assert servers["Google GDrive"]["authenticated"] is True
     assert servers["Dropbox Drive"]["enabled"] is False
     assert servers["Dropbox Drive"]["authenticated"] is False
+
+
+def test_reset_chat_session_success(client, mock_ragme):
+    """Test successful chat session reset."""
+    # Add the reset_chat_session method to the mock
+    mock_ragme.reset_chat_session = MagicMock()
+
+    response = client.post("/reset-chat-session")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Chat session reset successfully",
+    }
+    mock_ragme.reset_chat_session.assert_called_once()
+
+
+def test_reset_chat_session_error(client, mock_ragme):
+    """Test error handling when resetting chat session."""
+    # Add the reset_chat_session method to the mock and make it raise an exception
+    mock_ragme.reset_chat_session = MagicMock(side_effect=Exception("Test error"))
+
+    response = client.post("/reset-chat-session")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "error",
+        "message": "Failed to reset chat session: Test error",
+    }
+    mock_ragme.reset_chat_session.assert_called_once()

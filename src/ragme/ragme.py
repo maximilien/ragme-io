@@ -212,6 +212,17 @@ class RagMe:
         response = await self.ragme_agent.run(query)
         return str(response)
 
+    def reset_chat_session(self):
+        """
+        Reset the chat session, clearing memory and confirmation state.
+        This should be called when starting a new chat session.
+        """
+        if hasattr(self, "ragme_agent") and self.ragme_agent:
+            self.ragme_agent.reset_confirmation_state()
+            # Clear the memory as well
+            if hasattr(self.ragme_agent, "memory"):
+                self.ragme_agent.memory.reset()
+
 
 if __name__ == "__main__":
     ragme = RagMe()
