@@ -44,11 +44,11 @@ class TestRagMeAgent:
 
         # Verify initialization
         assert agent.ragme == mock_ragme
-        assert agent.llm is not None
-        assert agent.agent is not None
+        assert hasattr(agent, "functional_agent")
+        assert hasattr(agent, "query_agent")
 
     def test_create_agent(self):
-        """Test that the agent is created with the correct tools and configuration."""
+        """Test that the agents are created with the correct configuration."""
         # Mock the RagMe instance
         mock_ragme = Mock()
         mock_ragme.weeviate_client = Mock()
@@ -60,12 +60,12 @@ class TestRagMeAgent:
         # Create RagMeAgent instance
         agent = RagMeAgent(mock_ragme)
 
-        # Verify the agent was created
-        assert agent.agent is not None
-        # The agent should be a FunctionAgent with tools
-        assert (
-            len(agent.agent.tools) == 9
-        )  # 9 tools: write, delete_collection, delete_document, delete_all_documents, delete_documents_by_pattern, list, crawl, query, db info
+        # Verify the agents were created
+        assert agent.functional_agent is not None
+        assert agent.query_agent is not None
+        # The functional agent should have tools
+        assert hasattr(agent.functional_agent, "tools")
+        assert hasattr(agent.functional_agent, "agent")
 
     def test_run_method(self):
         """Test the run method of RagMeAgent."""
@@ -86,7 +86,7 @@ class TestRagMeAgent:
         assert callable(agent.run)
 
     def test_agent_tools_access_ragme_methods(self):
-        """Test that the agent's tools can access RagMe methods correctly."""
+        """Test that the functional agent's tools can access RagMe methods correctly."""
         # Mock the RagMe instance
         mock_ragme = Mock()
         mock_ragme.weeviate_client = Mock()
@@ -100,22 +100,20 @@ class TestRagMeAgent:
         # Create RagMeAgent instance
         agent = RagMeAgent(mock_ragme)
 
-        # Get the tools from the agent
-        tools = agent.agent.tools
+        # Get the tools from the functional agent
+        tools = agent.functional_agent.tools.get_all_tools()
 
         # Verify we have the expected number of tools
         assert (
-            len(tools) == 9
-        )  # write, delete_collection, delete_document, delete_all_documents, delete_documents_by_pattern, list, crawl, query, db info
+            len(tools) == 8
+        )  # write, delete_collection, delete_document, delete_all_documents, delete_documents_by_pattern, list, crawl, db info
 
-        # Test that the tools can access RagMe methods by calling them directly
-        # We'll test the list_ragme_collection function by finding it in the agent's _create_agent method
-        # Since we can't easily access the individual tools, we'll test the overall functionality
-        assert hasattr(agent, "_create_agent")
-        assert callable(agent._create_agent)
+        # Test that the tools can access RagMe methods
+        assert hasattr(agent.functional_agent.tools, "list_ragme_collection")
+        assert callable(agent.functional_agent.tools.list_ragme_collection)
 
     def test_agent_system_prompt(self):
-        """Test that the agent has the correct system prompt."""
+        """Test that the functional agent has the correct system prompt."""
         # Mock the RagMe instance
         mock_ragme = Mock()
         mock_ragme.weeviate_client = Mock()
@@ -127,11 +125,11 @@ class TestRagMeAgent:
         # Create RagMeAgent instance
         agent = RagMeAgent(mock_ragme)
 
-        # Verify the system prompt contains expected content
-        system_prompt = agent.agent.system_prompt
+        # Verify the functional agent system prompt contains expected content
+        system_prompt = agent.functional_agent.agent.system_prompt
         assert "helpful assistant" in system_prompt
         assert "RagMeDocs" in system_prompt
-        assert "query_agent" in system_prompt
+        assert "functional operations" in system_prompt
 
     def test_pattern_based_deletion_tool(self):
         """Test that the delete_documents_by_pattern tool is available."""
@@ -147,10 +145,12 @@ class TestRagMeAgent:
         agent = RagMeAgent(mock_ragme)
 
         # Verify the system prompt includes pattern-based deletion
-        system_prompt = agent.agent.system_prompt
+        system_prompt = agent.functional_agent.agent.system_prompt
         assert "delete_documents_by_pattern" in system_prompt
         assert "pattern" in system_prompt.lower()
 
         # Verify the tool is in the tools list
-        tool_names = [tool.fn.__name__ for tool in agent.agent.tools]
+        tool_names = [
+            tool.__name__ for tool in agent.functional_agent.tools.get_all_tools()
+        ]
         assert "delete_documents_by_pattern" in tool_names

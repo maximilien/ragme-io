@@ -3,8 +3,6 @@
 ## **OPENED**
 
 ### bugs
-* queries for functional agent are not flowing to function / tool, e.g., "list", "list docs"
-
 * add memory to chat agent
 * make sure to confirm with user before executing delete docs tools 
 
@@ -106,7 +104,9 @@ However, one of the documents (Document 2)...
 
 ## **COMPLETED**
 
-### features
+* ✅ **COMPLETED** - refactor: RagMeAgent to make tools, and agents explicit and separated from the RagMeAgent [Implemented three-agent architecture: RagMeAgent (dispatcher), FunctionalAgent (tool operations), QueryAgent (content queries)]
+
+* ✅ **COMPLETED** - bug: queries for functional agent are not flowing to function / tool, e.g., "list", "list docs" not calling the list_documents tool [Fixed by implementing proper query routing in FunctionalAgent with LlamaIndex FunctionAgent]
 
 * ✅ **COMPLETED** - Make RAGme work with configurable collection name(s) and LLMs, and MCP servers [Comprehensive configuration system implemented with config.yaml supporting multiple vector databases (Weaviate local/cloud, Milvus local/cloud), configurable LLM models for different agents, MCP server configurations, and complete environment variable support]
 

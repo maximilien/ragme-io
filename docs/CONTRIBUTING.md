@@ -147,8 +147,12 @@ ragme-ai/
 │   └── PRESENTATION.md
 ├── src/ragme/              # 🐍 Source code
 │   ├── ragme.py            # Main RagMe class
-│   ├── ragme_agent.py      # RagMeAgent class
-│   ├── local_agent.py      # File monitoring agent
+│   ├── agents/             # 🤖 Agent system
+│   │   ├── ragme_agent.py      # RagMeAgent (dispatcher)
+│   │   ├── functional_agent.py # FunctionalAgent (tool operations)
+│   │   ├── query_agent.py      # QueryAgent (content queries)
+│   │   ├── tools.py            # RagMeTools (tool collection)
+│   │   └── local_agent.py      # File monitoring agent
 │   ├── vector_db.py        # Vector database compatibility layer
 │   ├── vector_db_base.py   # Abstract base class
 │   ├── vector_db_weaviate.py # Weaviate Cloud implementation
@@ -157,7 +161,6 @@ ragme-ai/
 │   ├── vector_db_factory.py # Factory function
 │   ├── api.py              # FastAPI REST API
 │   ├── mcp.py              # Model Context Protocol
-
 │   ├── socket_manager.py   # WebSocket management
 │   └── common.py           # Common utilities
 ├── frontend/               # 🌐 New frontend (TypeScript/Express)
@@ -183,6 +186,43 @@ ragme-ai/
 │   ├── lint.sh             # Code linting
 │   └── podman-compose.weaviate.yml
 └── watch_directory/        # 📁 Monitored directory
+```
+
+### Agent Development
+
+When working with the agent system:
+
+1. **Follow the three-agent architecture**: 
+   - `RagMeAgent` (dispatcher) - routes queries to specialized agents
+   - `FunctionalAgent` - handles tool-based operations
+   - `QueryAgent` - handles content queries and RAG
+   - `RagMeTools` - centralized tool collection
+
+2. **Query routing**: Add new keywords to the appropriate agent's query detection method:
+   - `FunctionalAgent.is_functional_query()` for tool operations
+   - `QueryAgent.is_query_question()` for content queries
+
+3. **Tool development**: Add new tools to `RagMeTools` class and update `get_all_tools()` method
+
+4. **Agent testing**: Create comprehensive tests for new agents in `tests/test_agent_refactor.py`
+
+5. **Configuration**: Update `config.yaml.example` with new agent configurations
+
+Example for adding a new agent:
+
+```python
+# src/ragme/agents/new_agent.py
+class NewAgent:
+    def __init__(self, ragme_instance):
+        self.ragme = ragme_instance
+        
+    async def run(self, query: str):
+        # Implement agent logic
+        pass
+        
+    def is_new_agent_query(self, query: str) -> bool:
+        # Implement query detection logic
+        pass
 ```
 
 ### Vector Database Development

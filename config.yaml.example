@@ -105,6 +105,10 @@ llm:
     temperature: 0.1  # Lower temperature for consistent summaries
     max_tokens: 2000
 
+# Query Configuration
+query:
+  top_k: 5  # Number of most relevant documents to retrieve for queries
+
 # Agent Configuration
 agents:
   - name: "ragme-agent"

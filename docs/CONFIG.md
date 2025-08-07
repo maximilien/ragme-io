@@ -390,6 +390,47 @@ vector_databases:
         timeout: 30
 ```
 
+### Agent Configuration
+
+RAGme.ai uses a sophisticated three-agent architecture. Configure each agent independently:
+
+```yaml
+agents:
+  # Dispatcher agent - routes queries to specialized agents
+  - name: "ragme-agent"
+    type: "ragme"
+    llm_model: "gpt-4o-mini"
+    
+  # Functional agent - handles tool-based operations
+  - name: "functional-agent"
+    type: "functional"
+    llm_model: "gpt-4o-mini"
+    
+  # Query agent - handles content queries and RAG
+  - name: "query-agent"
+    type: "query"
+    llm_model: "gpt-4o-mini"
+    
+  # Local agent - file monitoring and processing
+  - name: "local-agent"
+    type: "local"
+    llm_model: "gpt-4o-mini"
+    watch_directory: "watch_directory"
+    chunk_size: 1000
+    mcp_servers:
+      - name: "local"
+        url: "http://localhost:8022"
+```
+
+### Query Configuration
+
+Configure query behavior for the QueryAgent:
+
+```yaml
+query:
+  top_k: 5  # Number of most relevant documents to retrieve for queries
+```
+
 ### Custom Agents
 
 Configure custom agents:
