@@ -227,6 +227,10 @@ JSON response:"""
         Returns:
             bool: True if confirmation is required
         """
+        # Check if confirmation bypass is enabled
+        if config.is_feature_enabled("bypass_delete_confirmation"):
+            return False
+
         # Always require confirmation for collection and multiple document deletions
         if operation_type in ["collection", "multiple_documents"]:
             return True
