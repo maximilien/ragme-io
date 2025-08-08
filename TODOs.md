@@ -3,13 +3,65 @@
 ## **OPENED**
 
 ### bugs 
+* switching to .env.app.viewfinder-ai did not load the correct Viewfinder app info 
+* make sure the VDB and collection name is showing correctly on top bar using the config
+
+* a query for "detailed report on RDI conference" w/o RDI conference document results in query agent finding documents when it should not:
+```bash
+2025-08-07 15:48:02 - Dispatching to QueryAgent: 'RDI conference report'
+2025-08-07 15:48:02 - QueryAgent received query: 'RDI conference report'
+2025-08-07 15:48:02 - QueryAgent searching vector database with query: 'RDI conference report' (top_k=5)
+2025-08-07 15:48:02 - QueryAgent found 5 documents
+2025-08-07 15:48:02 - QueryAgent generating answer with LLM for query: 'RDI conference report'
+2025-08-07 15:48:12 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-07 15:48:12 - QueryAgent returning result for query: 'RDI conference report'
+2025-08-07 15:48:13 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-07 15:48:22 - RagMeAgent got response: <class 'llama_index.core.agent.workflow.workflow_events.AgentOutput'> - Here is a detailed report on the RDI (Retrieval-Augmented Document Intelligence) conference, highlig...
+INFO:     127.0.0.1:52582 - "POST /query HTTP/1.1" 200 OK
+```
+But a query of: "who is maximilien"
+
+results in:
+```bash
+🤖
+The documents do not contain specific information about an individual named "Maximilien." If you are looking for information about a specific Maximilien (such as a historical figure or a character), please provide more context or 
+specify which Maximilien you are referring to.
+```
+
 * URL link in chat responses is incorrect when fetching from URL documents
+* add citations when query response results in more than one document
 
 ### bugs - mobile
 * right pane shows as purple block when collapse on mobile (iPhone)
 * the chat text input is hidden on mobile (iPhone). Need to flip to horizontal and touch bottom to be able to make text input visible and usable
 
+### tests
+* test with local weaviate 
+* test with local milvus
+
 ### features
+
+#### query accuray
+* queries about "RAGme" with research document about RAG paper but no RAGme doc results in hallucination -- correct result is no document on RAGme:
+
+```bash
+👤
+what is ragme-ai
+
+🤖
+RAGme-AI, as referenced in the documents, is closely related to the concept of Retrieval-Augmented Generation (RAG) in the context of artificial intelligence, particularly for regulatory science and compliance concerning medical devices.
+
+Overview of RAGme-AI:
+Automated Compliance: RAGme-AI utilizes a modular AI system that automates the determination of applicable regulatory standards for medical devices based on their descriptions. It retrieves relevant standards from a curated database and classifies them as Mandatory, Recommended, or Not Applicable, providing traceable justifications for each classification.
+Key Features:
+Cross-Jurisdictional Reasoning: The system can analyze and reconcile regulatory standards from different countries, such as the U.S. and China, helping to resolve conflicts and providing clear justifications for applicable standards.
+
+Performance Metrics: The system has demonstrated a classification accuracy of 73% and a Top-5 retrieval recall of 87%, indicating its effectiveness in identifying relevant regulatory standards.
+
+End-to-End System: It is described as an end-to-end system designed for standard applicability reasoning, which enhances the scalability and interpretability of AI-supported regulatory processes.
+
+In summary, RAGme-AI represents the application of RAG methodologies within AI systems to improve compliance and regulatory understanding, particularly in the medical device domain. If you are looking for a specific product or entity named "RAGme-AI" outside of this context, the documents do not provide that information.
+```
 
 #### agents
 * implement OpenAI agents version of the current agents
@@ -78,16 +130,14 @@
 * slack channels - add documents and links using slack messages
 * X / Twitter - add documents and links from X account posts
 
-#### tests
-* test with local weaviate 
-* test with local milvus
-
 ### nice to have
 * a2a support to discover and call other external agents to do work
 
 ---
 
 ## **COMPLETED**
+
+* ✅ **COMPLETED** - add agents and apis level integration tests [Implemented comprehensive integration tests for both API and Agent levels with complete scenario testing including empty collection verification, document addition/removal, and query validation. Created test files: tests/integration/test_apis.py, tests/integration/test_agents.py, tests/integration/run_integration_tests.py, tests/integration/config_manager.py, and tools/test-integration-agents.sh for easy test execution. Added configuration management to prevent test pollution by backing up config.yaml, modifying it to use test_integration collection, and restoring it after tests complete. Added bypass_delete_confirmation feature flag to skip confirmation prompts during tests, ensuring clean test execution without user interaction]
 
 * ✅ **COMPLETED** - deleting non existing (or already deleted doc) should result in a message that doc is not in collection [Fixed URL-based document deletion by implementing proper find_document_by_url method that handles Weaviate API changes and URL fragments. Enhanced matching logic to support exact matches, base URL matches (without fragments), and filename-only matches for file:// URLs. Now properly finds and deletes documents by URL with accurate error messages when documents don't exist]
 

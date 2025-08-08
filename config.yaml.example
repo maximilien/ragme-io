@@ -1,13 +1,14 @@
 # RAGme AI Configuration File
 # This file contains all configurable settings for RAGme deployment
-# Customize these values for different client deployments
+# Customize these values for different client deployments and your .env
+# file which will be used to fill the values with format {$ENV_VAR_NAME}
 
-# Application Metadata
+# Application Metadataapplication:
 application:
-  name: "RAGme"
-  version: "0.1.0"
-  title: "🤖 RAGme.ai Assistant"
-  description: "RAGme is a RAG system that uses vector databases and LLMs for intelligent document retrieval."
+  name: "{$APPLICATION_NAME}"
+  version: "{$APPLICATION_VERSION}"
+  title: "{$APPLICATION_TITLE}"
+  description: "{$APPLICATION_DESCRIPTION}"
   
 # Network Configuration
 network:
@@ -53,7 +54,7 @@ vector_databases:
     - name: "weaviate-local"
       type: "weaviate-local"
       url: "http://localhost:8080"
-      collection_name: "RagMeDocs"
+      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -64,7 +65,7 @@ vector_databases:
       type: "weaviate"
       url: "${WEAVIATE_URL}"  # From environment
       api_key: "${WEAVIATE_API_KEY}"  # From environment
-      collection_name: "RagMeDocs"
+      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -74,7 +75,7 @@ vector_databases:
     - name: "milvus-local"
       type: "milvus"
       uri: "milvus_demo.db"  # File-based for local development
-      collection_name: "RagMeDocs"
+      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -85,7 +86,7 @@ vector_databases:
       type: "milvus"
       uri: "${MILVUS_URI}"  # From environment
       token: "${MILVUS_TOKEN}"  # From environment
-      collection_name: "RagMeDocs"
+      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -115,7 +116,7 @@ agents:
     type: "ragme"
     llm_model: "gpt-4o-mini"
     system_prompt: |
-      You are a helpful assistant that can write the contents of urls to RagMeDocs
+      You are a helpful assistant that can write the contents of urls to {$VECTOR_DB_COLLECTION_NAME}
       collection, as well as answering questions about stored documents.
       
       MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
@@ -263,6 +264,7 @@ features:
   url_crawling: true
   json_ingestion: true
   pattern_deletion: true
+  bypass_delete_confirmation: false  # Skip confirmation for delete operations (useful for testing)
   authentication: false  # Future feature
   multi_tenant: false    # Future feature
 

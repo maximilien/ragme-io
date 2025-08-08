@@ -37,6 +37,7 @@ print_help() {
     echo "  api         Run only API tests (FastAPI endpoints)"
     echo "  mcp         Run only MCP server tests (Model Context Protocol)"
     echo "  integration Run only integration tests (end-to-end system tests)"
+    echo "  agents      Run only agent integration tests (RagMeAgent testing)"
     echo "  all         Run all tests (unit + api + mcp + integration)"
     echo "  help        Show this help message"
     echo ""
@@ -45,6 +46,7 @@ print_help() {
     echo "  ./test.sh api          # Run only API tests"
     echo "  ./test.sh mcp          # Run only MCP server tests"
     echo "  ./test.sh integration  # Run only integration tests"
+    echo "  ./test.sh agents       # Run only agent integration tests"
     echo "  ./test.sh all          # Run all tests"
     echo "  ./test.sh              # Run unit tests (default)"
     echo ""
@@ -69,7 +71,13 @@ print_help() {
     echo "    - End-to-end system testing"
     echo "    - Service communication"
     echo "    - Complete workflow validation"
-    echo "    - File monitoring and processing"
+    echo "    - API and Agent level testing"
+    echo ""
+    echo "  Agent Tests:"
+    echo "    - RagMeAgent functionality testing"
+    echo "    - Agent query processing"
+    echo "    - Document management via agents"
+    echo "    - MCP server integration"
 }
 
 # Check command line arguments
@@ -79,30 +87,42 @@ case "${1:-unit}" in
         RUN_API_TESTS=false
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=false
+        RUN_AGENT_TESTS=false
         ;;
     "api")
         RUN_UNIT_TESTS=false
         RUN_API_TESTS=true
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=false
+        RUN_AGENT_TESTS=false
         ;;
     "mcp")
         RUN_UNIT_TESTS=false
         RUN_API_TESTS=false
         RUN_MCP_TESTS=true
         RUN_INTEGRATION_TESTS=false
+        RUN_AGENT_TESTS=false
         ;;
     "integration")
         RUN_UNIT_TESTS=false
         RUN_API_TESTS=false
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=true
+        RUN_AGENT_TESTS=false
+        ;;
+    "agents")
+        RUN_UNIT_TESTS=false
+        RUN_API_TESTS=false
+        RUN_MCP_TESTS=false
+        RUN_INTEGRATION_TESTS=false
+        RUN_AGENT_TESTS=true
         ;;
     "all")
         RUN_UNIT_TESTS=true
         RUN_API_TESTS=true
         RUN_MCP_TESTS=true
         RUN_INTEGRATION_TESTS=true
+        RUN_AGENT_TESTS=true
         ;;
     "help"|"-h"|"--help")
         print_help
@@ -182,19 +202,46 @@ run_mcp_tests() {
 run_integration_tests() {
     print_header "Running Integration Tests..."
     
-    if [ -f "./tools/test-integration.sh" ]; then
-        print_status "Running integration test suite..."
-        if ./tools/test-integration.sh; then
+    # For integration tests, we need to use real API keys from .env file
+    # Don't override with fake keys like we do for unit tests
+    print_status "Using API keys from .env file for integration tests..."
+    
+    if [ -f "./tools/test-integration-agents.sh" ]; then
+        print_status "Running integration test suite (API and Agent tests)..."
+        if ./tools/test-integration-agents.sh --all; then
             print_status "✓ Integration tests passed"
         else
             print_error "Integration tests failed"
             exit 1
         fi
     else
-        print_warning "tools/test-integration.sh not found, skipping integration tests"
+        print_warning "tools/test-integration-agents.sh not found, skipping integration tests"
     fi
     
     print_header "Integration Tests Completed Successfully! 🎉"
+}
+
+# Function to run agent tests
+run_agent_tests() {
+    print_header "Running Agent Integration Tests..."
+    
+    # For integration tests, we need to use real API keys from .env file
+    # Don't override with fake keys like we do for unit tests
+    print_status "Using API keys from .env file for agent integration tests..."
+    
+    if [ -f "./tools/test-integration-agents.sh" ]; then
+        print_status "Running agent integration test suite..."
+        if ./tools/test-integration-agents.sh --agents; then
+            print_status "✓ Agent integration tests passed"
+        else
+            print_error "Agent integration tests failed"
+            exit 1
+        fi
+    else
+        print_warning "tools/test-integration-agents.sh not found, skipping agent tests"
+    fi
+    
+    print_header "Agent Integration Tests Completed Successfully! 🎉"
 }
 
 # Run unit tests if requested
@@ -215,6 +262,11 @@ fi
 # Run integration tests if requested
 if [ "$RUN_INTEGRATION_TESTS" = true ]; then
     run_integration_tests
+fi
+
+# Run agent tests if requested
+if [ "$RUN_AGENT_TESTS" = true ]; then
+    run_agent_tests
 fi
 
 print_status "All requested tests completed!" 
