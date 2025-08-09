@@ -138,9 +138,12 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             # Try to parse metadata if it's a JSON string
             try:
-                doc["metadata"] = json.loads(doc["metadata"])
+                if doc["metadata"] is not None:
+                    doc["metadata"] = json.loads(doc["metadata"])
+                else:
+                    doc["metadata"] = {}
             except json.JSONDecodeError:
-                pass
+                doc["metadata"] = {}
 
             documents.append(doc)
 
@@ -151,6 +154,65 @@ class WeaviateVectorDatabase(VectorDatabase):
         )
 
         return documents
+
+    def count_documents(self, date_filter: str = "all") -> int:
+        """Count documents in Weaviate efficiently using aggregation."""
+        try:
+            collection = self.client.collections.get(self.collection_name)
+
+            # Build date filter condition if needed
+            where_filter = None
+            if date_filter != "all":
+                import datetime
+
+                now = datetime.datetime.now()
+
+                if date_filter == "current":
+                    # Current week
+                    start_of_week = now - datetime.timedelta(days=now.weekday())
+                    start_date = start_of_week.isoformat()
+                elif date_filter == "month":
+                    # Current month
+                    start_date = now.replace(day=1).isoformat()
+                elif date_filter == "year":
+                    # Current year
+                    start_date = now.replace(month=1, day=1).isoformat()
+                else:
+                    start_date = None
+
+                if start_date:
+                    where_filter = {
+                        "path": ["metadata", "date_added"],
+                        "operator": "GreaterThanEqual",
+                        "valueDate": start_date,
+                    }
+
+            # Use efficient aggregation to count
+            if where_filter:
+                result = collection.aggregate.over_all(
+                    total_count=True, where=where_filter
+                )
+            else:
+                result = collection.aggregate.over_all(total_count=True)
+
+            return result.total_count or 0
+
+        except Exception as e:
+            print(f"Error counting documents in Weaviate: {str(e)}")
+            # Fallback to list_documents approach
+            try:
+                # Import the filter function from the API module where it's defined
+                import os
+                import sys
+
+                sys.path.append(os.path.join(os.path.dirname(__file__), "..", "apis"))
+                from api import filter_documents_by_date
+
+                all_docs = self.list_documents(limit=10000, offset=0)
+                filtered_docs = filter_documents_by_date(all_docs, date_filter)
+                return len(filtered_docs)
+            except Exception:
+                return 0
 
     def delete_document(self, document_id: str) -> bool:
         """Delete a document from Weaviate by ID."""

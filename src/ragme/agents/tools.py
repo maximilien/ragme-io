@@ -263,6 +263,64 @@ class RagMeTools:
         config = f"Collection: {getattr(db, 'collection_name', 'unknown')}"
         return f"RagMe is currently using the '{db_type}' vector database. {config}."
 
+    def count_documents(self, date_filter: str = "all") -> str:
+        """
+        Count the total number of documents in the collection with optional date filtering.
+
+        Args:
+            date_filter (str): Date filter to apply - 'all' (default), 'current' (this week),
+                             'month' (this month), or 'year' (this year)
+        Returns:
+            str: Count of documents matching the filter
+        """
+        try:
+            # Use the efficient count method from vector database
+            if hasattr(self.ragme.vector_db, "count_documents"):
+                count = self.ragme.vector_db.count_documents(date_filter)
+            else:
+                # Fallback to list and count
+                documents = self.ragme.list_documents(limit=10000, offset=0)
+
+                if date_filter == "all":
+                    count = len(documents)
+                else:
+                    # Apply date filtering
+                    import datetime
+
+                    now = datetime.datetime.now()
+
+                    if date_filter == "current":
+                        start_of_week = now - datetime.timedelta(days=now.weekday())
+                        cutoff = start_of_week.isoformat()
+                    elif date_filter == "month":
+                        cutoff = now.replace(day=1).isoformat()
+                    elif date_filter == "year":
+                        cutoff = now.replace(month=1, day=1).isoformat()
+                    else:
+                        cutoff = None
+
+                    if cutoff:
+                        count = 0
+                        for doc in documents:
+                            date_added = doc.get("metadata", {}).get("date_added", "")
+                            if date_added >= cutoff:
+                                count += 1
+                    else:
+                        count = len(documents)
+
+            # Format the response nicely
+            filter_text = {
+                "all": "total",
+                "current": "from this week",
+                "month": "from this month",
+                "year": "from this year",
+            }.get(date_filter, f"with filter '{date_filter}'")
+
+            return f"There are {count:,} documents {filter_text} in the collection."
+
+        except Exception as e:
+            return f"Error counting documents: {str(e)}"
+
     def get_all_tools(self):
         """
         Get all tools as a list of functions for use with LlamaIndex FunctionAgent.
@@ -279,4 +337,5 @@ class RagMeTools:
             self.list_ragme_collection,
             self.find_urls_crawling_webpage,
             self.get_vector_db_info,
+            self.count_documents,
         ]

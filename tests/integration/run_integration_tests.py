@@ -15,6 +15,8 @@ Usage:
 import argparse
 import asyncio
 import os
+import re
+import shutil
 import sys
 import time
 import warnings
@@ -160,6 +162,40 @@ def run_api_tests():
         print("❌ Failed to setup test configuration")
         return False
 
+    # Set environment variable for test collection to ensure it overrides config
+    original_collection_name = os.environ.get("VECTOR_DB_COLLECTION_NAME")
+    os.environ["VECTOR_DB_COLLECTION_NAME"] = get_test_collection_name()
+    print(f"🔧 Set VECTOR_DB_COLLECTION_NAME={get_test_collection_name()}")
+
+    # Restart backend services to pick up the new test configuration
+    print("🔄 Restarting backend services with test configuration...")
+    import subprocess
+
+    try:
+        # Ensure environment variables are passed to the subprocess
+        env = os.environ.copy()
+        result = subprocess.run(
+            ["./start.sh", "restart-backend"],
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            timeout=30,
+            env=env,
+        )
+        if result.returncode == 0:
+            print("✅ Backend services restarted successfully")
+            # Wait for services to be ready
+            time.sleep(3)
+        else:
+            print(f"❌ Failed to restart backend services: {result.stderr}")
+            return False
+    except subprocess.TimeoutExpired:
+        print("❌ Timeout while restarting backend services")
+        return False
+    except Exception as e:
+        print(f"❌ Error restarting backend services: {e}")
+        return False
+
     try:
         # Create test instance and run tests directly
         test_instance = TestAPIIntegration()
@@ -182,10 +218,10 @@ def run_api_tests():
 
         # Test data
         test_instance.test_url = "https://maximilien.org"
-        test_instance.test_pdf_path = "tests/fixtures/pdfs/askg.pdf"
+        test_instance.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
         test_instance.test_queries = {
             "maximilien": "who is Maximilien?",
-            "askg": "give detailed report on AskG",
+            "ragme": "what is the RAGme-ai project?",
         }
 
         try:
@@ -220,7 +256,16 @@ def run_api_tests():
             if hasattr(test_instance, "ragme") and test_instance.ragme:
                 test_instance.ragme.cleanup()
     finally:
-        # Always restore configuration
+        # Always restore configuration and environment
+        if "original_collection_name" in locals():
+            if original_collection_name is not None:
+                os.environ["VECTOR_DB_COLLECTION_NAME"] = original_collection_name
+                print(
+                    f"🔧 Restored VECTOR_DB_COLLECTION_NAME={original_collection_name}"
+                )
+            else:
+                os.environ.pop("VECTOR_DB_COLLECTION_NAME", None)
+                print("🔧 Removed VECTOR_DB_COLLECTION_NAME from environment")
         teardown_test_config()
 
 
@@ -233,6 +278,40 @@ async def run_agent_tests():
     # Setup test configuration
     if not setup_test_config():
         print("❌ Failed to setup test configuration")
+        return False
+
+    # Set environment variable for test collection to ensure it overrides config
+    original_collection_name = os.environ.get("VECTOR_DB_COLLECTION_NAME")
+    os.environ["VECTOR_DB_COLLECTION_NAME"] = get_test_collection_name()
+    print(f"🔧 Set VECTOR_DB_COLLECTION_NAME={get_test_collection_name()}")
+
+    # Restart backend services to pick up the new test configuration
+    print("🔄 Restarting backend services with test configuration...")
+    import subprocess
+
+    try:
+        # Ensure environment variables are passed to the subprocess
+        env = os.environ.copy()
+        result = subprocess.run(
+            ["./start.sh", "restart-backend"],
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            timeout=30,
+            env=env,
+        )
+        if result.returncode == 0:
+            print("✅ Backend services restarted successfully")
+            # Wait for services to be ready
+            time.sleep(3)
+        else:
+            print(f"❌ Failed to restart backend services: {result.stderr}")
+            return False
+    except subprocess.TimeoutExpired:
+        print("❌ Timeout while restarting backend services")
+        return False
+    except Exception as e:
+        print(f"❌ Error restarting backend services: {e}")
         return False
 
     try:
@@ -257,10 +336,10 @@ async def run_agent_tests():
 
         # Test data
         test_instance.test_url = "https://maximilien.org"
-        test_instance.test_pdf_path = "tests/fixtures/pdfs/askg.pdf"
+        test_instance.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
         test_instance.test_queries = {
             "maximilien": "who is Maximilien?",
-            "askg": "give detailed report on AskG",
+            "ragme": "what is the RAGme-ai project?",
         }
 
         # Initialize RagMe and RagMeAgent
@@ -302,7 +381,16 @@ async def run_agent_tests():
             if hasattr(test_instance, "ragme") and test_instance.ragme:
                 test_instance.ragme.cleanup()
     finally:
-        # Always restore configuration
+        # Always restore configuration and environment
+        if "original_collection_name" in locals():
+            if original_collection_name is not None:
+                os.environ["VECTOR_DB_COLLECTION_NAME"] = original_collection_name
+                print(
+                    f"🔧 Restored VECTOR_DB_COLLECTION_NAME={original_collection_name}"
+                )
+            else:
+                os.environ.pop("VECTOR_DB_COLLECTION_NAME", None)
+                print("🔧 Removed VECTOR_DB_COLLECTION_NAME from environment")
         teardown_test_config()
 
 
@@ -346,7 +434,7 @@ def main():
     print("=" * 40)
 
     # Check if test PDF exists
-    test_pdf_path = "tests/fixtures/pdfs/askg.pdf"
+    test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
     if not os.path.exists(test_pdf_path):
         print(f"❌ Test PDF not found: {test_pdf_path}")
         print(

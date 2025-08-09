@@ -67,6 +67,7 @@ class FunctionalAgent:
 You can perform the following operations:
 - Add URLs to the collection using write_to_ragme_collection(urls)
 - List documents in the collection using list_ragme_collection(limit, offset)
+- Count documents in the collection using count_documents(date_filter)
 - Delete specific documents using delete_document(doc_id)
 - Delete documents by URL using delete_document_by_url(url)
 - Delete all documents using delete_all_documents()
@@ -80,10 +81,18 @@ For functional queries like:
 - "delete document with ID 123"
 - "delete document https://example.com"
 - "list all documents"
+- "count documents" or "how many documents are there?"
+- "count documents from this week/month/year"
 - "delete all documents matching pattern test_*"
 - "reset the collection"
 
 Use the appropriate tool to perform the requested operation.
+
+When counting documents:
+- Use count_documents() for total count
+- Use count_documents("current") for this week's documents
+- Use count_documents("month") for this month's documents
+- Use count_documents("year") for this year's documents
 
 When deleting documents:
 - If the user provides a URL, use delete_document_by_url(url)

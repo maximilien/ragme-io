@@ -46,6 +46,9 @@ class TestAgentsIntegration:
         if not setup_test_config():
             pytest.fail("Failed to setup test configuration")
 
+        # Force config reload after setup to pick up modified .env file
+        config.reload()
+
         # Configure retry strategy for MCP calls
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -59,10 +62,10 @@ class TestAgentsIntegration:
 
         # Test data
         self.test_url = "https://maximilien.org"
-        self.test_pdf_path = "tests/fixtures/pdfs/askg.pdf"
+        self.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
         self.test_queries = {
             "maximilien": "who is Maximilien?",
-            "askg": "give detailed report on AskG",
+            "ragme": "what is the RAGme-ai project?",
         }
 
         # Ensure test PDF exists
@@ -242,7 +245,7 @@ class TestAgentsIntegration:
         pdf_added = False
         try:
             with open(self.test_pdf_path, "rb") as pdf_file:
-                files = {"file": ("askg.pdf", pdf_file, "application/pdf")}
+                files = {"file": ("ragme-ai.pdf", pdf_file, "application/pdf")}
                 pdf_response = self.session.post(
                     f"{self.mcp_url}/tool/process_pdf", files=files, timeout=60
                 )
@@ -263,20 +266,20 @@ class TestAgentsIntegration:
         except Exception as e:
             print(f"⚠️ Failed to add PDF via MCP server: {e}")
 
-        # Query for AskG after attempting to add PDF
-        print("Querying for AskG after adding PDF...")
-        askg_response = await self.agent.run(self.test_queries["askg"])
-        print(f"🔍 AskG query response: {askg_response[:200]}...")
+        # Query for RAGme after attempting to add PDF
+        print("Querying for RAGme after adding PDF...")
+        ragme_response = await self.agent.run(self.test_queries["ragme"])
+        print(f"🔍 RAGme query response: {ragme_response[:200]}...")
 
         if pdf_added:
-            # Response should contain detailed information about AskG or require confirmation
-            response_text = askg_response.lower()
+            # Response should contain detailed information about RAGme or require confirmation
+            response_text = ragme_response.lower()
             has_info = any(
                 phrase in response_text
                 for phrase in [
-                    "askg",
-                    "ask",
-                    "question",
+                    "ragme",
+                    "rag",
+                    "project",
                     "answer",
                     "knowledge",
                     "ai",
@@ -295,12 +298,12 @@ class TestAgentsIntegration:
                 ]
             )
             assert has_info or requires_confirmation, (
-                f"Query should return information about AskG or require confirmation, got: {askg_response}"
+                f"Query should return information about RAGme or require confirmation, got: {ragme_response}"
             )
 
             # Verify response is detailed (contains markdown or structured content) or requires confirmation
             requires_confirmation = any(
-                phrase in askg_response.lower()
+                phrase in ragme_response.lower()
                 for phrase in [
                     "confirm",
                     "sure",
@@ -310,12 +313,12 @@ class TestAgentsIntegration:
                     "cancel",
                 ]
             )
-            assert len(askg_response) > 100 or requires_confirmation, (
-                "AskG response should be detailed or require confirmation"
+            assert len(ragme_response) > 100 or requires_confirmation, (
+                "RAGme response should be detailed or require confirmation"
             )
         else:
             # If PDF wasn't added, response should indicate no information
-            response_text = askg_response.lower()
+            response_text = ragme_response.lower()
             has_no_info = any(
                 phrase in response_text
                 for phrase in [
@@ -342,7 +345,7 @@ class TestAgentsIntegration:
                 ]
             )
             assert has_no_info or has_general_knowledge, (
-                f"Query should indicate no specific information found, got: {askg_response}"
+                f"Query should indicate no specific information found, got: {ragme_response}"
             )
 
         # Verify documents in the collection (at least the URL document should be there)
@@ -452,11 +455,11 @@ class TestAgentsIntegration:
                 f"Document deletion should be successful or require confirmation, got: {delete_response}"
             )
 
-            # Query for AskG after removing PDF
-            print("Querying for AskG after removing PDF...")
-            askg_response = await self.agent.run(self.test_queries["askg"])
+            # Query for RAGme after removing PDF
+            print("Querying for RAGme after removing PDF...")
+            ragme_response = await self.agent.run(self.test_queries["ragme"])
 
-            response_text = askg_response.lower()
+            response_text = ragme_response.lower()
             # Check if response indicates no information or is asking for confirmation
             has_no_info = any(
                 phrase in response_text
@@ -483,7 +486,7 @@ class TestAgentsIntegration:
                 ]
             )
             assert has_no_info or is_asking_confirmation, (
-                f"Query should indicate no information or ask for confirmation after removing PDF document, got: {askg_response}"
+                f"Query should indicate no information or ask for confirmation after removing PDF document, got: {ragme_response}"
             )
 
     async def test_agent_functionality(self):

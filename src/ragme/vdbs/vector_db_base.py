@@ -111,6 +111,19 @@ class VectorDatabase(ABC):
         pass
 
     @abstractmethod
+    def count_documents(self, date_filter: str = "all") -> int:
+        """
+        Count documents in the vector database efficiently.
+
+        Args:
+            date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+
+        Returns:
+            Number of documents matching the filter
+        """
+        pass
+
+    @abstractmethod
     def cleanup(self):
         """Clean up resources and close connections."""
         pass

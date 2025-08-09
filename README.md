@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🔄 Environment Switching Fix**: Fixed critical bug where changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) wasn't taking effect after restart. Now seamlessly switch between different application environments (e.g., RAGme ↔ Viewfinder.ai) ⭐ **FIXED!**
 - **🤖 Three-Agent Architecture**: Sophisticated agent system with intelligent query routing and specialized processing ⭐ **NEW!**
 - **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment
 - **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
@@ -166,6 +167,8 @@ The configuration system allows you to customize:
 - **📊 Client branding** (logos, colors, welcome messages)
 
 **📚 Complete Configuration Guide:** See **[docs/CONFIG.md](docs/CONFIG.md)** for detailed configuration options, examples, and best practices.
+
+**🔄 Environment Switching:** Switch between different application environments (e.g., RAGme ↔ YourFancyRAG) by simply changing the `.env` file and restarting with `./stop.sh && ./start.sh`. All configuration changes (APPLICATION_*, VECTOR_DB_TYPE, collection names) take effect immediately.
 
 ## 🏃‍♂️ Run RAGme.ai
 

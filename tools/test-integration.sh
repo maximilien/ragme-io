@@ -3,6 +3,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+# Load environment variables from .env file
+set -a
+[ -f .env ] && . .env
+set +a
+
 set -e
 
 # Colors for output
@@ -13,8 +18,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-API_URL="http://localhost:8021"
-MCP_URL="http://localhost:8022"
+API_URL="http://localhost:${RAGME_API_PORT:-8021}"
+MCP_URL="http://localhost:${RAGME_MCP_PORT:-8022}"
 PID_FILE=".pid"
 WATCH_DIR="watch_directory"
 TIMEOUT=30

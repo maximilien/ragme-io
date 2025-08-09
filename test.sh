@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Load environment variables from .env file
+set -a
+[ -f .env ] && . .env
+set +a
+
 # RAGme AI Test Suite
 
 set -e

@@ -20,6 +20,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CONFIG_FILE="$PROJECT_ROOT/config.yaml"
 
+# Load environment variables from .env file
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
 # Function to print colored output
 print_error() {
     echo -e "${RED}❌ ERROR: $1${NC}" >&2
@@ -516,20 +523,22 @@ generate_report() {
     print_header "Configuration Report"
     
     python << 'EOF'
-import yaml
+import sys
 import os
-
-CONFIG_FILE = os.environ.get('CONFIG_FILE')
+sys.path.insert(0, os.path.join(os.environ.get('PROJECT_ROOT'), 'src'))
 
 try:
-    with open(CONFIG_FILE, 'r') as f:
-        config = yaml.safe_load(f)
+    from ragme.utils.config_manager import ConfigManager
+    config_manager = ConfigManager()
+    config = config_manager.config
 except Exception as e:
-    print(f"Failed to load config: {e}")
+    print(f"Failed to load config via ConfigManager: {e}")
     exit(1)
 
 print("📊 Configuration Summary:")
-print(f"  Application: {config.get('application', {}).get('name', 'Unknown')} v{config.get('application', {}).get('version', 'Unknown')}")
+app_name = config.get('application', {}).get('name', 'Unknown')
+app_version = config.get('application', {}).get('version', 'Unknown')
+print(f"  Application: {app_name} v{app_version}")
 
 if 'vector_databases' in config:
     vdb = config['vector_databases']

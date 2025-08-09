@@ -54,7 +54,7 @@ class RagMe:
         self,
         vector_db: VectorDatabase = None,
         db_type: str = None,
-        collection_name: str = "RagMeDocs",
+        collection_name: str = None,
     ):
         """
         Initialize RagMe with a vector database.
@@ -62,8 +62,19 @@ class RagMe:
         Args:
             vector_db: Vector database instance (if None, will create one based on db_type)
             db_type: Type of vector database to use if vector_db is None (defaults to VECTOR_DB_TYPE env var or "weaviate")
-            collection_name: Name of the collection to use
+            collection_name: Name of the collection to use (defaults to configuration or "RagMeDocs")
         """
+        # Get collection name from config if not provided
+        if collection_name is None:
+            from src.ragme.utils.config_manager import config
+
+            db_config = config.get_database_config()
+            collection_name = (
+                db_config.get("collection_name", "RagMeDocs")
+                if db_config
+                else "RagMeDocs"
+            )
+
         self.collection_name = collection_name
 
         # Get db_type from environment if not provided
@@ -134,9 +145,11 @@ class RagMe:
                             "url": doc.id_,
                             "date_added": datetime.now().isoformat(),
                         },
-                        "vector": vector.tolist()
-                        if hasattr(vector, "tolist")
-                        else list(vector),
+                        "vector": (
+                            vector.tolist()
+                            if hasattr(vector, "tolist")
+                            else list(vector)
+                        ),
                     }
                 )
         else:

@@ -236,6 +236,32 @@ The configuration is loaded in this order:
 2. **Environment variables** - Override specific values
 3. **Default values** - Fallback for missing configuration
 
+### 🔄 Environment Switching
+
+RAGme supports seamless switching between different application environments by changing the `.env` file:
+
+**Example: Switch from RAGme to Viewfinder.ai**
+1. **Stop services**: `./stop.sh`
+2. **Switch environment**: `cp .env.app.your-fancy-rag-ai .env`
+3. **Start services**: `./start.sh`
+
+**What changes automatically:**
+- Application name, title, and description
+- Vector database type and collection name
+- API keys and authentication credentials
+- All branding and UI elements
+
+**Environment Variables Used:**
+- `APPLICATION_NAME`, `APPLICATION_TITLE`, `APPLICATION_DESCRIPTION`
+- `VECTOR_DB_TYPE`, `VECTOR_DB_COLLECTION_NAME`
+- `WEAVIATE_URL`, `WEAVIATE_API_KEY` (for Weaviate)
+- `MILVUS_URI`, `MILVUS_TOKEN` (for Milvus)
+
+**Supported Scenarios:**
+- **Development ↔ Production**: Switch between different database instances
+- **Client Deployments**: Switch between different client configurations
+- **Demo Environments**: Quickly switch between demo datasets
+
 ## 🏗️ Deployment Scenarios
 
 ### 📊 Development Environment

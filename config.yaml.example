@@ -1,14 +1,14 @@
 # RAGme AI Configuration File
 # This file contains all configurable settings for RAGme deployment
 # Customize these values for different client deployments and your .env
-# file which will be used to fill the values with format {$ENV_VAR_NAME}
+# file which will be used to fill the values with format ${ENV_VAR_NAME}
 
-# Application Metadataapplication:
+# Application Metadata
 application:
-  name: "{$APPLICATION_NAME}"
-  version: "{$APPLICATION_VERSION}"
-  title: "{$APPLICATION_TITLE}"
-  description: "{$APPLICATION_DESCRIPTION}"
+  name: "${APPLICATION_NAME}"
+  version: "${APPLICATION_VERSION}"
+  title: "${APPLICATION_TITLE}"
+  description: "${APPLICATION_DESCRIPTION}"
   
 # Network Configuration
 network:
@@ -46,15 +46,15 @@ security:
 
 # Vector Database Configuration
 vector_databases:
-  # Default vector database to use
-  default: "weaviate-local"
+  # Default vector database to use (can be overridden by VECTOR_DB_TYPE environment variable)
+  default: "weaviate-cloud"
   
   # Available vector database configurations
   databases:
     - name: "weaviate-local"
       type: "weaviate-local"
       url: "http://localhost:8080"
-      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
+      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -65,7 +65,7 @@ vector_databases:
       type: "weaviate"
       url: "${WEAVIATE_URL}"  # From environment
       api_key: "${WEAVIATE_API_KEY}"  # From environment
-      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
+      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -75,7 +75,7 @@ vector_databases:
     - name: "milvus-local"
       type: "milvus"
       uri: "milvus_demo.db"  # File-based for local development
-      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
+      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -86,7 +86,7 @@ vector_databases:
       type: "milvus"
       uri: "${MILVUS_URI}"  # From environment
       token: "${MILVUS_TOKEN}"  # From environment
-      collection_name: "{$VECTOR_DB_COLLECTION_NAME}"
+      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -116,7 +116,7 @@ agents:
     type: "ragme"
     llm_model: "gpt-4o-mini"
     system_prompt: |
-      You are a helpful assistant that can write the contents of urls to {$VECTOR_DB_COLLECTION_NAME}
+      You are a helpful assistant that can write the contents of urls to ${VECTOR_DB_COLLECTION_NAME}
       collection, as well as answering questions about stored documents.
       
       MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.

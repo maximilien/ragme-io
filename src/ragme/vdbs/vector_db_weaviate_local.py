@@ -169,6 +169,79 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             print(f"Error listing documents from Weaviate: {str(e)}")
             return []
 
+    def count_documents(self, date_filter: str = "all") -> int:
+        """Count documents in local Weaviate efficiently using aggregation."""
+        try:
+            collection = self.client.collections.get(self.collection_name)
+
+            # Build date filter condition if needed
+            where_filter = None
+            if date_filter != "all":
+                import datetime
+
+                now = datetime.datetime.now()
+
+                if date_filter == "current":
+                    # Current week
+                    start_of_week = now - datetime.timedelta(days=now.weekday())
+                    start_date = start_of_week.isoformat()
+                elif date_filter == "month":
+                    # Current month
+                    start_date = now.replace(day=1).isoformat()
+                elif date_filter == "year":
+                    # Current year
+                    start_date = now.replace(month=1, day=1).isoformat()
+                else:
+                    start_date = None
+
+                if start_date:
+                    where_filter = {
+                        "path": ["date_added"],
+                        "operator": "GreaterThanEqual",
+                        "valueDate": start_date,
+                    }
+
+            # Use efficient aggregation to count
+            if where_filter:
+                result = collection.aggregate.over_all(
+                    total_count=True, where=where_filter
+                )
+            else:
+                result = collection.aggregate.over_all(total_count=True)
+
+            return result.total_count or 0
+
+        except Exception as e:
+            print(f"Error counting documents in local Weaviate: {str(e)}")
+            # Fallback to list_documents approach
+            try:
+                all_docs = self.list_documents(limit=10000, offset=0)
+                if date_filter == "all":
+                    return len(all_docs)
+                # Simple date filtering fallback
+                import datetime
+
+                now = datetime.datetime.now()
+
+                if date_filter == "current":
+                    start_of_week = now - datetime.timedelta(days=now.weekday())
+                    cutoff = start_of_week.isoformat()
+                elif date_filter == "month":
+                    cutoff = now.replace(day=1).isoformat()
+                elif date_filter == "year":
+                    cutoff = now.replace(month=1, day=1).isoformat()
+                else:
+                    return len(all_docs)
+
+                count = 0
+                for doc in all_docs:
+                    date_added = doc.get("metadata", {}).get("date_added", "")
+                    if date_added >= cutoff:
+                        count += 1
+                return count
+            except Exception:
+                return 0
+
     def delete_document(self, document_id: str) -> bool:
         """
         Delete a document from the local Weaviate collection by ID.
