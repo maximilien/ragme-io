@@ -84,10 +84,24 @@ class TestConfigManager:
                 env_content = f.read()
 
             # Replace VECTOR_DB_COLLECTION_NAME value
+            # Prefer new env vars for collections; also set legacy for compatibility
+            if re.search(r"^VECTOR_DB_TEXT_COLLECTION_NAME=", env_content, re.M):
+                env_content = re.sub(
+                    r"(VECTOR_DB_TEXT_COLLECTION_NAME=).*",
+                    f"\\1{self.test_collection_name}",
+                    env_content,
+                )
+            else:
+                env_content += (
+                    f"\nVECTOR_DB_TEXT_COLLECTION_NAME={self.test_collection_name}\n"
+                )
+
+            # Remove legacy collection name if present (migrating to new vars)
             env_content = re.sub(
-                r"(VECTOR_DB_COLLECTION_NAME=).*",
-                f"\\1{self.test_collection_name}",
+                r"^VECTOR_DB_COLLECTION_NAME=.*\n?",
+                "",
                 env_content,
+                flags=re.M,
             )
 
             # Write modified content back
@@ -123,11 +137,35 @@ class TestConfigManager:
                     "databases", []
                 )
                 for db_config in databases:
+                    # Legacy key support
                     if "collection_name" in db_config:
                         print(
                             f"🔄 Modifying collection '{db_config['collection_name']}' to '{self.test_collection_name}'"
                         )
                         db_config["collection_name"] = self.test_collection_name
+
+                    # New collections structure
+                    collections = db_config.get("collections")
+                    if isinstance(collections, list) and collections:
+                        # Replace text collection name
+                        updated = False
+                        for col in collections:
+                            if isinstance(col, dict) and col.get("type") == "text":
+                                original = col.get("name", "")
+                                col["name"] = self.test_collection_name
+                                print(
+                                    f"🔄 Modifying text collection '{original}' to '{self.test_collection_name}'"
+                                )
+                                updated = True
+                                break
+                        if not updated:
+                            # If no text collection present, add one
+                            collections.append(
+                                {"name": self.test_collection_name, "type": "text"}
+                            )
+                            print(
+                                f"➕ Added text collection '{self.test_collection_name}' to database config"
+                            )
 
             # Enable bypass_delete_confirmation for tests
             if "features" in self.modified_config:
@@ -298,8 +336,18 @@ class TestConfigManager:
             if "vector_databases" in current_config:
                 databases = current_config["vector_databases"].get("databases", [])
                 for db_config in databases:
+                    # Legacy structure
                     if db_config.get("collection_name") == self.test_collection_name:
                         return True
+                    # New structure
+                    collections = db_config.get("collections", [])
+                    for col in collections:
+                        if (
+                            isinstance(col, dict)
+                            and col.get("type") == "text"
+                            and col.get("name") == self.test_collection_name
+                        ):
+                            return True
 
             return False
 

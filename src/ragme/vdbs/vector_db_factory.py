@@ -54,7 +54,7 @@ def create_vector_database(
 
     # Use collection name from config if not provided
     if collection_name is None:
-        collection_name = db_config.get("collection_name", "RagMeDocs")
+        collection_name = config.get_text_collection_name(db_type)
 
     db_type_normalized = db_config.get("type", db_type).lower()
 

@@ -163,9 +163,9 @@ def run_api_tests():
         return False
 
     # Set environment variable for test collection to ensure it overrides config
-    original_collection_name = os.environ.get("VECTOR_DB_COLLECTION_NAME")
-    os.environ["VECTOR_DB_COLLECTION_NAME"] = get_test_collection_name()
-    print(f"🔧 Set VECTOR_DB_COLLECTION_NAME={get_test_collection_name()}")
+    original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
+    os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
+    print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
 
     # Restart backend services to pick up the new test configuration
     print("🔄 Restarting backend services with test configuration...")
@@ -259,13 +259,13 @@ def run_api_tests():
         # Always restore configuration and environment
         if "original_collection_name" in locals():
             if original_collection_name is not None:
-                os.environ["VECTOR_DB_COLLECTION_NAME"] = original_collection_name
+                os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = original_collection_name
                 print(
-                    f"🔧 Restored VECTOR_DB_COLLECTION_NAME={original_collection_name}"
+                    f"🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME={original_collection_name}"
                 )
             else:
-                os.environ.pop("VECTOR_DB_COLLECTION_NAME", None)
-                print("🔧 Removed VECTOR_DB_COLLECTION_NAME from environment")
+                os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
+                print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
         teardown_test_config()
 
 
@@ -281,9 +281,9 @@ async def run_agent_tests():
         return False
 
     # Set environment variable for test collection to ensure it overrides config
-    original_collection_name = os.environ.get("VECTOR_DB_COLLECTION_NAME")
-    os.environ["VECTOR_DB_COLLECTION_NAME"] = get_test_collection_name()
-    print(f"🔧 Set VECTOR_DB_COLLECTION_NAME={get_test_collection_name()}")
+    original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
+    os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
+    print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
 
     # Restart backend services to pick up the new test configuration
     print("🔄 Restarting backend services with test configuration...")
@@ -384,13 +384,13 @@ async def run_agent_tests():
         # Always restore configuration and environment
         if "original_collection_name" in locals():
             if original_collection_name is not None:
-                os.environ["VECTOR_DB_COLLECTION_NAME"] = original_collection_name
+                os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = original_collection_name
                 print(
-                    f"🔧 Restored VECTOR_DB_COLLECTION_NAME={original_collection_name}"
+                    f"🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME={original_collection_name}"
                 )
             else:
-                os.environ.pop("VECTOR_DB_COLLECTION_NAME", None)
-                print("🔧 Removed VECTOR_DB_COLLECTION_NAME from environment")
+                os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
+                print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
         teardown_test_config()
 
 

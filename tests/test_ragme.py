@@ -43,7 +43,10 @@ def test_ragme_init():
         patch("llama_index.core.agent.workflow.FunctionAgent") as mock_function_agent,
         patch.dict(
             "os.environ",
-            {"VECTOR_DB_TYPE": "weaviate", "VECTOR_DB_COLLECTION_NAME": "RagMeDocs"},
+            {
+                "VECTOR_DB_TYPE": "weaviate",
+                "VECTOR_DB_TEXT_COLLECTION_NAME": "RagMeDocs",
+            },
         ),
     ):
         # Reset config manager cache to ensure environment variables are picked up
@@ -79,7 +82,10 @@ def test_write_webpages_to_weaviate():
         patch("llama_index.core.agent.workflow.FunctionAgent") as mock_function_agent,
         patch.dict(
             "os.environ",
-            {"VECTOR_DB_TYPE": "weaviate", "VECTOR_DB_COLLECTION_NAME": "RagMeDocs"},
+            {
+                "VECTOR_DB_TYPE": "weaviate",
+                "VECTOR_DB_TEXT_COLLECTION_NAME": "RagMeDocs",
+            },
         ),
     ):
         # Reset config manager cache to ensure environment variables are picked up

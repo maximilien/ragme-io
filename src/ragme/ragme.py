@@ -68,12 +68,8 @@ class RagMe:
         if collection_name is None:
             from src.ragme.utils.config_manager import config
 
-            db_config = config.get_database_config()
-            collection_name = (
-                db_config.get("collection_name", "RagMeDocs")
-                if db_config
-                else "RagMeDocs"
-            )
+            # Use the new text collection method
+            collection_name = config.get_text_collection_name()
 
         self.collection_name = collection_name
 

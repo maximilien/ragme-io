@@ -27,7 +27,7 @@ interface AppConfig {
   };
   vector_database?: {
     type?: string;
-    collection_name?: string;
+    collections?: Array<{ name?: string; type?: string }>;
   };
   network?: {
     frontend?: {
@@ -620,7 +620,11 @@ io.on('connection', socket => {
       // Get vector DB info from the loaded configuration
       const vectorDbInfo = {
         dbType: appConfig?.vector_database?.type || 'weaviate-local',
-        collectionName: appConfig?.vector_database?.collection_name || 'RagMeDocs',
+        type: appConfig?.vector_database?.type || 'weaviate-local',
+        collections: appConfig?.vector_database?.collections || [
+          { name: 'RagMeDocs', type: 'text' },
+          { name: 'ImageDocs', type: 'images' },
+        ],
       };
 
       logger.info(`Vector DB Info: ${JSON.stringify(vectorDbInfo)}`);

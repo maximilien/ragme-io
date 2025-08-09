@@ -170,6 +170,27 @@ The configuration system allows you to customize:
 
 **🔄 Environment Switching:** Switch between different application environments (e.g., RAGme ↔ YourFancyRAG) by simply changing the `.env` file and restarting with `./stop.sh && ./start.sh`. All configuration changes (APPLICATION_*, VECTOR_DB_TYPE, collection names) take effect immediately.
 
+### Multiple Collections Support (Text + Images)
+
+RAGme supports multiple collections per vector database to enable different content types such as text documents and images. Configure in `config.yaml` under each database as a `collections` array:
+
+```yaml
+vector_databases:
+  default: "weaviate-cloud"
+  databases:
+    - name: "weaviate-cloud"
+      type: "weaviate"
+      url: "${WEAVIATE_URL}"
+      api_key: "${WEAVIATE_API_KEY}"
+      collections:
+        - name: "RagMeDocs"
+          type: "text"
+        - name: "ImageDocs"
+          type: "images"
+```
+
+The backend automatically uses the text collection for document operations. The `/config` endpoint returns the list of collections, and the frontend top bar shows `Collections:` with icons.
+
 ## 🏃‍♂️ Run RAGme.ai
 
 ### Quick Start (All Services)

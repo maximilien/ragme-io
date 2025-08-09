@@ -2944,8 +2944,23 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         }
         
         if (this.vectorDbInfo) {
-            vectorDbTypeElement.textContent = this.vectorDbInfo.dbType || 'Unknown';
-            vectorDbCollectionElement.textContent = this.vectorDbInfo.collectionName || 'Unknown';
+            vectorDbTypeElement.textContent = this.vectorDbInfo.dbType || this.vectorDbInfo.type || 'Unknown';
+
+            // Render collections with icons
+            const collections = this.vectorDbInfo.collections || [];
+            if (Array.isArray(collections) && collections.length > 0) {
+                const parts = collections.map(col => {
+                    const type = (col && col.type) || 'text';
+                    const name = (col && col.name) || 'Unknown';
+                    const iconClass = type === 'images' ? 'fas fa-image' : 'fas fa-file-alt';
+                    return `<span class="collection-item"><i class="${iconClass}"></i> ${this.escapeHtml(name)}</span>`;
+                });
+                vectorDbCollectionElement.innerHTML = parts.join(' ');
+            } else {
+                // Backward compatibility: single collectionName
+                const single = this.vectorDbInfo.collectionName || 'Unknown';
+                vectorDbCollectionElement.textContent = single;
+            }
             vectorDbInfoElement.style.display = 'flex';
         } else {
             vectorDbTypeElement.textContent = 'Loading...';
