@@ -32,6 +32,19 @@ def create_vector_database(
         if db_type is None:
             # Use default from config
             db_type = config.get("vector_databases.default", "weaviate-local")
+            # If config returns the unsubstituted placeholder, use fallback
+            if db_type == "${VECTOR_DB_TYPE}":
+                db_type = "weaviate-local"
+
+    # Map environment variable values to config database names
+    db_type_mapping = {
+        "weaviate": "weaviate-cloud",
+        "weaviate-local": "weaviate-local",
+        "milvus": "milvus-local",
+        "milvus-local": "milvus-local",
+        "milvus-cloud": "milvus-cloud",
+    }
+    db_type = db_type_mapping.get(db_type, db_type)
 
     # Get database configuration
     db_config = config.get_database_config(db_type)

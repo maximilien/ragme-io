@@ -327,7 +327,7 @@ JSON response:"""
             FunctionTool.from_defaults(
                 fn=dispatch_to_functional_agent,
                 name="functional_operations",
-                description="Use this tool for functional operations like adding URLs, deleting documents, listing documents, resetting the collection, crawling webpages, or getting vector database information.",
+                description="Use this tool for functional operations like adding URLs, deleting documents, listing documents, counting documents, resetting the collection, crawling webpages, or getting vector database information.",
             ),
             FunctionTool.from_defaults(
                 fn=dispatch_to_query_agent,
@@ -345,6 +345,7 @@ JSON response:"""
    - Adding URLs to the collection
    - Deleting documents
    - List documents
+   - Count documents
    - Reset the collection
    - Crawl webpages
    - Get vector database info

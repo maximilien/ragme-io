@@ -4,6 +4,43 @@ This guide covers common issues and their solutions for RAGme AI.
 
 ## 🚨 Common Issues
 
+### Environment Variable Configuration Not Taking Effect
+
+**Problem**: Changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) doesn't take effect after restart.
+
+**Symptoms**:
+- Application still shows old name/title after switching `.env` files
+- Still connecting to old vector database collection
+- Environment changes appear ignored
+
+**Solution**: ✅ **FIXED!** This was a critical bug that has been resolved. The system now properly reads and applies all environment variable changes:
+
+1. **Verify configuration loading**:
+   ```bash
+   ./tools/config-validator.sh
+   ```
+
+2. **Check environment variables are loaded**:
+   ```bash
+   python3 -c "
+   from src.ragme.utils.config_manager import config
+   print(f'App name: {config.get(\"application.name\")}')
+   print(f'DB type: {config.get(\"vector_databases.default\")}')
+   "
+   ```
+
+3. **Proper environment switching**:
+   ```bash
+   ./stop.sh
+   cp .env.app.viewfinder-ai .env  # or your desired environment
+   ./start.sh
+   ```
+
+**What was fixed**:
+- Environment variable syntax in config.yaml (changed from `{$VAR}` to `${VAR}`)
+- Dynamic VECTOR_DB_TYPE selection and mapping
+- Proper configuration loading and substitution
+
 ### Vector Database Connection Errors
 
 **Problem**: Connection errors when starting services.

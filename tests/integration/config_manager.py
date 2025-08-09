@@ -9,6 +9,7 @@ and restoring it after tests complete to avoid polluting the developer's main co
 """
 
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -31,8 +32,11 @@ class TestConfigManager:
         self.original_config_path = Path("config.yaml")
         self.backup_config_path = Path("config.yaml.test_backup")
         self.temp_config_path = Path("config.yaml.test_temp")
+        self.env_file_path = Path(".env")
+        self.env_backup_path = Path(".env.integration_backup")
         self.original_config = None
         self.modified_config = None
+        self.env_modified = False
 
     def backup_config(self) -> bool:
         """
@@ -58,6 +62,44 @@ class TestConfigManager:
 
         except Exception as e:
             print(f"❌ Failed to backup config.yaml: {e}")
+            return False
+
+    def backup_and_modify_env_file(self) -> bool:
+        """
+        Backup and modify .env file to use test collection name.
+
+        Returns:
+            True if modification was successful, False otherwise
+        """
+        try:
+            if not self.env_file_path.exists():
+                print(f"Warning: {self.env_file_path} does not exist")
+                return True  # Not an error if .env doesn't exist
+
+            # Backup original .env
+            shutil.copy2(self.env_file_path, self.env_backup_path)
+
+            # Read and modify .env content
+            with open(self.env_file_path) as f:
+                env_content = f.read()
+
+            # Replace VECTOR_DB_COLLECTION_NAME value
+            env_content = re.sub(
+                r"(VECTOR_DB_COLLECTION_NAME=).*",
+                f"\\1{self.test_collection_name}",
+                env_content,
+            )
+
+            # Write modified content back
+            with open(self.env_file_path, "w") as f:
+                f.write(env_content)
+
+            self.env_modified = True
+            print("🔧 Temporarily modified .env file with test collection name")
+            return True
+
+        except Exception as e:
+            print(f"❌ Error modifying .env file: {e}")
             return False
 
     def modify_config_for_tests(self) -> bool:
@@ -142,6 +184,33 @@ class TestConfigManager:
             print(f"❌ Failed to restore config.yaml: {e}")
             return False
 
+    def restore_env_file(self) -> bool:
+        """
+        Restore the original .env file from backup.
+
+        Returns:
+            True if restoration was successful, False otherwise
+        """
+        try:
+            if not self.env_modified:
+                return True  # Nothing to restore
+
+            if self.env_backup_path.exists():
+                shutil.copy2(self.env_backup_path, self.env_file_path)
+                self.env_backup_path.unlink()
+                print("🔧 Restored original .env file")
+                self.env_modified = False
+                return True
+            else:
+                print(f"Warning: .env backup file {self.env_backup_path} not found")
+                # Still mark as restored to avoid repeated warnings
+                self.env_modified = False
+                return True  # Return True to not fail the cleanup
+
+        except Exception as e:
+            print(f"❌ Error restoring .env file: {e}")
+            return False
+
     def cleanup(self):
         """Clean up temporary and backup files."""
         try:
@@ -154,6 +223,11 @@ class TestConfigManager:
             if self.temp_config_path.exists():
                 self.temp_config_path.unlink()
                 print(f"🗑️ Removed temp file {self.temp_config_path}")
+
+            # Remove .env backup file
+            if self.env_backup_path.exists():
+                self.env_backup_path.unlink()
+                print(f"🗑️ Removed .env backup file {self.env_backup_path}")
 
         except Exception as e:
             print(f"Warning: Failed to cleanup temporary files: {e}")
@@ -175,6 +249,11 @@ class TestConfigManager:
             self.restore_config()
             return False
 
+        if not self.backup_and_modify_env_file():
+            # Try to restore if .env modification failed
+            self.restore_config()
+            return False
+
         print("✅ Configuration setup completed successfully")
         return True
 
@@ -188,12 +267,14 @@ class TestConfigManager:
         print("🧹 Cleaning up configuration after integration tests...")
 
         success = self.restore_config()
-        if success:
+        env_success = self.restore_env_file()
+
+        if success and env_success:
             print("✅ Configuration cleanup completed successfully")
         else:
             print("❌ Configuration cleanup failed")
 
-        return success
+        return success and env_success
 
     def get_test_collection_name(self) -> str:
         """Get the test collection name."""

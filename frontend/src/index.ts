@@ -25,6 +25,10 @@ interface AppConfig {
     description?: string;
     version?: string;
   };
+  vector_database?: {
+    type?: string;
+    collection_name?: string;
+  };
   network?: {
     frontend?: {
       port?: number;
@@ -59,7 +63,8 @@ async function loadConfiguration() {
   try {
     const response = await fetch(`${RAGME_API_URL}/config`);
     if (response.ok) {
-      appConfig = (await response.json()) as AppConfig;
+      const responseData = (await response.json()) as { status: string; config: AppConfig };
+      appConfig = responseData.config;
       logger.info('Configuration loaded from backend');
 
       // Update RAGME_API_URL if different in config
@@ -612,11 +617,13 @@ io.on('connection', socket => {
     logger.info('Getting vector database info...');
 
     try {
-      // Get vector DB info from environment variables or use defaults
+      // Get vector DB info from the loaded configuration
       const vectorDbInfo = {
-        dbType: process.env.VECTOR_DB_TYPE || 'weaviate-local',
-        collectionName: process.env.COLLECTION_NAME || 'RagMeDocs',
+        dbType: appConfig?.vector_database?.type || 'weaviate-local',
+        collectionName: appConfig?.vector_database?.collection_name || 'RagMeDocs',
       };
+
+      logger.info(`Vector DB Info: ${JSON.stringify(vectorDbInfo)}`);
 
       socket.emit('vector_db_info', {
         success: true,

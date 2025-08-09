@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+# Load environment variables from .env file
+set -a
+[ -f .env ] && . .env
+set +a
+
 # Integration test runner for RAGme AI Agents and APIs
 # This script runs comprehensive integration tests for both APIs and Agents levels
 

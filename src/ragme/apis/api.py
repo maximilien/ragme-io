@@ -18,6 +18,9 @@ from pydantic import BaseModel
 from ..ragme import RagMe
 from ..utils.config_manager import config
 
+# Force reload configuration to pick up environment variable changes
+config.reload()
+
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(
     "ignore", category=DeprecationWarning, message=".*PydanticDeprecatedSince211.*"
@@ -313,6 +316,41 @@ def filter_documents_by_date(
             filtered_documents.append(doc)
 
     return filtered_documents
+
+
+@app.get("/count-documents")
+async def count_documents(
+    date_filter: str = Query(
+        default="all",
+        description="Date filter: 'current' (this week), 'month' (this month), 'year' (this year), 'all' (all documents)",
+    ),
+):
+    """
+    Get the count of documents in the RAG system.
+
+    Args:
+        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+
+    Returns:
+        dict: Document count information
+    """
+    try:
+        # Use efficient count method if available
+        if hasattr(ragme.vector_db, "count_documents"):
+            count = ragme.vector_db.count_documents(date_filter)
+        else:
+            # Fallback to old method for backward compatibility
+            all_documents = ragme.list_documents(limit=1000, offset=0)
+            filtered_documents = filter_documents_by_date(all_documents, date_filter)
+            count = len(filtered_documents)
+
+        return {
+            "status": "success",
+            "count": count,
+            "date_filter": date_filter,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/list-documents")
@@ -661,6 +699,21 @@ async def get_frontend_config():
             }
             safe_mcp_servers.append(safe_server)
 
+        # Get vector database configuration
+        db_config = config.get_database_config()
+        vector_db_info = {
+            "type": (
+                db_config.get("type", "weaviate-local")
+                if db_config
+                else "weaviate-local"
+            ),
+            "collection_name": (
+                db_config.get("collection_name", "RagMeDocs")
+                if db_config
+                else "RagMeDocs"
+            ),
+        }
+
         # Build safe configuration for frontend
         frontend_config_data = {
             "application": {
@@ -668,6 +721,7 @@ async def get_frontend_config():
                 "title": app_config.get("title", "RAGme.ai Assistant"),
                 "version": app_config.get("version", "1.0.0"),
             },
+            "vector_database": vector_db_info,
             "frontend": frontend_config,
             "client": client_config,
             "features": features_config,

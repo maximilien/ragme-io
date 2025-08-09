@@ -195,6 +195,57 @@ class MilvusVectorDatabase(VectorDatabase):
             )
         return docs
 
+    def count_documents(self, date_filter: str = "all") -> int:
+        """Count documents in Milvus efficiently."""
+        self._ensure_client()
+        if self.client is None:
+            warnings.warn("Milvus client is not available. Returning 0.")
+            return 0
+
+        try:
+            # For Milvus, we'll use a simple count query
+            # Note: Milvus doesn't have direct date filtering in count, so we'll use a query approach
+            if date_filter == "all":
+                # Get total count by querying with no filters
+                total_results = self.client.query(
+                    self.collection_name,
+                    output_fields=["id"],
+                    limit=16384,  # Milvus max limit
+                )
+                return len(total_results)
+            else:
+                # For date filtering, we need to fall back to listing and filtering
+                # since Milvus metadata filtering is more complex
+                all_docs = self.list_documents(limit=10000, offset=0)
+                if date_filter == "all":
+                    return len(all_docs)
+
+                # Simple date filtering
+                import datetime
+
+                now = datetime.datetime.now()
+
+                if date_filter == "current":
+                    start_of_week = now - datetime.timedelta(days=now.weekday())
+                    cutoff = start_of_week.isoformat()
+                elif date_filter == "month":
+                    cutoff = now.replace(day=1).isoformat()
+                elif date_filter == "year":
+                    cutoff = now.replace(month=1, day=1).isoformat()
+                else:
+                    return len(all_docs)
+
+                count = 0
+                for doc in all_docs:
+                    date_added = doc.get("metadata", {}).get("date_added", "")
+                    if date_added >= cutoff:
+                        count += 1
+                return count
+
+        except Exception as e:
+            print(f"Error counting documents in Milvus: {str(e)}")
+            return 0
+
     def delete_document(self, document_id: str) -> bool:
         """Delete a document from Milvus by ID."""
         self._ensure_client()
