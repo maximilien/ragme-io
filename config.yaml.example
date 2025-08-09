@@ -54,7 +54,11 @@ vector_databases:
     - name: "weaviate-local"
       type: "weaviate-local"
       url: "http://localhost:8080"
-      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "images"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -65,7 +69,11 @@ vector_databases:
       type: "weaviate"
       url: "${WEAVIATE_URL}"  # From environment
       api_key: "${WEAVIATE_API_KEY}"  # From environment
-      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "images"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -75,7 +83,9 @@ vector_databases:
     - name: "milvus-local"
       type: "milvus"
       uri: "milvus_demo.db"  # File-based for local development
-      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -86,7 +96,9 @@ vector_databases:
       type: "milvus"
       uri: "${MILVUS_URI}"  # From environment
       token: "${MILVUS_TOKEN}"  # From environment
-      collection_name: "${VECTOR_DB_COLLECTION_NAME}"
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -116,8 +128,8 @@ agents:
     type: "ragme"
     llm_model: "gpt-4o-mini"
     system_prompt: |
-      You are a helpful assistant that can write the contents of urls to ${VECTOR_DB_COLLECTION_NAME}
-      collection, as well as answering questions about stored documents.
+      You are a helpful assistant that can write the contents of urls to text document
+      collections, as well as answering questions about stored documents.
       
       MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
       

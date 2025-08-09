@@ -73,7 +73,11 @@ vector_databases:
     - name: "weaviate-local"
       type: "weaviate-local"
       url: "http://localhost:8080"
-      collection_name: "RagMeDocs"
+      collections:
+        - name: "RagMeDocs"
+          type: "text"
+        - name: "ImageDocs"
+          type: "images"
       embedding_model: "text-embedding-3-large"
       chunk_size: 1000
       chunk_overlap: 100
@@ -226,6 +230,16 @@ environment:
   optional:
     - "WEAVIATE_API_KEY"
     - "WEAVIATE_URL"
+    - "WEAVIATE_LOCAL_URL"
+    - "MILVUS_URI"
+    - "MILVUS_TOKEN"
+    - "RAGME_API_URL"
+    - "RAGME_MCP_URL"
+    - "RAGME_API_PORT"
+    - "RAGME_MCP_PORT"
+    - "RAGME_FRONTEND_PORT"
+    - "VECTOR_DB_TEXT_COLLECTION_NAME"   # preferred override for text collection
+    - "VECTOR_DB_IMAGE_COLLECTION_NAME"  # preferred override for image collection
 ```
 
 ### Configuration Loading
@@ -253,7 +267,7 @@ RAGme supports seamless switching between different application environments by 
 
 **Environment Variables Used:**
 - `APPLICATION_NAME`, `APPLICATION_TITLE`, `APPLICATION_DESCRIPTION`
-- `VECTOR_DB_TYPE`, `VECTOR_DB_COLLECTION_NAME`
+- `VECTOR_DB_TYPE`, `VECTOR_DB_TEXT_COLLECTION_NAME`, `VECTOR_DB_IMAGE_COLLECTION_NAME`
 - `WEAVIATE_URL`, `WEAVIATE_API_KEY` (for Weaviate)
 - `MILVUS_URI`, `MILVUS_TOKEN` (for Milvus)
 
@@ -410,7 +424,9 @@ vector_databases:
     - name: "custom-db"
       type: "custom"
       connection_string: "${CUSTOM_DB_URL}"
-      collection_name: "documents"
+      collections:
+        - name: "documents"
+          type: "text"
       custom_settings:
         batch_size: 100
         timeout: 30

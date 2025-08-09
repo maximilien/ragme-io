@@ -159,6 +159,10 @@ See [CI_CD.md](CI_CD.md) for detailed testing information.
 - **Documentation**: Complete documentation with examples
 - **CI/CD**: Automated testing and quality checks
 
+## 🖼️ Image Collections & Multiple Collections Support
+
+RAGme supports multiple collections per vector database to enable different content types (e.g., text documents and images). The backend exposes configured collections via `/config`, and the frontend top bar shows `Collections:` with file and image icons. See `docs/CONFIG.md` for configuration examples.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details. 

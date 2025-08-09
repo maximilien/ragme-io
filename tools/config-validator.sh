@@ -222,12 +222,50 @@ if 'vector_databases' in config:
                 print_error(f"Database {i} must be a dictionary")
                 continue
                 
-            required_db_fields = ['name', 'type', 'collection_name']
+            # Base required fields
+            required_db_fields = ['name', 'type']
             for field in required_db_fields:
                 if field not in db:
                     print_error(f"Database {i} missing required field: {field}")
                 elif not isinstance(db[field], str) or not db[field].strip():
                     print_error(f"Database {i} field '{field}' must be a non-empty string")
+
+            # Collections validation (new schema)
+            if 'collections' in db:
+                collections = db.get('collections')
+                if not isinstance(collections, list):
+                    print_error(f"Database {i} 'collections' must be a list")
+                elif len(collections) == 0:
+                    print_error(f"Database {i} 'collections' cannot be empty")
+                else:
+                    text_found = False
+                    for j, col in enumerate(collections):
+                        if not isinstance(col, dict):
+                            print_error(f"Database {i} collection {j} must be a dictionary")
+                            continue
+                        # Validate collection name and type
+                        name = col.get('name')
+                        ctype = col.get('type')
+                        if not isinstance(name, str) or not name.strip():
+                            print_error(f"Database {i} collection {j} missing or invalid 'name'")
+                        if not isinstance(ctype, str) or not ctype.strip():
+                            print_error(f"Database {i} collection {j} missing or invalid 'type'")
+                        else:
+                            if ctype not in ('text', 'images'):
+                                print_warning(f"Database {i} collection {j} has unrecognized type '{ctype}'. Expected 'text' or 'images'")
+                            if ctype == 'text':
+                                text_found = True
+                    if not text_found:
+                        print_warning(f"Database {i} has no 'text' collection; defaulting may apply (RagMeDocs)")
+            # Legacy single collection_name support
+            elif 'collection_name' in db:
+                cname = db.get('collection_name')
+                if not isinstance(cname, str) or not cname.strip():
+                    print_error(f"Database {i} field 'collection_name' must be a non-empty string")
+                else:
+                    print_warning(f"Database {i} uses legacy 'collection_name'. Consider migrating to 'collections' array with types")
+            else:
+                print_error(f"Database {i} must define either 'collections' (preferred) or legacy 'collection_name'")
 
 # Validate agents section
 if 'agents' in config:
