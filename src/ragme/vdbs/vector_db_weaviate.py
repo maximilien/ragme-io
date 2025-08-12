@@ -32,43 +32,32 @@ class WeaviateVectorDatabase(VectorDatabase):
     def _create_client(self):
         """Create the Weaviate client."""
         import os
-
         import weaviate
-        from weaviate.auth import Auth
 
-        weaviate_api_key = os.getenv("WEAVIATE_API_KEY")
+        # Get environment variables
         weaviate_url = os.getenv("WEAVIATE_URL")
+        weaviate_api_key = os.getenv("WEAVIATE_API_KEY")
 
-        if not weaviate_api_key:
-            raise ValueError("WEAVIATE_API_KEY is not set")
-        if not weaviate_url:
-            raise ValueError("WEAVIATE_URL is not set")
+        if not weaviate_url or not weaviate_api_key:
+            raise ValueError(
+                "WEAVIATE_URL and WEAVIATE_API_KEY environment variables are required"
+            )
 
-        # Add timeout configuration to prevent hanging connections
+        # Ensure URL has proper scheme
+        if not weaviate_url.startswith(("http://", "https://")):
+            weaviate_url = f"https://{weaviate_url}"
+
+        # Remove trailing slash if present
+        weaviate_url = weaviate_url.rstrip("/")
+
         try:
-            # Try to use timeout configuration if available
-            try:
-                from weaviate.classes.config import Config
+            # Connect to Weaviate using the v4 client
+            self.client = weaviate.connect_to_weaviate_cloud(
+                cluster_url=weaviate_url,
+                auth_credentials=weaviate.auth.AuthApiKey(weaviate_api_key),
+            )
 
-                self.client = weaviate.connect_to_weaviate_cloud(
-                    cluster_url=weaviate_url,
-                    auth_credentials=Auth.api_key(weaviate_api_key),
-                    additional_config=Config(
-                        timeout=Config.Timeout(
-                            init=10,  # 10 second timeout for initialization
-                            query=30,  # 30 second timeout for queries
-                            insert=30,  # 30 second timeout for inserts
-                        )
-                    ),
-                )
-            except ImportError:
-                # Fallback to basic connection if Config is not available
-                self.client = weaviate.connect_to_weaviate_cloud(
-                    cluster_url=weaviate_url,
-                    auth_credentials=Auth.api_key(weaviate_api_key),
-                )
         except Exception as e:
-            # Provide more helpful error message
             raise ConnectionError(
                 f"Failed to connect to Weaviate at {weaviate_url}: {str(e)}"
             ) from e
@@ -78,28 +67,89 @@ class WeaviateVectorDatabase(VectorDatabase):
         from weaviate.classes.config import Configure, DataType, Property
 
         if not self.client.collections.exists(self.collection_name):
-            self.client.collections.create(
-                self.collection_name,
-                description="A dataset with the contents of RagMe docs and website",
-                vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
-                properties=[
-                    Property(
-                        name="url",
-                        data_type=DataType.TEXT,
-                        description="the source URL of the webpage",
-                    ),
-                    Property(
-                        name="text",
-                        data_type=DataType.TEXT,
-                        description="the content of the webpage",
-                    ),
-                    Property(
-                        name="metadata",
-                        data_type=DataType.TEXT,
-                        description="additional metadata in JSON format",
-                    ),
-                ],
-            )
+            # Determine if this is an image collection based on collection name
+            is_image_collection = self._is_image_collection()
+            
+            if is_image_collection:
+                # Create image collection with BLOB support
+                try:
+                    self.client.collections.create(
+                        self.collection_name,
+                        description="A dataset with image content for RagMe",
+                        vectorizer_config=Configure.Vectorizer.multi2vec_google(image_fields=["image"]),
+                        properties=[
+                            Property(
+                                name="image",
+                                data_type=DataType.BLOB,
+                                description="the base64 encoded image",
+                            ),
+                            Property(
+                                name="metadata",
+                                data_type=DataType.TEXT,
+                                description="additional metadata in JSON format",
+                            ),
+                        ],
+                    )
+                except Exception:
+                    # Fallback to text vectorizer if multi2vec-google is not available
+                    print("multi2vec-google not available for images, falling back to text2vec-weaviate.")
+                    self.client.collections.create(
+                        self.collection_name,
+                        description="A dataset with image content for RagMe",
+                        vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
+                        properties=[
+                            Property(
+                                name="image",
+                                data_type=DataType.BLOB,
+                                description="the base64 encoded image",
+                            ),
+                            Property(
+                                name="metadata",
+                                data_type=DataType.TEXT,
+                                description="additional metadata in JSON format",
+                            ),
+                        ],
+                    )
+            else:
+                # Create text collection
+                self.client.collections.create(
+                    self.collection_name,
+                    description="A dataset with the contents of RagMe docs and website",
+                    vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
+                    properties=[
+                        Property(
+                            name="url",
+                            data_type=DataType.TEXT,
+                            description="the source URL of the webpage",
+                        ),
+                        Property(
+                            name="text",
+                            data_type=DataType.TEXT,
+                            description="the content of the webpage",
+                        ),
+                        Property(
+                            name="metadata",
+                            data_type=DataType.TEXT,
+                            description="additional metadata in JSON format",
+                        ),
+                    ],
+                )
+
+    def _is_image_collection(self) -> bool:
+        """Check if this collection is configured for images."""
+        from ..utils.config_manager import config
+        
+        # Check if this collection name matches any image collection in config
+        collections = config.get_collections_config()
+        for collection in collections:
+            if (isinstance(collection, dict) and 
+                collection.get("name") == self.collection_name and 
+                collection.get("type") == "images"):
+                return True
+        
+        # Also check common image collection naming patterns
+        image_patterns = ["image", "images", "ragmeimages"]
+        return any(pattern.lower() in self.collection_name.lower() for pattern in image_patterns)
 
     def write_documents(self, documents: list[dict[str, Any]]):
         """Write documents to Weaviate."""
@@ -114,6 +164,26 @@ class WeaviateVectorDatabase(VectorDatabase):
                         "metadata": metadata_text,
                     }
                 )
+
+    def write_images(self, images: list[dict[str, Any]]):
+        """Write images to Weaviate."""
+        collection = self.client.collections.get(self.collection_name)
+        with collection.batch.dynamic() as batch:
+            for img in images:
+                metadata_text = json.dumps(img.get("metadata", {}), ensure_ascii=False)
+                try:
+                    batch.add_object(
+                        properties={
+                            "image": img.get("image_data", ""),
+                            "metadata": metadata_text,
+                        }
+                    )
+                except Exception as e:
+                    print(f"Error writing image to Weaviate: {e}")
+
+    def supports_images(self) -> bool:
+        """Check if this Weaviate implementation supports images."""
+        return True
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """List documents from Weaviate."""

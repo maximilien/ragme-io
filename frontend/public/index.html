@@ -229,44 +229,64 @@
                 </button>
             </div>
             <div class="modal-body">
-                <div class="content-tabs">
-                    <button class="tab-btn active" data-tab="urls">URLs</button>
-                    <button class="tab-btn" data-tab="files">Files</button>
-                    <button class="tab-btn" data-tab="json">JSON</button>
-                </div>
-                
-                <div class="tab-content active" id="urlsTab">
-                    <div class="form-group">
-                        <label for="urlInput">Enter URLs (one per line):</label>
-                        <textarea id="urlInput" placeholder="https://example.com&#10;https://example.org" rows="5"></textarea>
+                <div class="modal-tabs">
+                    <div class="tab-header">
+                        <button class="tab-btn active" data-tab="urlTab">URLs</button>
+                        <button class="tab-btn" data-tab="filesTab">Files</button>
+                        <button class="tab-btn" data-tab="imagesTab">Images</button>
+                        <button class="tab-btn" data-tab="jsonTab">JSON</button>
                     </div>
-                </div>
-                
-                <div class="tab-content" id="filesTab">
-                    <div class="form-group">
-                        <label for="fileInput">Select files to upload:</label>
-                        <div class="file-upload-area" id="fileUploadArea">
-                            <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.md,.json,.csv" style="display: none;">
-                            <div class="file-upload-placeholder">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p>Click to select files or drag and drop</p>
-                                <p class="file-types">Supported: PDF, DOCX, TXT, MD, JSON, CSV</p>
+                    
+                    <div class="tab-content active" id="urlTab">
+                        <div class="form-group">
+                            <label for="urlsInput">Enter URLs (one per line):</label>
+                            <textarea id="urlsInput" placeholder="https://example.com/page1&#10;https://example.com/page2" rows="5"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="filesTab">
+                        <div class="form-group">
+                            <label for="fileInput">Select files to upload:</label>
+                            <div class="file-upload-area" id="fileUploadArea">
+                                <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.md,.json,.csv" style="display: none;">
+                                <div class="file-upload-placeholder">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Click to select files or drag and drop</p>
+                                    <p class="file-types">Supported: PDF, DOCX, TXT, MD, JSON, CSV</p>
+                                </div>
+                            </div>
+                            <div class="file-list" id="fileList">
+                                <!-- Selected files will be listed here -->
                             </div>
                         </div>
-                        <div class="file-list" id="fileList">
-                            <!-- Selected files will be listed here -->
+                    </div>
+                    
+                    <div class="tab-content" id="imagesTab">
+                        <div class="form-group">
+                            <label for="imageInput">Select images to upload:</label>
+                            <div class="file-upload-area" id="imageUploadArea">
+                                <input type="file" id="imageInput" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.bmp" style="display: none;">
+                                <div class="file-upload-placeholder">
+                                    <i class="fas fa-images"></i>
+                                    <p>Click to select images or drag and drop</p>
+                                    <p class="file-types">Supported: JPG, PNG, GIF, WebP, BMP</p>
+                                </div>
+                            </div>
+                            <div class="file-list" id="imageList">
+                                <!-- Selected images will be listed here with previews -->
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="tab-content" id="jsonTab">
-                    <div class="form-group">
-                        <label for="jsonInput">Enter JSON data:</label>
-                        <textarea id="jsonInput" placeholder='{"key": "value"}' rows="5"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="metadataInput">Metadata (optional):</label>
-                        <textarea id="metadataInput" placeholder='{"source": "manual", "category": "example"}' rows="3"></textarea>
+                    
+                    <div class="tab-content" id="jsonTab">
+                        <div class="form-group">
+                            <label for="jsonInput">Enter JSON data:</label>
+                            <textarea id="jsonInput" placeholder='{"key": "value"}' rows="5"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="metadataInput">Metadata (optional):</label>
+                            <textarea id="metadataInput" placeholder='{"source": "manual", "category": "example"}' rows="3"></textarea>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -127,3 +127,27 @@ class VectorDatabase(ABC):
     def cleanup(self):
         """Clean up resources and close connections."""
         pass
+
+    # Image support methods
+    @abstractmethod
+    def write_images(self, images: list[dict[str, Any]]):
+        """
+        Write images to the vector database.
+
+        Args:
+            images: List of images with 'url', 'image_data' (base64), and 'metadata' fields
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    def supports_images(self) -> bool:
+        """
+        Check if this vector database implementation supports image storage.
+
+        Returns:
+            bool: True if images are supported, False otherwise
+        """
+        pass

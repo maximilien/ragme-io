@@ -321,6 +321,144 @@ class RagMeTools:
         except Exception as e:
             return f"Error counting documents: {str(e)}"
 
+    def write_image_to_collection(self, image_url: str) -> str:
+        """
+        Add an image from a URL to the RagMe image collection.
+        
+        Args:
+            image_url: The URL of the image to add to the collection
+            
+        Returns:
+            str: Success or error message
+        """
+        try:
+            from ..utils.image_processor import image_processor
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+            
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+            image_vdb.setup()
+
+            # Process the image
+            processed_data = image_processor.process_image(image_url)
+            
+            # Encode image to base64
+            base64_data = image_processor.encode_image_to_base64(image_url)
+
+            # Check if the vector database supports images
+            if image_vdb.supports_images():
+                # Write to image collection
+                image_vdb.write_images([{
+                    "url": image_url,
+                    "image_data": base64_data,
+                    "metadata": processed_data
+                }])
+            else:
+                # Fallback: store as text document with image metadata
+                text_representation = f"Image: {image_url}\nClassification: {processed_data.get('classification', {}).get('top_prediction', {}).get('label', 'unknown')}\nMetadata: {str(processed_data)}"
+                image_vdb.write_documents([{
+                    "url": image_url,
+                    "text": text_representation,
+                    "metadata": processed_data
+                }])
+
+            return f"Successfully added image {image_url} to the collection"
+
+        except Exception as e:
+            return f"Error adding image to collection: {str(e)}"
+
+    def list_image_collection(self, limit: int = 10, offset: int = 0) -> str:
+        """
+        List images in the RagMe image collection.
+        
+        Args:
+            limit: Maximum number of images to return (default: 10)
+            offset: Number of images to skip (default: 0)
+            
+        Returns:
+            str: Formatted list of images with metadata
+        """
+        try:
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+            
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List images
+            images = image_vdb.list_documents(limit=limit, offset=offset)
+
+            if not images:
+                return "No images found in the collection."
+
+            result = f"Found {len(images)} images in the collection:\n\n"
+            
+            for i, img in enumerate(images, offset + 1):
+                metadata = img.get("metadata", {})
+                if isinstance(metadata, str):
+                    import json
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+                classification = metadata.get("classification", {})
+                top_prediction = classification.get("top_prediction", {})
+                
+                result += f"{i}. Image ID: {img.get('id', 'unknown')}\n"
+                result += f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
+                
+                if top_prediction:
+                    result += f"   Classification: {top_prediction.get('label', 'unknown')} ({top_prediction.get('confidence', 0):.2%} confidence)\n"
+                
+                if metadata.get("date_added"):
+                    result += f"   Added: {metadata.get('date_added')}\n"
+                    
+                result += "\n"
+
+            return result
+
+        except Exception as e:
+            return f"Error listing images: {str(e)}"
+
+    def delete_image_from_collection(self, image_id: str) -> str:
+        """
+        Delete an image from the RagMe image collection by ID.
+        
+        Args:
+            image_id: The ID of the image to delete
+            
+        Returns:
+            str: Success or error message
+        """
+        try:
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+            
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # Delete the image
+            success = image_vdb.delete_document(image_id)
+
+            if success:
+                return f"Successfully deleted image with ID: {image_id}"
+            else:
+                return f"Image with ID {image_id} not found"
+
+        except Exception as e:
+            return f"Error deleting image: {str(e)}"
+
     def get_all_tools(self):
         """
         Get all tools as a list of functions for use with LlamaIndex FunctionAgent.
@@ -338,4 +476,8 @@ class RagMeTools:
             self.find_urls_crawling_webpage,
             self.get_vector_db_info,
             self.count_documents,
+            # Image-related tools
+            self.write_image_to_collection,
+            self.list_image_collection,
+            self.delete_image_from_collection,
         ]
