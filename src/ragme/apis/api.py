@@ -717,7 +717,7 @@ async def get_frontend_config():
         frontend_config_data = {
             "application": {
                 "name": app_config.get("name", "RAGme"),
-                "title": app_config.get("title", "RAGme.ai Assistant"),
+                "title": app_config.get("title", "RAGme.io Assistant"),
                 "version": app_config.get("version", "1.0.0"),
             },
             "vector_database": vector_db_info,

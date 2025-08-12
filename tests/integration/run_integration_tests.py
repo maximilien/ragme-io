@@ -218,10 +218,10 @@ def run_api_tests():
 
         # Test data
         test_instance.test_url = "https://maximilien.org"
-        test_instance.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
+        test_instance.test_pdf_path = "tests/fixtures/pdfs/ragme-io.pdf"
         test_instance.test_queries = {
             "maximilien": "who is Maximilien?",
-            "ragme": "what is the RAGme-ai project?",
+            "ragme": "what is the RAGme-io project?",
         }
 
         try:
@@ -336,10 +336,10 @@ async def run_agent_tests():
 
         # Test data
         test_instance.test_url = "https://maximilien.org"
-        test_instance.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
+        test_instance.test_pdf_path = "tests/fixtures/pdfs/ragme-io.pdf"
         test_instance.test_queries = {
             "maximilien": "who is Maximilien?",
-            "ragme": "what is the RAGme-ai project?",
+            "ragme": "what is the RAGme-io project?",
         }
 
         # Initialize RagMe and RagMeAgent
@@ -434,7 +434,7 @@ def main():
     print("=" * 40)
 
     # Check if test PDF exists
-    test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
+    test_pdf_path = "tests/fixtures/pdfs/ragme-io.pdf"
     if not os.path.exists(test_pdf_path):
         print(f"❌ Test PDF not found: {test_pdf_path}")
         print(
