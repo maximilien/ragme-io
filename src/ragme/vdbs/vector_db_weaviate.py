@@ -76,7 +76,9 @@ class WeaviateVectorDatabase(VectorDatabase):
                     self.client.collections.create(
                         self.collection_name,
                         description="A dataset with image content for RagMe",
-                        vectorizer_config=Configure.Vectorizer.multi2vec_google(image_fields=["image"]),
+                        vectorizer_config=Configure.Vectorizer.multi2vec_google(
+                            image_fields=["image"]
+                        ),
                         properties=[
                             Property(
                                 name="image",
@@ -92,7 +94,10 @@ class WeaviateVectorDatabase(VectorDatabase):
                     )
                 except Exception:
                     # Fallback to text vectorizer if multi2vec-google is not available
-                    print("multi2vec-google not available for images, falling back to text2vec-weaviate.")
+                    print(
+                        "multi2vec-google not available for images, "
+                        "falling back to text2vec-weaviate."
+                    )
                     self.client.collections.create(
                         self.collection_name,
                         description="A dataset with image content for RagMe",
@@ -149,7 +154,10 @@ class WeaviateVectorDatabase(VectorDatabase):
         
         # Also check common image collection naming patterns
         image_patterns = ["image", "images", "ragmeimages"]
-        return any(pattern.lower() in self.collection_name.lower() for pattern in image_patterns)
+        return any(
+            pattern.lower() in self.collection_name.lower() 
+            for pattern in image_patterns
+        )
 
     def write_documents(self, documents: list[dict[str, Any]]):
         """Write documents to Weaviate."""
@@ -217,8 +225,8 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             documents.append(doc)
 
-        # Sort by creation time (most recent first) - Weaviate doesn't support sorting in query
-        # So we'll sort the results after fetching
+        # Sort by creation time (most recent first) - Weaviate doesn't support 
+        # sorting in query. So we'll sort the results after fetching
         documents.sort(
             key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
         )

@@ -25,10 +25,11 @@ class RagMeTools:
 
     def __init__(self, ragme_instance):
         """
-        Initialize the RagMeTools with a reference to the main RagMe instance.
+        Initialize RagMeTools with a reference to the main RagMe instance.
 
         Args:
-            ragme_instance: The RagMe instance that provides access to vector database and methods
+            ragme_instance: The RagMe instance that provides access to vector 
+                           database and methods
         """
         self.ragme = ragme_instance
 
@@ -123,11 +124,12 @@ class RagMeTools:
 
     def delete_documents_by_pattern(self, pattern: str) -> str:
         """
-        Delete documents from the RagMeDocs collection that match a pattern in their name/URL.
+        Delete documents from the RagMeDocs collection that match a pattern 
+        in their name/URL.
+        
         Args:
-            pattern (str): Pattern to match against document names/URLs (supports regex-like patterns)
-        Returns:
-            str: Success message with count of deleted documents
+            pattern (str): Pattern to match against document names/URLs 
+                          (supports regex-like patterns)
         """
         try:
             import re
@@ -181,7 +183,10 @@ class RagMeTools:
             if deleted_count == 0:
                 return f"No documents found matching pattern: {pattern}"
             else:
-                return f"Successfully deleted {deleted_count} documents matching pattern: {pattern}"
+                return (
+                    f"Successfully deleted {deleted_count} documents "
+                    f"matching pattern: {pattern}"
+                )
 
         except Exception as e:
             return f"Error deleting documents by pattern: {str(e)}"
@@ -265,13 +270,14 @@ class RagMeTools:
 
     def count_documents(self, date_filter: str = "all") -> str:
         """
-        Count the total number of documents in the collection with optional date filtering.
+        Count the total number of documents in the collection with optional 
+        date filtering.
 
         Args:
-            date_filter (str): Date filter to apply - 'all' (default), 'current' (this week),
-                             'month' (this month), or 'year' (this year)
+            date_filter: Filter by date - 'all', 'current', 'month', 'year'
+        
         Returns:
-            str: Count of documents matching the filter
+            str: Formatted count message
         """
         try:
             # Use the efficient count method from vector database
@@ -359,7 +365,15 @@ class RagMeTools:
                 }])
             else:
                 # Fallback: store as text document with image metadata
-                text_representation = f"Image: {image_url}\nClassification: {processed_data.get('classification', {}).get('top_prediction', {}).get('label', 'unknown')}\nMetadata: {str(processed_data)}"
+                classification = processed_data.get('classification', {})
+                top_pred = classification.get('top_prediction', {})
+                label = top_pred.get('label', 'unknown')
+                
+                text_representation = (
+                    f"Image: {image_url}\n"
+                    f"Classification: {label}\n"
+                    f"Metadata: {str(processed_data)}"
+                )
                 image_vdb.write_documents([{
                     "url": image_url,
                     "text": text_representation,
@@ -413,10 +427,16 @@ class RagMeTools:
                 top_prediction = classification.get("top_prediction", {})
                 
                 result += f"{i}. Image ID: {img.get('id', 'unknown')}\n"
-                result += f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
+                result += (
+                    f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
+                )
                 
                 if top_prediction:
-                    result += f"   Classification: {top_prediction.get('label', 'unknown')} ({top_prediction.get('confidence', 0):.2%} confidence)\n"
+                    label = top_prediction.get('label', 'unknown')
+                    confidence = top_prediction.get('confidence', 0)
+                    result += (
+                        f"   Classification: {label} ({confidence:.2%} confidence)\n"
+                    )
                 
                 if metadata.get("date_added"):
                     result += f"   Added: {metadata.get('date_added')}\n"

@@ -185,8 +185,9 @@ async def add_json(json_input: JSONInput):
                 # Check if a document with the same URL already exists
                 existing_doc = ragme.vector_db.find_document_by_url(unique_url)
                 if existing_doc:
-                    # Only replace if it's not a chunked document or if the new one is chunked
-                    # This prevents chunked documents from replacing regular documents
+                    # Only replace if it's not a chunked document or if the new one 
+                    # is chunked. This prevents chunked documents from replacing 
+                    # regular documents
                     existing_is_chunked = existing_doc.get("metadata", {}).get(
                         "is_chunked"
                     ) or existing_doc.get("metadata", {}).get("is_chunk")
@@ -204,7 +205,8 @@ async def add_json(json_input: JSONInput):
                         ragme.vector_db.delete_document(existing_doc["id"])
                         replaced_count += 1
                     elif existing_is_chunked and not new_is_chunked:
-                        # Skip adding this document to avoid replacing chunked document with regular document
+                        # Skip adding this document to avoid replacing chunked 
+                        # document with regular document
                         continue
 
                 # Add the new document with unique URL
@@ -230,7 +232,8 @@ async def add_json(json_input: JSONInput):
 
     except Exception as e:
         # Assuming 'logger' is defined elsewhere or needs to be imported
-        # For now, using print for simplicity as 'logger' is not defined in the original file
+        # For now, using print for simplicity as 'logger' is not defined 
+        # in the original file
         print(f"Error adding JSON: {e}")
         return {"status": "error", "message": str(e)}
 
@@ -322,7 +325,10 @@ def filter_documents_by_date(
 async def count_documents(
     date_filter: str = Query(
         default="all",
-        description="Date filter: 'current' (this week), 'month' (this month), 'year' (this year), 'all' (all documents)",
+        description=(
+            "Date filter: 'current' (this week), 'month' (this month), "
+            "'year' (this year), 'all' (all documents)"
+        ),
     ),
 ):
     """
@@ -699,8 +705,11 @@ async def upload_images(files: list[UploadFile] = File(...)):
                 try:
                     # Process image metadata and classification
                     # For uploaded files, we need to use the temp file path instead of URL
-                    image_metadata = image_processor.get_image_metadata(f"file://{temp_file_path}")
-                    image_classification = image_processor.classify_image_with_tensorflow(f"file://{temp_file_path}")
+                    file_path = f"file://{temp_file_path}"
+                    image_metadata = image_processor.get_image_metadata(file_path)
+                    image_classification = (
+                        image_processor.classify_image_with_tensorflow(file_path)
+                    )
                     
                     # Combine metadata
                     combined_metadata = {
@@ -726,7 +735,14 @@ async def upload_images(files: list[UploadFile] = File(...)):
                         }])
                     else:
                         # Fallback: store as text document with image metadata
-                        text_representation = f"Image: {file.filename}\nClassification: {image_classification.get('top_prediction', {}).get('label', 'unknown')}\nMetadata: {str(combined_metadata)}"
+                        top_pred = image_classification.get('top_prediction', {})
+                        label = top_pred.get('label', 'unknown')
+                        
+                        text_representation = (
+                            f"Image: {file.filename}\n"
+                            f"Classification: {label}\n"
+                            f"Metadata: {str(combined_metadata)}"
+                        )
                         image_vdb.write_documents([{
                             "url": temp_url,
                             "text": text_representation,
