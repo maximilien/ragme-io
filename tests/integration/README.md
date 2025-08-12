@@ -23,10 +23,10 @@ The integration tests implement a complete scenario that validates the end-to-en
 ### Test Data
 
 - **Test URL**: `https://maximilien.org` - Used for testing URL document addition
-- **Test PDF**: `tests/fixtures/pdfs/ragme-ai.pdf` - Used for testing PDF document addition
+- **Test PDF**: `tests/fixtures/pdfs/ragme-io.pdf` - Used for testing PDF document addition
 - **Test Queries**:
   - "who is Maximilien?" - Should return information about Maximilien from the URL document
-  - "what is the RAGme-ai project?" - Should return detailed information about the RAGme-ai project from the PDF document
+  - "what is the RAGme-io project?" - Should return detailed information about the RAGme-io project from the PDF document
 
 ## Prerequisites
 
@@ -39,7 +39,7 @@ Before running the integration tests, ensure:
 
 2. **Test PDF exists**:
    ```bash
-   ls tests/fixtures/pdfs/ragme-ai.pdf
+   ls tests/fixtures/pdfs/ragme-io.pdf
    ```
 
 3. **Python dependencies are installed**:
@@ -201,7 +201,7 @@ The tests automatically:
 - **Test Collection Name**: `test_integration`
 - **Test Documents**: 
   - URL: `https://maximilien.org`
-  - PDF: `tests/fixtures/pdfs/ragme-ai.pdf`
+  - PDF: `tests/fixtures/pdfs/ragme-io.pdf`
 
 ### Manual Configuration Cleanup
 
@@ -226,7 +226,7 @@ This will restore your original `config.yaml` and remove backup files.
 2. **Test PDF missing**:
    ```bash
    # Ensure the test PDF exists
-   ls tests/fixtures/pdfs/ragme-ai.pdf
+   ls tests/fixtures/pdfs/ragme-io.pdf
    ```
 
 3. **Configuration issues**:

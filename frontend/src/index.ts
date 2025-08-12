@@ -696,7 +696,7 @@ app.get('/api/config', (req, res) => {
   const safeConfig = {
     application: {
       name: appConfig.application?.name || 'RAGme',
-      title: appConfig.application?.title || 'RAGme.ai Assistant',
+      title: appConfig.application?.title || 'RAGme.io Assistant',
       version: appConfig.application?.version || '1.0.0',
     },
     frontend: appConfig.frontend || {},
@@ -726,7 +726,7 @@ async function startServer() {
     3020;
 
   server.listen(finalPort, () => {
-    const appName = appConfig.application?.name || 'RAGme.ai Assistant';
+    const appName = appConfig.application?.name || 'RAGme.io Assistant';
     logger.info(`🤖 ${appName} Frontend running on port ${finalPort}`);
     logger.info(`Open http://localhost:${finalPort} in your browser`);
     logger.info(`RAGme API: ${RAGME_API_URL}`);

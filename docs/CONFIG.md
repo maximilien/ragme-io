@@ -36,7 +36,7 @@ The configuration is organized into logical sections:
 application:
   name: "RAGme"
   version: "0.1.0"
-  title: "🤖 RAGme.ai Assistant"
+  title: "🤖 RAGme.io Assistant"
   description: "RAGme is a RAG system that uses vector databases and LLMs for intelligent document retrieval."
 ```
 
@@ -304,7 +304,7 @@ logging:
 # config.yaml for production
 application:
   name: "RAGme Production"
-  title: "🤖 RAGme.ai Assistant"
+  title: "🤖 RAGme.io Assistant"
 
 vector_databases:
   default: "weaviate-cloud"
@@ -397,7 +397,7 @@ Response:
 {
   "application": {
     "name": "RAGme",
-    "title": "🤖 RAGme.ai Assistant",
+    "title": "🤖 RAGme.io Assistant",
     "version": "0.1.0"
   },
   "frontend": {
@@ -434,7 +434,7 @@ vector_databases:
 
 ### Agent Configuration
 
-RAGme.ai uses a sophisticated three-agent architecture. Configure each agent independently:
+RAGme.io uses a sophisticated three-agent architecture. Configure each agent independently:
 
 ```yaml
 agents:

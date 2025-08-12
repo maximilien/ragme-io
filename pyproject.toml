@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 packages = ["src/ragme"]
 
 [project]
-name = "ragme-ai"
+name = "ragme-io"
 version = "0.1.0"
 description = "A personal RAG system for collecting and querying web content and documents"
 readme = "README.md"

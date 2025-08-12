@@ -1,4 +1,4 @@
-# RAGme.ai
+# RAGme.io
 
 A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) websites and documents you care about and let you query them in an agentic fashion.
 
@@ -6,16 +6,16 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 <div style="display: flex; gap: 20px; margin: 20px 0;">
   <a href="images/ragme1.png" target="_blank">
-    <img src="images/ragme1.png" alt="RAGme.ai Interface - Main Chat" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <img src="images/ragme1.png" alt="RAGme.io Interface - Main Chat" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
   </a>
   <a href="images/ragme2.png" target="_blank">
-    <img src="images/ragme2.png" alt="RAGme.ai Interface - Document Management" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <img src="images/ragme2.png" alt="RAGme.io Interface - Document Management" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
   </a>
   <a href="images/ragme3.png" target="_blank">
-    <img src="images/ragme3.png" alt="RAGme.ai Interface - Visualizations" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <img src="images/ragme3.png" alt="RAGme.io Interface - Visualizations" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
   </a>
   <a href="images/ragme4.png" target="_blank">
-    <img src="images/ragme4.png" alt="RAGme.ai Interface - Prompt Ideas" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <img src="images/ragme4.png" alt="RAGme.io Interface - Prompt Ideas" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
   </a>
   </div>
 
@@ -71,8 +71,8 @@ Install and/or update the following if needed:
 ### Get code, setup dependencies
 
 ```bash
-gh repo clone maximilien/ragme-ai
-cd ragme-ai
+gh repo clone maximilien/ragme-io
+cd ragme-io
 
 # Setup virtual environment
 uv venv
@@ -191,7 +191,7 @@ vector_databases:
 
 The backend automatically uses the text collection for document operations. The `/config` endpoint returns the list of collections, and the frontend top bar shows `Collections:` with icons.
 
-## 🏃‍♂️ Run RAGme.ai
+## 🏃‍♂️ Run RAGme.io
 
 ### Quick Start (All Services)
 
@@ -317,21 +317,21 @@ The system can automatically process PDF and DOCX files by monitoring a watch di
 ### Current affairs
 
 1. Go to [Google News](https://news.google.com/home?hl=en-US&gl=US&ceid=US:en) and add a few articles you care about
-2. Ask RAGme.ai to summarize or ask any question about the article
+2. Ask RAGme.io to summarize or ask any question about the article
 
 ### Blogs 
 
 1. Ask `Crawl my <favorite.blog.url> up to 10 posts and add to my collection`
-2. Ask RAGme.ai questions about the blog posts ingested
+2. Ask RAGme.io questions about the blog posts ingested
 
 ### Code
 
 1. Find your favorite OSS GitHub project and ask `Crawl my <favorite.oss.github.url> up to 10 deep and add to my collection`
-2. Ask RAGme.ai questions about the project, e.g., give a quick user guide
+2. Ask RAGme.io questions about the project, e.g., give a quick user guide
 
 ## 🏗️ Architecture
 
-RAGme.ai uses a multi-service architecture with a sophisticated three-agent system:
+RAGme.io uses a multi-service architecture with a sophisticated three-agent system:
 
 ```mermaid
 flowchart TB
@@ -359,7 +359,7 @@ flowchart TB
 
 ### Three-Agent Architecture ⭐ **NEW!**
 
-RAGme.ai now features a sophisticated three-agent architecture that provides intelligent query routing and specialized processing:
+RAGme.io now features a sophisticated three-agent architecture that provides intelligent query routing and specialized processing:
 
 #### 1. **RagMeAgent (Dispatcher)**
 - **Purpose**: Routes user queries to appropriate specialized agents

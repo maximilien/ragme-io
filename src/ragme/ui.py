@@ -57,12 +57,12 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Welcome to the RAGme.ai Assistant! I can help you RAG web pages and answer questions about them. How can I help you today?",
+            "content": "Welcome to the RAGme.io Assistant! I can help you RAG web pages and answer questions about them. How can I help you today?",
         }
     ]
 
 # Page header
-st.title("🤖 RAGme.ai Assistant")
+st.title("🤖 RAGme.io Assistant")
 st.markdown(
     "Search and create reports through the collection of web pages (crawled or added manually)"
 )

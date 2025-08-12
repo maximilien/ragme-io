@@ -1,20 +1,20 @@
-# RAGme.ai: Personal RAG Agent for Web Content
+# RAGme.io: Personal RAG Agent for Web Content
 ## A Comprehensive Overview
 
 <!-- 
 To generate PDF or HTML from this presentation:
-npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-ai.pdf
-npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-ai.html
+npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-io.pdf
+npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-io.html
 
 For HTML with speaker notes:
-npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/Desktop/ragme-ai.html
+npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/Desktop/ragme-io.html
 -->
 
 ---
 
-## 🎯 What is RAGme.ai?
+## 🎯 What is RAGme.io?
 
-**RAGme.ai** is a personalized agent that uses [Retrieval-Augmented Generation (RAG)](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) to process websites and documents you care about, enabling intelligent querying through an LLM agent.
+**RAGme.io** is a personalized agent that uses [Retrieval-Augmented Generation (RAG)](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) to process websites and documents you care about, enabling intelligent querying through an LLM agent.
 
 ### Core Concept
 - **RAG**: Combines document retrieval with AI generation
@@ -30,7 +30,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 ### Modern Three-Pane Layout
 
 <div style="display: flex; justify-content: center; margin: 20px 0;">
-  <img src="../images/ragme1.png" alt="RAGme.ai Interface - Main Chat" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+  <img src="../images/ragme1.png" alt="RAGme.io Interface - Main Chat" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
 </div>
 
 **Key Features:**
@@ -46,7 +46,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 ### Interactive Document Dashboard
 
 <div style="display: flex; justify-content: center; margin: 20px 0;">
-  <img src="../images/ragme2.png" alt="RAGme.ai Interface - Document Management" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+  <img src="../images/ragme2.png" alt="RAGme.io Interface - Document Management" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
 </div>
 
 **Advanced Features:**
@@ -64,7 +64,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 ### D3.js Powered Charts
 
 <div style="display: flex; justify-content: center; margin: 20px 0;">
-  <img src="../images/ragme3.png" alt="RAGme.ai Interface - Visualizations" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+  <img src="../images/ragme3.png" alt="RAGme.io Interface - Visualizations" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
 </div>
 
 **Visualization Features:**
@@ -163,7 +163,7 @@ flowchart TB
 
 ### Three-Agent Architecture ⭐ **NEW!**
 
-RAGme.ai features a sophisticated three-agent system that provides intelligent query routing and specialized processing:
+RAGme.io features a sophisticated three-agent system that provides intelligent query routing and specialized processing:
 
 #### **RagMeAgent (Dispatcher)**
 - Routes user queries to appropriate specialized agents
@@ -430,8 +430,8 @@ For detailed setup instructions, see the main [README.md](../README.md) in the p
 ### Quick Start
 ```bash
 # Clone and setup
-gh repo clone maximilien/ragme-ai
-cd ragme-ai
+gh repo clone maximilien/ragme-io
+cd ragme-io
 uv venv
 source .venv/bin/activate
 uv sync --extra dev
@@ -486,7 +486,7 @@ uv sync --extra dev
 - **API Documentation**: Available at `/docs` when API server is running
 
 ### Community
-- **GitHub**: https://github.com/maximilien/ragme-ai
+- **GitHub**: https://github.com/maximilien/ragme-io
 - **Issues**: Bug reports and feature requests
 - **Discussions**: Community support and ideas
 
@@ -497,7 +497,7 @@ uv sync --extra dev
 
 ## 🎉 Conclusion
 
-RAGme.ai represents a powerful approach to personal knowledge management:
+RAGme.io represents a powerful approach to personal knowledge management:
 
 - **🔍 Intelligent Content Discovery**: Automatically process and index your content
 - **🤖 AI-Powered Insights**: Get intelligent responses from your personal knowledge base
