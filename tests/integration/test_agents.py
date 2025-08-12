@@ -62,10 +62,10 @@ class TestAgentsIntegration:
 
         # Test data
         self.test_url = "https://maximilien.org"
-        self.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
+        self.test_pdf_path = "tests/fixtures/pdfs/ragme-io.pdf"
         self.test_queries = {
             "maximilien": "who is Maximilien?",
-            "ragme": "what is the RAGme-ai project?",
+            "ragme": "what is the RAGme-io project?",
         }
 
         # Ensure test PDF exists
@@ -245,7 +245,7 @@ class TestAgentsIntegration:
         pdf_added = False
         try:
             with open(self.test_pdf_path, "rb") as pdf_file:
-                files = {"file": ("ragme-ai.pdf", pdf_file, "application/pdf")}
+                files = {"file": ("ragme-io.pdf", pdf_file, "application/pdf")}
                 pdf_response = self.session.post(
                     f"{self.mcp_url}/tool/process_pdf", files=files, timeout=60
                 )

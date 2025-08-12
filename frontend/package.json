@@ -1,7 +1,7 @@
 {
-  "name": "ragme-ai-frontend",
+  "name": "ragme-io-frontend",
   "version": "1.0.0",
-  "description": "Modern frontend UI for RAGme.ai Assistant",
+  "description": "Modern frontend UI for RAGme.io Assistant",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -21,7 +21,7 @@
     "typescript",
     "nodejs"
   ],
-  "author": "RAGme.ai team",
+  "author": "RAGme.io team",
   "license": "MIT",
   "dependencies": {
     "compression": "^1.7.4",

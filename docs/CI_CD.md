@@ -337,8 +337,8 @@ All pull requests must:
 
 ```bash
 # Clone repository
-git clone https://github.com/maximilien/ragme-ai.git
-cd ragme-ai
+git clone https://github.com/maximilien/ragme-io.git
+cd ragme-io
 
 # Setup Python environment
 uv venv

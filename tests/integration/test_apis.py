@@ -58,10 +58,10 @@ class TestAPIIntegration:
 
         # Test data
         self.test_url = "https://maximilien.org"
-        self.test_pdf_path = "tests/fixtures/pdfs/ragme-ai.pdf"
+        self.test_pdf_path = "tests/fixtures/pdfs/ragme-io.pdf"
         self.test_queries = {
             "maximilien": "who is Maximilien?",
-            "ragme": "what is the RAGme-ai project?",
+            "ragme": "what is the RAGme-io project?",
         }
 
         # Ensure test PDF exists
@@ -263,7 +263,7 @@ class TestAPIIntegration:
         # Step 2b: Add PDF document and query
         print("Adding PDF document...")
         with open(self.test_pdf_path, "rb") as pdf_file:
-            files = {"files": ("ragme-ai.pdf", pdf_file, "application/pdf")}
+            files = {"files": ("ragme-io.pdf", pdf_file, "application/pdf")}
             pdf_response = self.session.post(
                 f"{self.base_url}/upload-files", files=files, timeout=60
             )

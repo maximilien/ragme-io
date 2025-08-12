@@ -57,7 +57,7 @@ Shows comprehensive status of all services:
 
 ## 🔧 Service Architecture
 
-RAGme AI runs four main services:
+RAGme IO runs four main services:
 
 | Service | Port | Description | URL | Default |
 |---------|------|-------------|-----|---------|
