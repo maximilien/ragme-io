@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🖼️ AI-Powered Image Support**: Complete image processing pipeline with TensorFlow ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
 - **🔄 Environment Switching Fix**: Fixed critical bug where changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) wasn't taking effect after restart. Now seamlessly switch between different application environments (e.g., RAGme ↔ Viewfinder.ai) ⭐ **FIXED!**
 - **🤖 Three-Agent Architecture**: Sophisticated agent system with intelligent query routing and specialized processing ⭐ **NEW!**
 - **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment
@@ -185,9 +186,42 @@ vector_databases:
       collections:
         - name: "RagMeDocs"
           type: "text"
-        - name: "ImageDocs"
+        - name: "RagMeImages"
           type: "images"
 ```
+
+#### 🖼️ Image Processing Features
+
+RAGme now includes comprehensive image support with AI-powered analysis:
+
+**📤 Image Upload:**
+- Support for JPG, PNG, GIF, WebP, and BMP formats
+- Frontend drag-and-drop image upload interface
+- Dedicated `/upload-images` API endpoint
+
+**🤖 AI-Powered Processing:**
+- **TensorFlow Classification**: Uses ResNet50 trained on ImageNet to classify image content
+- **EXIF Metadata Extraction**: Extracts camera settings, GPS data, and other technical metadata
+- **Smart Storage**: Images stored as base64 BLOB data in Weaviate with rich metadata
+
+**💬 Agent Tools:**
+- `write_image_to_collection(image_url)` - Add images from URLs to the collection
+- `list_image_collection(limit, offset)` - List images with AI classifications
+- `delete_image_from_collection(image_id)` - Remove images from the collection
+
+**Example Usage:**
+```
+User: "Add this image to my collection: https://example.com/photo.jpg"
+Agent: Processes image with AI classification (e.g., "Golden Retriever, 94% confidence")
+
+User: "List my images"
+Agent: Shows images with classifications, confidence scores, and metadata
+
+User: "What images do I have of dogs?"
+Agent: Searches image collection for dog-related classifications
+```
+
+The backend automatically routes image operations to the image collection. The frontend shows separate upload tabs for files and images, and the agent intelligently handles both text and image content.
 
 The backend automatically uses the text collection for document operations. The `/config` endpoint returns the list of collections, and the frontend top bar shows `Collections:` with icons.
 

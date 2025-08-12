@@ -33,6 +33,10 @@ dependencies = [
     "weaviate-client>=4.0.0",
     "weaviate-client[agents]",
     "pymilvus>=2.4.4",
+    # Image processing dependencies
+    "exif>=1.6.1",
+    "pillow>=9.0.0",
+    "tensorflow>=2.15.0",
 ]
 
 [project.optional-dependencies]

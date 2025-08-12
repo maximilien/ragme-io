@@ -646,6 +646,116 @@ async def upload_files(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.post("/upload-images")
+async def upload_images(files: list[UploadFile] = File(...)):
+    """
+    Upload and process image files (JPG, PNG, GIF, WebP, BMP) to the RAG system.
+
+    Args:
+        files: List of image files to upload
+
+    Returns:
+        dict: Status message and number of images processed
+    """
+    try:
+        from ..utils.image_processor import image_processor
+        from ..utils.config_manager import config
+
+        processed_count = 0
+        supported_formats = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+
+        # Get image collection name from config
+        image_collection_name = config.get_image_collection_name()
+        
+        # Create image-specific vector database instance
+        from ..vdbs.vector_db_factory import create_vector_database
+        image_vdb = create_vector_database(collection_name=image_collection_name)
+        
+        # Ensure the image collection is set up
+        image_vdb.setup()
+
+        for file in files:
+            try:
+                # Validate file type
+                filename = file.filename.lower()
+                file_ext = '.' + filename.split('.')[-1] if '.' in filename else ''
+                
+                if file_ext not in supported_formats:
+                    print(f"Skipping unsupported file format: {filename}")
+                    continue
+
+                # Read file content
+                content = await file.read()
+
+                # Create a temporary URL for processing
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                temp_url = f"file://{file.filename}#{timestamp}"
+
+                # Save to temporary file for processing
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+                    temp_file.write(content)
+                    temp_file_path = temp_file.name
+
+                try:
+                    # Process image metadata and classification
+                    # For uploaded files, we need to use the temp file path instead of URL
+                    image_metadata = image_processor.get_image_metadata(f"file://{temp_file_path}")
+                    image_classification = image_processor.classify_image_with_tensorflow(f"file://{temp_file_path}")
+                    
+                    # Combine metadata
+                    combined_metadata = {
+                        **image_metadata,
+                        "classification": image_classification,
+                        "filename": file.filename,
+                        "file_size": len(content),
+                        "date_added": datetime.now().isoformat(),
+                        "processing_timestamp": datetime.now().isoformat()
+                    }
+
+                    # Encode image to base64 for storage
+                    import base64
+                    base64_data = base64.b64encode(content).decode("utf-8")
+
+                    # Check if the vector database supports images
+                    if image_vdb.supports_images():
+                        # Write to image collection
+                        image_vdb.write_images([{
+                            "url": temp_url,
+                            "image_data": base64_data,
+                            "metadata": combined_metadata
+                        }])
+                    else:
+                        # Fallback: store as text document with image metadata
+                        text_representation = f"Image: {file.filename}\nClassification: {image_classification.get('top_prediction', {}).get('label', 'unknown')}\nMetadata: {str(combined_metadata)}"
+                        image_vdb.write_documents([{
+                            "url": temp_url,
+                            "text": text_representation,
+                            "metadata": combined_metadata
+                        }])
+
+                    processed_count += 1
+
+                finally:
+                    # Clean up temporary file
+                    if os.path.exists(temp_file_path):
+                        os.unlink(temp_file_path)
+
+            except Exception as e:
+                print(f"Error processing image {file.filename}: {str(e)}")
+                continue
+
+        return {
+            "status": "success",
+            "message": f"Successfully uploaded {processed_count} images.",
+            "files_processed": processed_count,
+        }
+
+    except Exception as e:
+        print(f"Error in upload_images: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.delete("/delete-document/{document_id}")
 async def delete_document(document_id: str):
     """

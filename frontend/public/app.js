@@ -1584,7 +1584,7 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
 
     showAddContentModal() {
         this.showModal('addContentModal');
-        this.switchTab('urls');
+        this.switchTab('urlTab');
     }
 
     showSettingsModal() {
@@ -1633,9 +1633,9 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
     submitAddContent() {
         const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
         
-        if (activeTab === 'urls') {
-            const urlInput = document.getElementById('urlInput');
-            const urls = urlInput.value.trim().split('\n').filter(url => url.trim());
+        if (activeTab === 'urlTab') {
+            const urlsInput = document.getElementById('urlsInput');
+            const urls = urlsInput.value.trim().split('\n').filter(url => url.trim());
             
             if (urls.length === 0) {
                 this.showNotification('error', 'Please enter at least one URL');
@@ -1643,8 +1643,8 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             }
 
             this.socket.emit('add_urls', { urls });
-            urlInput.value = '';
-        } else if (activeTab === 'files') {
+            urlsInput.value = '';
+        } else if (activeTab === 'filesTab') {
             const fileInput = document.getElementById('fileInput');
             const files = fileInput.files;
             
@@ -1655,7 +1655,18 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
 
             // Handle file uploads
             this.uploadFiles(files);
-        } else if (activeTab === 'json') {
+        } else if (activeTab === 'imagesTab') {
+            const imageInput = document.getElementById('imageInput');
+            const images = imageInput.files;
+            
+            if (images.length === 0) {
+                this.showNotification('error', 'Please select at least one image');
+                return;
+            }
+
+            // Handle image uploads
+            this.uploadImages(images);
+        } else if (activeTab === 'jsonTab') {
             const jsonInput = document.getElementById('jsonInput');
             const metadataInput = document.getElementById('metadataInput');
             
@@ -1706,10 +1717,45 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         });
     }
 
+    uploadImages(files) {
+        const formData = new FormData();
+        
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        // Show loading notification
+        this.showNotification('info', `Processing ${files.length} image(s)...`);
+
+        // Send images to backend via API
+        fetch('http://localhost:8021/upload-images', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                this.showNotification('success', `Successfully processed ${files.length} image(s) with AI classification`);
+                // Refresh documents list to show images
+                this.loadDocuments();
+            } else {
+                this.showNotification('error', data.message || 'Image upload failed');
+            }
+        })
+        .catch(error => {
+            console.error('Image upload error:', error);
+            this.showNotification('error', 'Image upload failed. Please try again.');
+        });
+    }
+
     setupFileUpload() {
         const fileUploadArea = document.getElementById('fileUploadArea');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
+        
+        const imageUploadArea = document.getElementById('imageUploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const imageList = document.getElementById('imageList');
 
         // Click to select files
         fileUploadArea.addEventListener('click', () => {
@@ -1739,6 +1785,36 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
             const files = e.dataTransfer.files;
             fileInput.files = files;
             this.updateFileList(files);
+        });
+
+        // Click to select images
+        imageUploadArea.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        // Handle image selection
+        imageInput.addEventListener('change', (e) => {
+            this.updateImageList(e.target.files);
+        });
+
+        // Drag and drop functionality
+        imageUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUploadArea.classList.add('dragover');
+        });
+
+        imageUploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            imageUploadArea.classList.remove('dragover');
+        });
+
+        imageUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            imageInput.files = files;
+            this.updateImageList(files);
         });
     }
 
@@ -1770,6 +1846,34 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         });
     }
 
+    updateImageList(files) {
+        const imageList = document.getElementById('imageList');
+        imageList.innerHTML = '';
+
+        Array.from(files).forEach((file, index) => {
+            const imageItem = document.createElement('div');
+            imageItem.className = 'image-item';
+            
+            const imageIcon = this.getImageIcon(file.name);
+            const imageSize = this.formatImageSize(file.size);
+            
+            imageItem.innerHTML = `
+                <div class="image-item-info">
+                    <i class="${imageIcon} image-item-icon"></i>
+                    <div>
+                        <div class="image-item-name">${this.escapeHtml(file.name)}</div>
+                        <div class="image-item-size">${imageSize}</div>
+                    </div>
+                </div>
+                <button class="image-item-remove" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            imageList.appendChild(imageItem);
+        });
+    }
+
     getFileIcon(filename) {
         const ext = filename.split('.').pop().toLowerCase();
         const iconMap = {
@@ -1784,7 +1888,26 @@ Try asking me to add some URLs or ask questions about your existing documents!`;
         return iconMap[ext] || 'fa-file';
     }
 
+    getImageIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const iconMap = {
+            'jpg': 'fa-file-image',
+            'jpeg': 'fa-file-image',
+            'png': 'fa-file-image',
+            'gif': 'fa-file-image'
+        };
+        return iconMap[ext] || 'fa-file';
+    }
+
     formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    formatImageSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
