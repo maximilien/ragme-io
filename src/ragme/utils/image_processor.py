@@ -2,15 +2,12 @@
 # Copyright (c) 2025 dr.max
 
 import base64
-import json
-import os
-import tempfile
 import warnings
-from typing import Dict, Any
+from typing import Any, Dict
 
 import requests
-from PIL import Image
 from exif import Image as ExifImage
+from PIL import Image
 
 # Suppress TensorFlow warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="tensorflow")
@@ -19,7 +16,8 @@ warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
 
 class ImageProcessor:
     """
-    Image processing utilities for EXIF extraction, TensorFlow classification, and metadata handling.
+    Image processing utilities for EXIF extraction, TensorFlow classification,
+    and metadata handling.
     """
 
     def __init__(self):
@@ -69,7 +67,9 @@ class ImageProcessor:
             print(f"Error getting image metadata: {e}")
             return {"type": "image", "source": image_source, "error": str(e)}
 
-    def classify_image_with_tensorflow(self, image_source: str, top_k: int = 5) -> Dict[str, Any]:
+    def classify_image_with_tensorflow(
+        self, image_source: str, top_k: int = 5
+    ) -> Dict[str, Any]:
         """
         Classify an image using TensorFlow with a pre-trained ResNet50 model.
         
@@ -83,7 +83,9 @@ class ImageProcessor:
         try:
             import tensorflow as tf
             from tensorflow.keras.applications import ResNet50
-            from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
+            from tensorflow.keras.applications.resnet50 import (
+                preprocess_input, decode_predictions
+            )
             from tensorflow.keras.preprocessing import image
             import numpy as np
             import io
@@ -209,7 +211,9 @@ class ImageProcessor:
                 
             return base64.b64encode(image_data).decode("utf-8")
         except Exception as e:
-            raise ValueError(f"Failed to download and encode image from {image_source}: {e}")
+            raise ValueError(
+                f"Failed to download and encode image from {image_source}: {e}"
+            )
 
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
