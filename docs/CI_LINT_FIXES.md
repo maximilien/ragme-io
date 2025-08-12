@@ -5,7 +5,7 @@ The CI pipeline was failing with ESLint errors:
 ```
 Error: Cannot find module '../lib/cli'
 Require stack:
-- /home/runner/work/ragme-ai/ragme-ai/frontend/node_modules/eslint/bin/eslint.js
+- /home/runner/work/ragme-io/ragme-io/frontend/node_modules/eslint/bin/eslint.js
 ```
 
 This was caused by corrupted or incomplete ESLint installation in the CI environment.

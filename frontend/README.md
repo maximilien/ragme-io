@@ -1,6 +1,6 @@
-# 🤖 RAGme.ai Assistant Frontend
+# 🤖 RAGme.io Assistant Frontend
 
-A modern, responsive web interface for the RAGme.ai Assistant, built with TypeScript, Express, Socket.IO, and D3.js.
+A modern, responsive web interface for the RAGme.io Assistant, built with TypeScript, Express, Socket.IO, and D3.js.
 
 ## Features
 
@@ -25,7 +25,7 @@ A modern, responsive web interface for the RAGme.ai Assistant, built with TypeSc
 
 - Node.js 18+ 
 - npm or yarn
-- RAGme.ai backend running on port 8021
+- RAGme.io backend running on port 8021
 
 ### Installation
 
@@ -77,7 +77,7 @@ frontend/
 
 ## API Integration
 
-The frontend communicates with the RAGme.ai backend API via WebSocket events:
+The frontend communicates with the RAGme.io backend API via WebSocket events:
 
 ### Chat Events
 - `chat_message` - Send user message
@@ -110,7 +110,7 @@ The frontend communicates with the RAGme.ai backend API via WebSocket events:
 
 ## Configuration
 
-The frontend runs on port 3020 by default and connects to the RAGme.ai API on `http://localhost:8021` by default. To change these, set the `RAGME_FRONTEND_PORT` and `RAGME_API_URL` environment variables, or modify the constants in `src/index.ts`.
+The frontend runs on port 3020 by default and connects to the RAGme.io API on `http://localhost:8021` by default. To change these, set the `RAGME_FRONTEND_PORT` and `RAGME_API_URL` environment variables, or modify the constants in `src/index.ts`.
 
 ## Browser Support
 

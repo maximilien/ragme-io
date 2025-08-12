@@ -139,7 +139,7 @@ npm run dev
 ### Project Structure
 
 ```
-ragme-ai/
+ragme-io/
 ├── docs/                    # 📚 Documentation
 │   ├── README.md           # Documentation index
 │   ├── VECTOR_DB_ABSTRACTION.md
