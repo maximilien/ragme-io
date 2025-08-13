@@ -135,7 +135,7 @@ class VectorDatabase(ABC):
         Write images to the vector database.
 
         Args:
-            images: List of images with 'url', 'image_data' (base64), 
+            images: List of images with 'url', 'image_data' (base64),
                    and 'metadata' fields
 
         Returns:

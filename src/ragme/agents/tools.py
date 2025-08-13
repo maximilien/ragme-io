@@ -28,7 +28,7 @@ class RagMeTools:
         Initialize RagMeTools with a reference to the main RagMe instance.
 
         Args:
-            ragme_instance: The RagMe instance that provides access to vector 
+            ragme_instance: The RagMe instance that provides access to vector
                            database and methods
         """
         self.ragme = ragme_instance
@@ -124,11 +124,11 @@ class RagMeTools:
 
     def delete_documents_by_pattern(self, pattern: str) -> str:
         """
-        Delete documents from the RagMeDocs collection that match a pattern 
+        Delete documents from the RagMeDocs collection that match a pattern
         in their name/URL.
-        
+
         Args:
-            pattern (str): Pattern to match against document names/URLs 
+            pattern (str): Pattern to match against document names/URLs
                           (supports regex-like patterns)
         """
         try:
@@ -270,12 +270,12 @@ class RagMeTools:
 
     def count_documents(self, date_filter: str = "all") -> str:
         """
-        Count the total number of documents in the collection with optional 
+        Count the total number of documents in the collection with optional
         date filtering.
 
         Args:
             date_filter: Filter by date - 'all', 'current', 'month', 'year'
-        
+
         Returns:
             str: Formatted count message
         """
@@ -330,55 +330,63 @@ class RagMeTools:
     def write_image_to_collection(self, image_url: str) -> str:
         """
         Add an image from a URL to the RagMe image collection.
-        
+
         Args:
             image_url: The URL of the image to add to the collection
-            
+
         Returns:
             str: Success or error message
         """
         try:
-            from ..utils.image_processor import image_processor
             from ..utils.config_manager import config
+            from ..utils.image_processor import image_processor
             from ..vdbs.vector_db_factory import create_vector_database
 
             # Get image collection name
             image_collection_name = config.get_image_collection_name()
-            
+
             # Create image vector database
             image_vdb = create_vector_database(collection_name=image_collection_name)
             image_vdb.setup()
 
             # Process the image
             processed_data = image_processor.process_image(image_url)
-            
+
             # Encode image to base64
             base64_data = image_processor.encode_image_to_base64(image_url)
 
             # Check if the vector database supports images
             if image_vdb.supports_images():
                 # Write to image collection
-                image_vdb.write_images([{
-                    "url": image_url,
-                    "image_data": base64_data,
-                    "metadata": processed_data
-                }])
+                image_vdb.write_images(
+                    [
+                        {
+                            "url": image_url,
+                            "image_data": base64_data,
+                            "metadata": processed_data,
+                        }
+                    ]
+                )
             else:
                 # Fallback: store as text document with image metadata
-                classification = processed_data.get('classification', {})
-                top_pred = classification.get('top_prediction', {})
-                label = top_pred.get('label', 'unknown')
-                
+                classification = processed_data.get("classification", {})
+                top_pred = classification.get("top_prediction", {})
+                label = top_pred.get("label", "unknown")
+
                 text_representation = (
                     f"Image: {image_url}\n"
                     f"Classification: {label}\n"
                     f"Metadata: {str(processed_data)}"
                 )
-                image_vdb.write_documents([{
-                    "url": image_url,
-                    "text": text_representation,
-                    "metadata": processed_data
-                }])
+                image_vdb.write_documents(
+                    [
+                        {
+                            "url": image_url,
+                            "text": text_representation,
+                            "metadata": processed_data,
+                        }
+                    ]
+                )
 
             return f"Successfully added image {image_url} to the collection"
 
@@ -388,11 +396,11 @@ class RagMeTools:
     def list_image_collection(self, limit: int = 10, offset: int = 0) -> str:
         """
         List images in the RagMe image collection.
-        
+
         Args:
             limit: Maximum number of images to return (default: 10)
             offset: Number of images to skip (default: 0)
-            
+
         Returns:
             str: Formatted list of images with metadata
         """
@@ -402,7 +410,7 @@ class RagMeTools:
 
             # Get image collection name
             image_collection_name = config.get_image_collection_name()
-            
+
             # Create image vector database
             image_vdb = create_vector_database(collection_name=image_collection_name)
 
@@ -413,11 +421,12 @@ class RagMeTools:
                 return "No images found in the collection."
 
             result = f"Found {len(images)} images in the collection:\n\n"
-            
+
             for i, img in enumerate(images, offset + 1):
                 metadata = img.get("metadata", {})
                 if isinstance(metadata, str):
                     import json
+
                     try:
                         metadata = json.loads(metadata)
                     except json.JSONDecodeError:
@@ -425,22 +434,22 @@ class RagMeTools:
 
                 classification = metadata.get("classification", {})
                 top_prediction = classification.get("top_prediction", {})
-                
+
                 result += f"{i}. Image ID: {img.get('id', 'unknown')}\n"
                 result += (
                     f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
                 )
-                
+
                 if top_prediction:
-                    label = top_prediction.get('label', 'unknown')
-                    confidence = top_prediction.get('confidence', 0)
+                    label = top_prediction.get("label", "unknown")
+                    confidence = top_prediction.get("confidence", 0)
                     result += (
                         f"   Classification: {label} ({confidence:.2%} confidence)\n"
                     )
-                
+
                 if metadata.get("date_added"):
                     result += f"   Added: {metadata.get('date_added')}\n"
-                    
+
                 result += "\n"
 
             return result
@@ -451,10 +460,10 @@ class RagMeTools:
     def delete_image_from_collection(self, image_id: str) -> str:
         """
         Delete an image from the RagMe image collection by ID.
-        
+
         Args:
             image_id: The ID of the image to delete
-            
+
         Returns:
             str: Success or error message
         """
@@ -464,7 +473,7 @@ class RagMeTools:
 
             # Get image collection name
             image_collection_name = config.get_image_collection_name()
-            
+
             # Create image vector database
             image_vdb = create_vector_database(collection_name=image_collection_name)
 

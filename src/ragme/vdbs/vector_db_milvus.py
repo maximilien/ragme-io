@@ -508,11 +508,13 @@ class MilvusVectorDatabase(VectorDatabase):
         # For now, store images as text documents with metadata
         documents = []
         for img in images:
-            documents.append({
-                "url": img.get("url", ""),
-                "text": f"Image: {img.get('url', 'unknown')} - {json.dumps(img.get('metadata', {}))}",
-                "metadata": img.get("metadata", {})
-            })
+            documents.append(
+                {
+                    "url": img.get("url", ""),
+                    "text": f"Image: {img.get('url', 'unknown')} - {json.dumps(img.get('metadata', {}))}",
+                    "metadata": img.get("metadata", {}),
+                }
+            )
         self.write_documents(documents)
 
     def supports_images(self) -> bool:

@@ -373,11 +373,13 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
         # For now, store images as metadata only since local Weaviate may not support BLOB
         documents = []
         for img in images:
-            documents.append({
-                "url": img.get("url", ""),
-                "text": f"Image: {img.get('url', 'unknown')}",
-                "metadata": img.get("metadata", {})
-            })
+            documents.append(
+                {
+                    "url": img.get("url", ""),
+                    "text": f"Image: {img.get('url', 'unknown')}",
+                    "metadata": img.get("metadata", {}),
+                }
+            )
         self.write_documents(documents)
 
     def supports_images(self) -> bool:

@@ -185,8 +185,8 @@ async def add_json(json_input: JSONInput):
                 # Check if a document with the same URL already exists
                 existing_doc = ragme.vector_db.find_document_by_url(unique_url)
                 if existing_doc:
-                    # Only replace if it's not a chunked document or if the new one 
-                    # is chunked. This prevents chunked documents from replacing 
+                    # Only replace if it's not a chunked document or if the new one
+                    # is chunked. This prevents chunked documents from replacing
                     # regular documents
                     existing_is_chunked = existing_doc.get("metadata", {}).get(
                         "is_chunked"
@@ -205,7 +205,7 @@ async def add_json(json_input: JSONInput):
                         ragme.vector_db.delete_document(existing_doc["id"])
                         replaced_count += 1
                     elif existing_is_chunked and not new_is_chunked:
-                        # Skip adding this document to avoid replacing chunked 
+                        # Skip adding this document to avoid replacing chunked
                         # document with regular document
                         continue
 
@@ -232,7 +232,7 @@ async def add_json(json_input: JSONInput):
 
     except Exception as e:
         # Assuming 'logger' is defined elsewhere or needs to be imported
-        # For now, using print for simplicity as 'logger' is not defined 
+        # For now, using print for simplicity as 'logger' is not defined
         # in the original file
         print(f"Error adding JSON: {e}")
         return {"status": "error", "message": str(e)}
@@ -664,19 +664,20 @@ async def upload_images(files: list[UploadFile] = File(...)):
         dict: Status message and number of images processed
     """
     try:
-        from ..utils.image_processor import image_processor
         from ..utils.config_manager import config
+        from ..utils.image_processor import image_processor
 
         processed_count = 0
-        supported_formats = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+        supported_formats = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
         # Get image collection name from config
         image_collection_name = config.get_image_collection_name()
-        
+
         # Create image-specific vector database instance
         from ..vdbs.vector_db_factory import create_vector_database
+
         image_vdb = create_vector_database(collection_name=image_collection_name)
-        
+
         # Ensure the image collection is set up
         image_vdb.setup()
 
@@ -684,8 +685,8 @@ async def upload_images(files: list[UploadFile] = File(...)):
             try:
                 # Validate file type
                 filename = file.filename.lower()
-                file_ext = '.' + filename.split('.')[-1] if '.' in filename else ''
-                
+                file_ext = "." + filename.split(".")[-1] if "." in filename else ""
+
                 if file_ext not in supported_formats:
                     print(f"Skipping unsupported file format: {filename}")
                     continue
@@ -698,7 +699,9 @@ async def upload_images(files: list[UploadFile] = File(...)):
                 temp_url = f"file://{file.filename}#{timestamp}"
 
                 # Save to temporary file for processing
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=file_ext
+                ) as temp_file:
                     temp_file.write(content)
                     temp_file_path = temp_file.name
 
@@ -710,7 +713,7 @@ async def upload_images(files: list[UploadFile] = File(...)):
                     image_classification = (
                         image_processor.classify_image_with_tensorflow(file_path)
                     )
-                    
+
                     # Combine metadata
                     combined_metadata = {
                         **image_metadata,
@@ -718,36 +721,45 @@ async def upload_images(files: list[UploadFile] = File(...)):
                         "filename": file.filename,
                         "file_size": len(content),
                         "date_added": datetime.now().isoformat(),
-                        "processing_timestamp": datetime.now().isoformat()
+                        "processing_timestamp": datetime.now().isoformat(),
                     }
 
                     # Encode image to base64 for storage
                     import base64
+
                     base64_data = base64.b64encode(content).decode("utf-8")
 
                     # Check if the vector database supports images
                     if image_vdb.supports_images():
                         # Write to image collection
-                        image_vdb.write_images([{
-                            "url": temp_url,
-                            "image_data": base64_data,
-                            "metadata": combined_metadata
-                        }])
+                        image_vdb.write_images(
+                            [
+                                {
+                                    "url": temp_url,
+                                    "image_data": base64_data,
+                                    "metadata": combined_metadata,
+                                }
+                            ]
+                        )
                     else:
                         # Fallback: store as text document with image metadata
-                        top_pred = image_classification.get('top_prediction', {})
-                        label = top_pred.get('label', 'unknown')
-                        
+                        top_pred = image_classification.get("top_prediction", {})
+                        label = top_pred.get("label", "unknown")
+
                         text_representation = (
                             f"Image: {file.filename}\n"
                             f"Classification: {label}\n"
                             f"Metadata: {str(combined_metadata)}"
                         )
-                        image_vdb.write_documents([{
-                            "url": temp_url,
-                            "text": text_representation,
-                            "metadata": combined_metadata
-                        }])
+                        image_vdb.write_documents(
+                            [
+                                {
+                                    "url": temp_url,
+                                    "text": text_representation,
+                                    "metadata": combined_metadata,
+                                }
+                            ]
+                        )
 
                     processed_count += 1
 
