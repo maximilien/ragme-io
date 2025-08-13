@@ -411,6 +411,45 @@ def run_pytest_tests(test_type):
     return result == 0
 
 
+def cleanup_resources():
+    """Clean up resources to prevent ResourceWarnings."""
+    import gc
+
+    # Force garbage collection
+    gc.collect()
+
+    # Close any remaining asyncio event loops
+    try:
+        loop = asyncio.get_event_loop()
+        if not loop.is_closed():
+            # Cancel all pending tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+
+            # Run until all tasks are cancelled
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+    except RuntimeError:
+        # No event loop in current thread
+        pass
+
+    # Additional cleanup for any remaining network connections
+    try:
+        import socket
+
+        # Force close any remaining socket connections
+        for sock in socket._socketobject.__subclasses__():
+            try:
+                sock.close()
+            except (OSError, AttributeError, TypeError):
+                pass
+    except (ImportError, AttributeError):
+        pass
+
+
 def main():
     """Main function to run integration tests."""
     parser = argparse.ArgumentParser(description="Run RAGme AI integration tests")
@@ -478,6 +517,9 @@ def main():
 
         if args.agents or args.all:
             success &= asyncio.run(run_agent_tests())
+
+    # Clean up resources to prevent ResourceWarnings
+    cleanup_resources()
 
     # Print summary
     print("\n" + "=" * 60)

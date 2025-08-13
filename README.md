@@ -475,7 +475,7 @@ uv run ruff format src/ tests/ examples/
 ./test.sh integration  # Integration tests only
 
 # Run tests with coverage
-uv run pytest --cov=src/ragme tests/
+uv run --active python -m pytest --cov=src/ragme tests/
 
 # Show test help
 ./test.sh help

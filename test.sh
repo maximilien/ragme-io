@@ -42,6 +42,7 @@ print_help() {
     echo "  api         Run only API tests (FastAPI endpoints)"
     echo "  mcp         Run only MCP server tests (Model Context Protocol)"
     echo "  integration Run only integration tests (end-to-end system tests)"
+    echo "  integration-fast Run fast integration tests (minimal testing)"
     echo "  agents      Run only agent integration tests (RagMeAgent testing)"
     echo "  all         Run all tests (unit + api + mcp + integration)"
     echo "  help        Show this help message"
@@ -51,6 +52,7 @@ print_help() {
     echo "  ./test.sh api          # Run only API tests"
     echo "  ./test.sh mcp          # Run only MCP server tests"
     echo "  ./test.sh integration  # Run only integration tests"
+    echo "  ./test.sh integration-fast # Run fast integration tests"
     echo "  ./test.sh agents       # Run only agent integration tests"
     echo "  ./test.sh all          # Run all tests"
     echo "  ./test.sh              # Run unit tests (default)"
@@ -85,6 +87,9 @@ print_help() {
     echo "    - MCP server integration"
 }
 
+# Initialize variables
+RUN_FAST_INTEGRATION=false
+
 # Check command line arguments
 case "${1:-unit}" in
     "unit")
@@ -115,12 +120,27 @@ case "${1:-unit}" in
         RUN_INTEGRATION_TESTS=true
         RUN_AGENT_TESTS=false
         ;;
+    "integration-fast")
+        RUN_UNIT_TESTS=false
+        RUN_API_TESTS=false
+        RUN_MCP_TESTS=false
+        RUN_INTEGRATION_TESTS=true
+        RUN_AGENT_TESTS=false
+        RUN_FAST_INTEGRATION=true
+        ;;
     "agents")
         RUN_UNIT_TESTS=false
         RUN_API_TESTS=false
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=false
         RUN_AGENT_TESTS=true
+        ;;
+    "most")
+        RUN_UNIT_TESTS=true
+        RUN_API_TESTS=true
+        RUN_MCP_TESTS=true
+        RUN_INTEGRATION_TESTS=true
+        RUN_AGENT_TESTS=false
         ;;
     "all")
         RUN_UNIT_TESTS=true
@@ -152,7 +172,7 @@ run_unit_tests() {
 
     # Run unit tests with the correct PYTHONPATH and robustly suppress Pydantic deprecation warnings
     # Exclude API and MCP specific tests
-    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run pytest -v \
+    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run --active python -m pytest -v \
         tests/test_common.py \
         tests/test_ragme.py \
         tests/test_ragme_agent.py \
@@ -179,7 +199,7 @@ run_api_tests() {
     export WEAVIATE_URL=fake-weaviate-url.com
 
     # Run API-specific tests
-    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run pytest -v \
+    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run --active python -m pytest -v \
         tests/test_api.py \
         -k "api"
     
@@ -196,7 +216,7 @@ run_mcp_tests() {
     export WEAVIATE_URL=fake-weaviate-url.com
 
     # Run MCP-specific tests
-    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run pytest -v \
+    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run --active python -m pytest -v \
         tests/ \
         -k "mcp"
     
@@ -205,25 +225,44 @@ run_mcp_tests() {
 
 # Function to run integration tests
 run_integration_tests() {
-    print_header "Running Integration Tests..."
-    
-    # For integration tests, we need to use real API keys from .env file
-    # Don't override with fake keys like we do for unit tests
-    print_status "Using API keys from .env file for integration tests..."
-    
-    if [ -f "./tools/test-integration-agents.sh" ]; then
-        print_status "Running integration test suite (API and Agent tests)..."
-        if ./tools/test-integration-agents.sh --all; then
-            print_status "✓ Integration tests passed"
+    if [ "$RUN_FAST_INTEGRATION" = true ]; then
+        print_header "Running Fast Integration Tests..."
+        print_status "Using API keys from .env file for fast integration tests..."
+        
+        if [ -f "./tools/test-integration.sh" ]; then
+            print_status "Running fast integration test suite..."
+            if ./tools/test-integration.sh --fast; then
+                print_status "✓ Fast integration tests passed"
+            else
+                print_error "Fast integration tests failed"
+                exit 1
+            fi
         else
-            print_error "Integration tests failed"
-            exit 1
+            print_warning "tools/test-integration.sh not found, skipping fast integration tests"
         fi
+        
+        print_header "Fast Integration Tests Completed Successfully! 🎉"
     else
-        print_warning "tools/test-integration-agents.sh not found, skipping integration tests"
+        print_header "Running Integration Tests..."
+        
+        # For integration tests, we need to use real API keys from .env file
+        # Don't override with fake keys like we do for unit tests
+        print_status "Using API keys from .env file for integration tests..."
+        
+        if [ -f "./tools/test-integration-agents.sh" ]; then
+            print_status "Running integration test suite (API and Agent tests)..."
+            if ./tools/test-integration-agents.sh --all; then
+                print_status "✓ Integration tests passed"
+            else
+                print_error "Integration tests failed"
+                exit 1
+            fi
+        else
+            print_warning "tools/test-integration-agents.sh not found, skipping integration tests"
+        fi
+        
+        print_header "Integration Tests Completed Successfully! 🎉"
     fi
-    
-    print_header "Integration Tests Completed Successfully! 🎉"
 }
 
 # Function to run agent tests

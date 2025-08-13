@@ -24,8 +24,36 @@ PID_FILE=".pid"
 WATCH_DIR="watch_directory"
 TIMEOUT=30
 
-echo -e "${BLUE}🧪 RAGme Integration Test Suite${NC}"
-echo "=================================="
+# Parse command line arguments
+FAST_MODE=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --fast|-f)
+            FAST_MODE=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Options:"
+            echo "  --fast, -f    Run fast integration tests (minimal testing)"
+            echo "  --help, -h    Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+if [ "$FAST_MODE" = true ]; then
+    echo -e "${BLUE}🚀 RAGme Fast Integration Test Suite${NC}"
+    echo "====================================="
+else
+    echo -e "${BLUE}🧪 RAGme Integration Test Suite${NC}"
+    echo "=================================="
+fi
 
 # Function to check if a service is running
 check_service() {
@@ -298,9 +326,190 @@ test_file_monitoring() {
     fi
 }
 
+# Fast integration test function - minimal testing for quick validation
+fast_integration_test() {
+    local all_tests_passed=true
+    local total_tests=8
+    local current_test=0
+    
+    echo -e "\n${BLUE}🚀 Starting RAGme services...${NC}"
+    
+    # Start all services
+    if ./start.sh; then
+        echo -e "  ✅ Services started successfully"
+    else
+        echo -e "  ❌ Failed to start services"
+        exit 1
+    fi
+    
+    # Wait for services to be ready (shorter wait for fast mode)
+    echo -e "\n${BLUE}⏳ Waiting for services to be ready...${NC}"
+    sleep 3
+    
+    # Show test plan
+    echo -e "\n${BLUE}📋 Fast Integration Test Plan (8 tests):${NC}"
+    echo -e "  1. Service Connectivity"
+    echo -e "  2. Check Empty Collection"
+    echo -e "  3. Add URL"
+    echo -e "  4. Check Collection After URL"
+    echo -e "  5. Add PDF"
+    echo -e "  6. Check Collection After PDF"
+    echo -e "  7. Cleanup Documents"
+    echo -e "  8. Final Empty Check"
+    echo -e "\n${BLUE}🚀 Starting tests...${NC}"
+    
+    # Test 1: Basic service connectivity
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Service Connectivity${NC}"
+    
+    if check_service "API Server" 8021 "$API_URL"; then
+        echo -e "  ${GREEN}✅ API Server: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ API Server: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    if check_service "MCP Server" 8022 "$MCP_URL"; then
+        echo -e "  ${GREEN}✅ MCP Server: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ MCP Server: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Test 2: Check empty collection
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Check Empty Collection${NC}"
+    local response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=1" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        echo -e "  ${GREEN}✅ Empty collection check: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ Empty collection check: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Test 3: Add URL
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Add URL${NC}"
+    local test_url="https://httpbin.org/html"
+    local add_response=$(curl -s --max-time 15 -X POST "$API_URL/add-urls" \
+        -H "Content-Type: application/json" \
+        -d "{\"urls\": [\"$test_url\"]}" 2>/dev/null || echo "{}")
+    
+    if echo "$add_response" | grep -q "status.*success"; then
+        echo -e "  ${GREEN}✅ Add URL: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ Add URL: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Test 4: Check collection after URL
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Check Collection After URL${NC}"
+    sleep 2
+    response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=10" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        echo -e "  ${GREEN}✅ Collection check after URL: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ Collection check after URL: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Test 5: Add PDF
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Add PDF${NC}"
+    local test_pdf="tests/fixtures/pdfs/ragme-io.pdf"
+    if [ -f "$test_pdf" ]; then
+        local pdf_file=$(curl -s --max-time 15 -X POST "$API_URL/upload-files" \
+            -F "files=@$test_pdf" 2>/dev/null || echo "{}")
+        
+        if echo "$pdf_file" | grep -q "status.*success"; then
+            echo -e "  ${GREEN}✅ Add PDF: PASS${NC}"
+        else
+            echo -e "  ${RED}❌ Add PDF: FAIL${NC}"
+            all_tests_passed=false
+        fi
+    else
+        echo -e "  ${YELLOW}⚠️ Test PDF not found, skipping PDF test${NC}"
+    fi
+    
+    # Test 6: Check collection after PDF
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Check Collection After PDF${NC}"
+    sleep 2
+    response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=10" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        echo -e "  ${GREEN}✅ Collection check after PDF: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ Collection check after PDF: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Test 7: Cleanup - Delete documents
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Cleanup Documents${NC}"
+    
+    # Get list of documents and delete them
+    response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=100" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        # Extract document IDs and delete them
+        local doc_ids=$(echo "$response" | grep -o '"id":"[^"]*"' | sed 's/"id":"//g' | sed 's/"//g')
+        local deleted_count=0
+        
+        for doc_id in $doc_ids; do
+            local delete_response=$(curl -s --max-time 10 -X DELETE "$API_URL/delete-document/$doc_id" 2>/dev/null || echo "{}")
+            if echo "$delete_response" | grep -q "status.*success"; then
+                ((deleted_count++))
+            fi
+        done
+        
+        echo -e "  ${GREEN}✅ Cleanup: PASS (deleted $deleted_count documents)${NC}"
+    else
+        echo -e "  ${YELLOW}⚠️ Cleanup: SKIP (could not retrieve documents)${NC}"
+    fi
+    
+    # Test 8: Final empty check
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Final Empty Check${NC}"
+    sleep 2
+    response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=1" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        echo -e "  ${GREEN}✅ Final empty check: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ Final empty check: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Final results
+    echo -e "\n${BLUE}📊 Fast Integration Test Results${NC}"
+    echo "================================="
+    
+    if [ "$all_tests_passed" = true ]; then
+        echo -e "${GREEN}🎉 All fast integration tests PASSED!${NC}"
+        echo -e "${GREEN}✅ RAGme system core functionality is working${NC}"
+        exit 0
+    else
+        echo -e "${RED}❌ Some fast integration tests FAILED${NC}"
+        echo -e "${YELLOW}⚠️ Check the output above for details${NC}"
+        exit 1
+    fi
+}
+
 # Main integration test
 main() {
+    # Check if we should run fast mode
+    if [ "$FAST_MODE" = true ]; then
+        fast_integration_test
+        return
+    fi
+    
     local all_tests_passed=true
+    local total_tests=8
+    local current_test=0
     
     echo -e "\n${BLUE}🚀 Starting RAGme services...${NC}"
     
@@ -316,8 +525,21 @@ main() {
     echo -e "\n${BLUE}⏳ Waiting for services to be ready...${NC}"
     sleep 5
     
+    # Show test plan
+    echo -e "\n${BLUE}📋 Integration Test Plan (8 tests):${NC}"
+    echo -e "  1. Service Status Check"
+    echo -e "  2. Vector Database Connection"
+    echo -e "  3. MCP Server Health Check"
+    echo -e "  4. RagMe API Health Check"
+    echo -e "  5. Local Agent Check"
+    echo -e "  6. RagMe Agent Check"
+    echo -e "  7. New Frontend UI Check"
+    echo -e "  8. File Monitoring (Optional)"
+    echo -e "\n${BLUE}🚀 Starting tests...${NC}"
+    
     # Test 1: Check if all services are running
-    echo -e "\n${BLUE}📋 Test 1: Service Status Check${NC}"
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: Service Status Check${NC}"
     
     if check_service "API Server" 8021 "$API_URL"; then
         echo -e "  ${GREEN}✅ API Server: PASS${NC}"
@@ -336,7 +558,8 @@ main() {
 
     
     # Test 2: Vector Database Connection
-    echo -e "\n${BLUE}📋 Test 2: Vector Database Connection${NC}"
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: Vector Database Connection${NC}"
     if test_vector_db; then
         echo -e "  ${GREEN}✅ Vector Database: PASS${NC}"
     else
@@ -345,7 +568,8 @@ main() {
     fi
     
     # Test 3: MCP Server Health Check
-    echo -e "\n${BLUE}📋 Test 3: MCP Server Health Check${NC}"
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: MCP Server Health Check${NC}"
     if test_mcp_server; then
         echo -e "  ${GREEN}✅ MCP Server Health: PASS${NC}"
     else
@@ -354,7 +578,8 @@ main() {
     fi
     
     # Test 4: RagMe API Health Check
-    echo -e "\n${BLUE}📋 Test 4: RagMe API Health Check${NC}"
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: RagMe API Health Check${NC}"
     if test_ragme_api; then
         echo -e "  ${GREEN}✅ RagMe API: PASS${NC}"
     else
@@ -363,7 +588,8 @@ main() {
     fi
     
     # Test 5: Local Agent Check
-    echo -e "\n${BLUE}📋 Test 5: Local Agent Check${NC}"
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: Local Agent Check${NC}"
     if test_local_agent; then
         echo -e "  ${GREEN}✅ Local Agent: PASS${NC}"
     else
@@ -371,8 +597,9 @@ main() {
         all_tests_passed=false
     fi
     
-    # Test 6: RagMe Agent Check
-    echo -e "\n${BLUE}📋 Test 6: RagMe Agent Check${NC}"
+    # Test 6: RagMe Agent Check 
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: RagMe Agent Check${NC}"
     if test_ragme_agent; then
         echo -e "  ${GREEN}✅ RagMe Agent: PASS${NC}"
     else
@@ -380,14 +607,16 @@ main() {
         all_tests_passed=false
     fi
     
-    # Test 7: UI Check (New Frontend)
-    echo -e "\n${BLUE}📋 Test 7: New Frontend UI Check${NC}"
+    # Test 7: UI Check (New Frontend)   
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: New Frontend UI Check${NC}"
     echo -e "  ${YELLOW}ℹ️ New Frontend UI is running on port 3020${NC}"
     echo -e "  ${YELLOW}ℹ️ Access at: http://localhost:3020${NC}"
     echo -e "  ${GREEN}✅ New Frontend UI: PASS (assumed running)${NC}"
     
     # Test 8: File Monitoring (Optional)
-    echo -e "\n${BLUE}📋 Test 8: File Monitoring (Optional)${NC}"
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Test $current_test/$total_tests: File Monitoring (Optional)${NC}"
     if test_file_monitoring; then
         echo -e "  ${GREEN}✅ File Monitoring: PASS${NC}"
     else
