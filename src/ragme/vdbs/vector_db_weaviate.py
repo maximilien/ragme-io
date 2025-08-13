@@ -32,6 +32,7 @@ class WeaviateVectorDatabase(VectorDatabase):
     def _create_client(self):
         """Create the Weaviate client."""
         import os
+
         import weaviate
 
         # Get environment variables
@@ -69,7 +70,7 @@ class WeaviateVectorDatabase(VectorDatabase):
         if not self.client.collections.exists(self.collection_name):
             # Determine if this is an image collection based on collection name
             is_image_collection = self._is_image_collection()
-            
+
             if is_image_collection:
                 # Create image collection with BLOB support
                 try:
@@ -143,19 +144,21 @@ class WeaviateVectorDatabase(VectorDatabase):
     def _is_image_collection(self) -> bool:
         """Check if this collection is configured for images."""
         from ..utils.config_manager import config
-        
+
         # Check if this collection name matches any image collection in config
         collections = config.get_collections_config()
         for collection in collections:
-            if (isinstance(collection, dict) and 
-                collection.get("name") == self.collection_name and 
-                collection.get("type") == "images"):
+            if (
+                isinstance(collection, dict)
+                and collection.get("name") == self.collection_name
+                and collection.get("type") == "images"
+            ):
                 return True
-        
+
         # Also check common image collection naming patterns
         image_patterns = ["image", "images", "ragmeimages"]
         return any(
-            pattern.lower() in self.collection_name.lower() 
+            pattern.lower() in self.collection_name.lower()
             for pattern in image_patterns
         )
 
@@ -225,7 +228,7 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             documents.append(doc)
 
-        # Sort by creation time (most recent first) - Weaviate doesn't support 
+        # Sort by creation time (most recent first) - Weaviate doesn't support
         # sorting in query. So we'll sort the results after fetching
         documents.sort(
             key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
