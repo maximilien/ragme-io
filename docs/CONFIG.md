@@ -51,7 +51,7 @@ network:
     host: "0.0.0.0"
     port: 8022
   frontend:
-    port: 3020
+    port: 8020
     api_url: "http://localhost:8021"
 ```
 
@@ -77,7 +77,7 @@ vector_databases:
         - name: "RagMeDocs"
           type: "text"
         - name: "ImageDocs"
-          type: "images"
+          type: "image"
       embedding_model: "text-embedding-3-large"
       chunk_size: 1000
       chunk_overlap: 100
@@ -525,7 +525,7 @@ See `config.yaml.example` for the complete configuration schema with all availab
 | `VECTOR_DB_TYPE` | Default vector database type | ❌ |
 | `RAGME_API_PORT` | API server port (default: 8021) | ❌ |
 | `RAGME_MCP_PORT` | MCP server port (default: 8022) | ❌ |
-| `RAGME_FRONTEND_PORT` | Frontend port (default: 3020) | ❌ |
+| `RAGME_FRONTEND_PORT` | Frontend port (default: 8020) | ❌ |
 
 ### Configuration Validation
 

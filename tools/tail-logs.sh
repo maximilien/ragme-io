@@ -35,7 +35,7 @@ get_agent_pid() {
 show_status() {
     echo -e "${BLUE}=== RAGme Service Status ===${NC}"
     echo ""
-    check_service 3020 "New Frontend"
+    check_service 8020 "New Frontend"
     check_service 8021 "API"
     check_service 8022 "MCP"
     
@@ -133,8 +133,8 @@ tail_agent_logs() {
 
 # Function to tail frontend logs
 tail_frontend_logs() {
-    echo -e "${BLUE}📡 Tailing Frontend logs (port 3020)...${NC}"
-    if check_service 3020 "New Frontend"; then
+    echo -e "${BLUE}📡 Tailing Frontend logs (port 8020)...${NC}"
+    if check_service 8020 "New Frontend"; then
         if [ -f "logs/frontend.log" ]; then
             echo -e "${BLUE}Following Frontend log file...${NC}"
             echo -e "${YELLOW}Press Ctrl+C to stop monitoring${NC}"
@@ -173,7 +173,7 @@ show_help() {
     echo -e "  ${GREEN}api${NC}        - Tail API logs (port 8021)"
     echo -e "  ${GREEN}mcp${NC}        - Tail MCP logs (port 8022)"
     echo -e "  ${GREEN}agent${NC}      - Tail Agent logs"
-    echo -e "  ${GREEN}frontend${NC}   - Tail Frontend logs (port 3020)"
+    echo -e "  ${GREEN}frontend${NC}   - Tail Frontend logs (port 8020)"
     echo -e "  ${GREEN}status${NC}     - Show status of all services"
     echo -e "  ${GREEN}recent${NC}     - Show recent logs"
     echo ""

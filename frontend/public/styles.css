@@ -499,6 +499,30 @@ body {
     gap: 0.5rem;
 }
 
+.content-filter-selector {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+    margin-right: 0.5rem;
+}
+
+.content-filter-selector:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.content-filter-selector:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
 .date-filter-selector {
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(0, 0, 0, 0.1);
@@ -738,6 +762,21 @@ body {
     word-wrap: break-word;
     overflow-wrap: break-word;
     white-space: pre-wrap;
+}
+
+.message-text pre {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+}
+
+.message-text img,
+.message-content img {
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: block;
 }
 
 .message-text pre {
@@ -1720,6 +1759,19 @@ body {
     border: 1px solid rgba(102, 126, 234, 0.2);
 }
 
+/* Image badge styling */
+.image-badge {
+    background: rgba(217, 119, 6, 0.1);
+    color: #d97706;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
 .document-title.truncated {
     cursor: help;
     transition: all 0.2s ease;
@@ -1807,6 +1859,96 @@ body {
     color: #333;
     word-break: break-word;
     flex: 1;
+}
+
+/* Image metadata sections */
+.metadata-section {
+    margin-bottom: 1.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.metadata-section:last-child {
+    margin-bottom: 0;
+}
+
+.section-title {
+    background: #f9fafb;
+    padding: 0.75rem 1rem;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.metadata-scrollable {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.metadata-scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.metadata-scrollable::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.metadata-scrollable::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.metadata-scrollable::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Collapsible metadata sections */
+.metadata-collapsible {
+    margin-top: 0.5rem;
+}
+
+.collapsible-btn {
+    background: none;
+    border: none;
+    color: #667eea;
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+    text-align: left;
+}
+
+.collapsible-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.collapsible-btn i {
+    transition: transform 0.2s ease;
+}
+
+.metadata-collapsible.expanded .collapsible-btn i {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    margin-top: 0.5rem;
+}
+
+.metadata-collapsible.expanded .collapsible-content {
+    max-height: 500px;
 }
 
 /* Content preview */
@@ -2363,10 +2505,14 @@ body {
 .file-upload-area {
     border: 2px dashed #d1d5db;
     border-radius: 8px;
-    padding: 2rem;
+    padding: 1.5rem;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .file-upload-area:hover {
@@ -2384,13 +2530,13 @@ body {
 }
 
 .file-upload-placeholder i {
-    font-size: 2rem;
-    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
     color: #9ca3af;
 }
 
 .file-upload-placeholder p {
-    margin: 0.5rem 0;
+    margin: 0.25rem 0;
     font-size: 0.875rem;
 }
 
@@ -2447,6 +2593,55 @@ body {
 }
 
 .file-item-remove:hover {
+    background: #ef4444;
+    color: white;
+}
+
+/* Image item styles */
+.image-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.image-item-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.image-item-icon {
+    font-size: 1.25rem;
+    color: #6b7280;
+}
+
+.image-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.image-item-size {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.image-item-remove {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.image-item-remove:hover {
     background: #ef4444;
     color: white;
 }

@@ -68,11 +68,11 @@ ConnectionError: Failed to connect to vector database
 
 ### Frontend Not Loading
 
-**Problem**: New frontend (default port 3020) is not accessible.
+**Problem**: New frontend (default port 8020) is not accessible.
 
 **Symptoms**:
 ```
-Cannot connect to http://localhost:3020
+Cannot connect to http://localhost:8020
 ```
 
 **Note**: The frontend port can be customized using the `RAGME_FRONTEND_PORT` environment variable.
@@ -263,7 +263,7 @@ For comprehensive debugging information, see [Process Management Guide](PROCESS_
    ```bash
    curl --max-time 10 http://localhost:8021/docs  # API
    curl --max-time 10 http://localhost:8022/docs  # MCP
-   open http://localhost:3020                     # Frontend
+   open http://localhost:8020                     # Frontend
    ```
 
 ## 📞 Getting Help
