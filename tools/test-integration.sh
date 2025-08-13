@@ -253,16 +253,16 @@ test_ragme_agent() {
 test_ui() {
     echo -e "\n${YELLOW}🖥️ Testing New Frontend UI...${NC}"
     
-    # Test new frontend UI accessibility on port 3020
-    local response=$(curl -s --max-time 10 "http://localhost:3020" 2>/dev/null || echo "{}")
+    # Test new frontend UI accessibility on port 8020
+local response=$(curl -s --max-time 10 "http://localhost:8020" 2>/dev/null || echo "{}")
     
     if echo "$response" | grep -q "RAGme\|Assistant\|Frontend"; then
         echo -e "  ✅ New Frontend UI is accessible"
         return 0
     else
         # If we can't detect the content, just check if the port is listening
-        if lsof -i :3020 > /dev/null 2>&1; then
-            echo -e "  ✅ New Frontend UI is running on port 3020"
+        if lsof -i :8020 > /dev/null 2>&1; then
+    echo -e "  ✅ New Frontend UI is running on port 8020"
             return 0
         else
             echo -e "  ❌ New Frontend UI is not accessible"
@@ -610,8 +610,8 @@ main() {
     # Test 7: UI Check (New Frontend)   
     ((current_test++))
     echo -e "\n${BLUE}📋 Test $current_test/$total_tests: New Frontend UI Check${NC}"
-    echo -e "  ${YELLOW}ℹ️ New Frontend UI is running on port 3020${NC}"
-    echo -e "  ${YELLOW}ℹ️ Access at: http://localhost:3020${NC}"
+    echo -e "  ${YELLOW}ℹ️ New Frontend UI is running on port 8020${NC}"
+echo -e "  ${YELLOW}ℹ️ Access at: http://localhost:8020${NC}"
     echo -e "  ${GREEN}✅ New Frontend UI: PASS (assumed running)${NC}"
     
     # Test 8: File Monitoring (Optional)

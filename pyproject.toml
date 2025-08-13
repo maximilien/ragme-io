@@ -50,7 +50,9 @@ dev = [
 ]
 ml = [
     # Optional ML dependencies that might be heavy or cause CI issues
-    "tensorflow>=2.15.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "Pillow>=9.0.0",
 ]
 
 [tool.ruff]

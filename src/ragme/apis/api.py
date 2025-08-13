@@ -401,6 +401,87 @@ async def list_documents(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/list-content")
+async def list_content(
+    limit: int = Query(
+        default=10, ge=1, le=100, description="Maximum number of items to return"
+    ),
+    offset: int = Query(default=0, ge=0, description="Number of items to skip"),
+    date_filter: str = Query(
+        default="all",
+        description="Date filter: 'current' (this week), 'month' (this month), 'year' (this year), 'all' (all items)",
+    ),
+    content_type: str = Query(
+        default="both",
+        description="Content type filter: 'documents', 'image', or 'both'",
+    ),
+):
+    """
+    List documents and/or images in the RAG system.
+
+    Args:
+        limit: Maximum number of items to return (1-100)
+        offset: Number of items to skip
+        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+        content_type: Content type filter ('documents', 'image', 'both')
+
+    Returns:
+        dict: List of items and pagination info
+    """
+    try:
+        from ..utils.config_manager import config
+        from ..vdbs.vector_db_factory import create_vector_database
+
+        all_items = []
+
+        # Get documents if requested
+        if content_type in ["documents", "both"]:
+            documents = ragme.list_documents(limit=1000, offset=0)
+            for doc in documents:
+                doc["content_type"] = "document"
+            all_items.extend(documents)
+
+        # Get images if requested
+        if content_type in ["image", "both"]:
+            try:
+                # Get image collection name from config
+                image_collection_name = config.get_image_collection_name()
+
+                # Create image-specific vector database instance
+                image_vdb = create_vector_database(
+                    collection_name=image_collection_name
+                )
+
+                # List images from image collection
+                images = image_vdb.list_documents(limit=1000, offset=0)
+                for img in images:
+                    img["content_type"] = "image"
+                all_items.extend(images)
+            except Exception as e:
+                print(f"Error listing images: {e}")
+                # Continue without images if there's an error
+
+        # Apply date filtering
+        filtered_items = filter_documents_by_date(all_items, date_filter)
+
+        # Sort by date (most recent first)
+        filtered_items.sort(
+            key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
+        )
+
+        # Apply pagination to filtered results
+        total_count = len(filtered_items)
+        paginated_items = filtered_items[offset : offset + limit]
+
+        return {
+            "status": "success",
+            "items": paginated_items,
+            "pagination": {"limit": limit, "offset": offset, "count": total_count},
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.post("/mcp-server-config")
 async def update_mcp_server_config(config: McpServerConfigList):
     """
@@ -458,7 +539,7 @@ async def update_mcp_server_config(config: McpServerConfigList):
 @app.post("/summarize-document")
 async def summarize_document(input_data: SummarizeInput):
     """
-    Summarize a document using the RagMe agent.
+    Summarize a document or image using the RagMe agent.
 
     Args:
         input_data: Contains document_id to summarize
@@ -467,61 +548,148 @@ async def summarize_document(input_data: SummarizeInput):
         dict: Summarized content
     """
     try:
-        # Get the document content
-        documents = ragme.list_documents(
-            limit=1000, offset=0
-        )  # Get all documents to find the one by ID
+        # Get all documents and images
+        all_items = []
 
-        # Find the document by ID (assuming ID is the index in the list)
+        # Get text documents
+        documents = ragme.list_documents(limit=1000, offset=0)
+        for doc in documents:
+            doc["content_type"] = "document"
+        all_items.extend(documents)
+
+        # Get images
+        images = []  # Initialize images list
         try:
-            doc_id = int(input_data.document_id)
-            if doc_id < 0 or doc_id >= len(documents):
-                raise HTTPException(status_code=404, detail="Document not found")
-            document = documents[doc_id]
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid document ID") from None
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
 
-        # Create a summarization prompt
-        content = document.get("text", "")
-        if not content:
-            return {"status": "success", "summary": "No content available to summarize"}
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
 
-        # Limit content more aggressively for faster processing
-        limited_content = content[
-            :500
-        ]  # Reduced from 1000 to 500 characters for faster processing
-        if len(content) > 500:
-            limited_content += "..."
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
 
-        # Use a direct LLM call for faster summarization
-        from llama_index.llms.openai import OpenAI
+            # List images from image collection
+            images = image_vdb.list_documents(limit=1000, offset=0)
+            for img in images:
+                img["content_type"] = "image"
+            all_items.extend(images)
+        except Exception as e:
+            print(f"Error listing images: {e}")
+            # Continue without images if there's an error
 
-        # Get LLM configuration from config
-        llm_config = config.get_llm_config()
-        summarization_config = llm_config.get("summarization", {})
+        # Find the document by ID
+        document = None
+        document_id = input_data.document_id
+        print(f"Looking for document with ID: {document_id}")
+        print(f"Number of documents: {len(documents)}")
+        print(f"Number of images: {len(images)}")
 
-        llm = OpenAI(
-            model=summarization_config.get("model", "gpt-4o-mini"),
-            temperature=summarization_config.get("temperature", 0.1),
-        )
+        # First try to find by ID in documents
+        for doc in documents:
+            doc_id = doc.get("id")
+            # Convert Weaviate UUID to string for comparison
+            doc_id_str = str(doc_id) if doc_id else None
+            if doc_id_str == document_id:
+                document = doc
+                document["content_type"] = "document"
+                print(f"Found document: {doc.get('url', 'No URL')}")
+                break
 
-        summary_prompt = f"""Please provide a brief summary of the following document content in 1-2 sentences maximum.
-        Focus on the main topic and key points.
+        # If not found in documents, try to find in images
+        if not document:
+            for img in images:
+                img_id = img.get("id")
+                # Convert Weaviate UUID to string for comparison
+                img_id_str = str(img_id) if img_id else None
+                if img_id_str == document_id:
+                    document = img
+                    document["content_type"] = "image"
+                    print(
+                        f"Found image: {img.get('metadata', {}).get('filename', 'No filename')}"
+                    )
+                    break
 
-        Document content:
-        {limited_content}"""
+        if not document:
+            print(f"Document not found with ID: {document_id}")
+            raise HTTPException(status_code=404, detail="Document not found")
 
-        # Add timeout for faster response
-        import asyncio
+        # Handle different content types
+        content_type = document.get("content_type", "document")
 
-        try:
-            summary = await asyncio.wait_for(
-                llm.acomplete(summary_prompt),
-                timeout=10.0,  # Reduced from 15 to 10 seconds
+        if content_type == "image":
+            # For images, create a summary based on metadata and classification
+            metadata = document.get("metadata", {})
+            classification = metadata.get("classification", {})
+            top_prediction = classification.get("top_prediction", {})
+
+            # Extract relevant information
+            filename = metadata.get("filename", "Unknown image")
+            label = top_prediction.get("label", "Unknown")
+            confidence = top_prediction.get("confidence", 0)
+            confidence_percent = (
+                f"{confidence * 100:.1f}%" if confidence > 0 else "Unknown"
             )
-            summary_text = summary.text
-        except asyncio.TimeoutError:
-            summary_text = "Summary generation timed out. The document may be too large or complex."
+
+            # Create image summary
+            summary_text = f"This is an image file named '{filename}'. AI classification identifies it as '{label}' with {confidence_percent} confidence."
+
+            # Add additional metadata if available
+            if metadata.get("file_size"):
+                summary_text += f" File size: {metadata['file_size']} bytes."
+
+            if metadata.get("format"):
+                summary_text += f" Format: {metadata['format']}."
+
+        else:
+            # For text documents, use the existing summarization logic
+            content = document.get("text", "")
+            if not content:
+                return {
+                    "status": "success",
+                    "summary": "No content available to summarize",
+                }
+
+            # Limit content more aggressively for faster processing
+            limited_content = content[
+                :500
+            ]  # Reduced from 1000 to 500 characters for faster processing
+            if len(content) > 500:
+                limited_content += "..."
+
+            # Use a direct LLM call for faster summarization
+            from llama_index.llms.openai import OpenAI
+
+            # Get LLM configuration from config
+            llm_config = config.get_llm_config()
+            summarization_config = llm_config.get("summarization", {})
+
+            llm = OpenAI(
+                model=summarization_config.get("model", "gpt-4o-mini"),
+                temperature=summarization_config.get("temperature", 0.1),
+            )
+
+            summary_prompt = f"""Please provide a brief summary of the following document content in 1-2 sentences maximum.
+            Focus on the main topic and key points.
+
+            Document content:
+            {limited_content}"""
+
+            # Add timeout for faster response
+            import asyncio
+
+            try:
+                summary = await asyncio.wait_for(
+                    llm.acomplete(summary_prompt),
+                    timeout=10.0,  # Reduced from 15 to 10 seconds
+                )
+                summary_text = summary.text
+            except asyncio.TimeoutError:
+                summary_text = "Summary generation timed out. The document may be too large or complex."
+
+        # Ensure summary_text is defined
+        if "summary_text" not in locals():
+            summary_text = "Failed to generate summary. Please try again."
 
         return {
             "status": "success",
@@ -710,8 +878,10 @@ async def upload_images(files: list[UploadFile] = File(...)):
                     # For uploaded files, we need to use the temp file path instead of URL
                     file_path = f"file://{temp_file_path}"
                     image_metadata = image_processor.get_image_metadata(file_path)
-                    image_classification = (
-                        image_processor.classify_image_with_tensorflow(file_path)
+
+                    # Use PyTorch for image classification
+                    image_classification = image_processor.classify_image_with_pytorch(
+                        file_path
                     )
 
                     # Combine metadata
@@ -735,7 +905,7 @@ async def upload_images(files: list[UploadFile] = File(...)):
                         image_vdb.write_images(
                             [
                                 {
-                                    "url": temp_url,
+                                    "url": file.filename,  # Use filename as URL for uploaded files
                                     "image_data": base64_data,
                                     "metadata": combined_metadata,
                                 }
@@ -787,29 +957,150 @@ async def upload_images(files: list[UploadFile] = File(...)):
 @app.delete("/delete-document/{document_id}")
 async def delete_document(document_id: str):
     """
-    Delete a document from the RAG system by ID.
+    Delete a document or image from the RAG system by ID.
 
     Args:
-        document_id: ID of the document to delete
+        document_id: ID of the document or image to delete
 
     Returns:
         dict: Status message
     """
     try:
-        success = ragme.delete_document(document_id)
+        # First check if document exists in text collection
+        documents = ragme.list_documents(limit=1000, offset=0)
 
-        if success:
+        # Convert Weaviate UUID to string for comparison
+        text_document = None
+        for doc in documents:
+            doc_id = str(doc.get("id")) if doc.get("id") else None
+            if doc_id == document_id:
+                text_document = doc
+                break
+
+        if text_document:
+            # Document exists in text collection, delete it
+            success = ragme.delete_document(document_id)
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Document {document_id} deleted successfully",
+                }
+            else:
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to delete document {document_id}"
+                )
+
+        # If not found in text collection, try image collection
+        try:
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # Check if image exists in image collection
+            images = image_vdb.list_documents(limit=1000, offset=0)
+
+            # Convert Weaviate UUID to string for comparison
+            image_document = None
+            for img in images:
+                img_id = str(img.get("id")) if img.get("id") else None
+                if img_id == document_id:
+                    image_document = img
+                    break
+
+            if image_document:
+                # Image exists in image collection, delete it
+                image_success = image_vdb.delete_document(document_id)
+                if image_success:
+                    return {
+                        "status": "success",
+                        "message": f"Image {document_id} deleted successfully",
+                    }
+                else:
+                    raise HTTPException(
+                        status_code=500, detail=f"Failed to delete image {document_id}"
+                    )
+
+        except Exception as image_error:
+            print(f"Error trying to delete from image collection: {str(image_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error accessing image collection: {str(image_error)}",
+            ) from image_error
+
+        # If not found in either collection
+        raise HTTPException(
+            status_code=404, detail=f"Document or image {document_id} not found"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting document/image {document_id}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/document/{document_id}")
+async def get_document(document_id: str):
+    """
+    Get a document or image from the RAG system by ID.
+
+    Args:
+        document_id: ID of the document or image to retrieve
+
+    Returns:
+        dict: Document data
+    """
+    try:
+        # First try to get from text collection
+        documents = ragme.list_documents(limit=1000, offset=0)
+        document = next(
+            (doc for doc in documents if doc.get("id") == document_id), None
+        )
+
+        if document:
             return {
                 "status": "success",
-                "message": f"Document {document_id} deleted successfully",
+                "document": document,
             }
-        else:
-            raise HTTPException(
-                status_code=404, detail=f"Document {document_id} not found"
-            )
 
+        # If not found in text collection, try image collection
+        try:
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # Try to get from image collection
+            images = image_vdb.list_documents(limit=1000, offset=0)
+            image = next((img for img in images if img.get("id") == document_id), None)
+
+            if image:
+                return {
+                    "status": "success",
+                    "document": image,
+                }
+        except Exception as image_error:
+            print(f"Error trying to get from image collection: {str(image_error)}")
+
+        # If not found in either collection
+        raise HTTPException(
+            status_code=404, detail=f"Document or image {document_id} not found"
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error deleting document {document_id}: {str(e)}")
+        print(f"Error getting document/image {document_id}: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) from e
 

@@ -149,14 +149,17 @@ class RagMe:
                     }
                 )
         else:
-            for doc in documents:
+            # Map documents to their original URLs
+            for i, doc in enumerate(documents):
+                # Use the original URL from the input list
+                original_url = urls[i] if i < len(urls) else doc.id_
                 docs_to_write.append(
                     {
-                        "url": doc.id_,
+                        "url": original_url,
                         "text": doc.text,
                         "metadata": {
                             "type": "webpage",
-                            "url": doc.id_,
+                            "url": original_url,
                             "date_added": datetime.now().isoformat(),
                         },
                     }

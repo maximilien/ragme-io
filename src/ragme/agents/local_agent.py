@@ -304,14 +304,64 @@ class RagMeLocalAgent:
             logging.error(f"Error processing DOCX file {file_path}: {str(e)}")
             return False
 
+    def _process_image_file(self, file_path: Path) -> bool:
+        """Process an image file using the RAGme API"""
+        try:
+            # Check if file exists and is an image
+            if not file_path.exists():
+                logging.error(f"Image file does not exist: {file_path}")
+                return False
+
+            # Check if it's a supported image format
+            supported_formats = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+            if file_path.suffix.lower() not in supported_formats:
+                logging.error(f"Unsupported image format: {file_path}")
+                return False
+
+            # Prepare the file for upload
+            with open(file_path, "rb") as image_file:
+                files = {"files": (file_path.name, image_file, "image/*")}
+
+                # Call the RAGme API directly
+                response = requests.post(f"{self.api_url}/upload-images", files=files)
+
+                if response.status_code == 200:
+                    result = response.json()
+                    if result["status"] == "success":
+                        logging.info(f"Successfully processed image: {file_path}")
+                        logging.info(
+                            f"Files processed: {result.get('files_processed', 1)}"
+                        )
+                        return True
+                    else:
+                        logging.error(
+                            f"Error processing image: {result.get('message', 'Unknown error')}"
+                        )
+                else:
+                    logging.error(
+                        f"Server error: {response.status_code} - {response.text}"
+                    )
+
+                return False
+
+        except Exception as e:
+            print("Full traceback:")
+            print(traceback.format_exc())
+            logging.error(f"Error processing image file {file_path}: {str(e)}")
+            return False
+
     # public methods
 
     def process_file(self, file_path: Path):
         """Process detected files based on their type"""
-        if file_path.suffix.lower() == ".pdf":
+        file_ext = file_path.suffix.lower()
+
+        if file_ext == ".pdf":
             self._process_pdf_file(file_path)
-        elif file_path.suffix.lower() == ".docx":
+        elif file_ext == ".docx":
             self._process_docx_file(file_path)
+        elif file_ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}:
+            self._process_image_file(file_path)
         else:
             logging.warning(f"Unsupported file type: {file_path}")
 

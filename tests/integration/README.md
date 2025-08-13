@@ -10,6 +10,7 @@ The integration tests implement a complete scenario that validates the end-to-en
 2. **Step 1**: Query with empty collection (should return no information)
 3. **Step 2**: Add documents one by one and verify queries return appropriate results
 4. **Step 3**: Remove documents one by one and verify queries return no results
+5. **Step 4**: Test image collection operations (listing, adding, checking, and deleting images)
 
 ## Test Files
 
@@ -24,6 +25,7 @@ The integration tests implement a complete scenario that validates the end-to-en
 
 - **Test URL**: `https://maximilien.org` - Used for testing URL document addition
 - **Test PDF**: `tests/fixtures/pdfs/ragme-io.pdf` - Used for testing PDF document addition
+- **Test Image**: `small_test_image.jpg` - Used for testing image collection operations
 - **Test Queries**:
   - "who is Maximilien?" - Should return information about Maximilien from the URL document
   - "what is the RAGme-io project?" - Should return detailed information about the RAGme-io project from the PDF document
@@ -37,9 +39,10 @@ Before running the integration tests, ensure:
    ./start.sh
    ```
 
-2. **Test PDF exists**:
+2. **Test files exist**:
    ```bash
    ls tests/fixtures/pdfs/ragme-io.pdf
+   ls small_test_image.jpg
    ```
 
 3. **Python dependencies are installed**:
@@ -53,7 +56,7 @@ Before running the integration tests, ensure:
    ls config.yaml
    ```
    
-   The tests will automatically backup your `config.yaml`, modify it to use a test collection (`test_integration`), and restore it after the tests complete.
+   The tests will automatically backup your `config.yaml`, modify it to use test collections (`test_integration` for text, `test_integration_images` for images), and restore it after the tests complete.
 
 ## Running the Tests
 
@@ -136,7 +139,9 @@ Tests the RAGme API endpoints directly:
   - `POST /query` - Query the RAG system
   - `POST /add-urls` - Add URL documents
   - `POST /upload-files` - Upload PDF documents
+  - `POST /upload-images` - Upload image documents
   - `GET /list-documents` - List all documents
+  - `GET /list-content?content_type=image` - List image documents
   - `DELETE /delete-document/{id}` - Delete specific documents
   - `POST /tool/process_pdf` (MCP) - Process PDF files
 
@@ -146,6 +151,7 @@ Tests the RAGme API endpoints directly:
   3. Add URL document and verify query returns information
   4. Add PDF document and verify query returns detailed information
   5. Remove documents one by one and verify queries return no information
+  6. Test image collection operations (cleanup, list, add, verify, delete)
 
 ### Agent Integration Tests (`test_agents.py`)
 
@@ -164,6 +170,7 @@ Tests the RagMeAgent functionality:
   3. Add URL document via agent and verify query returns information
   4. Add PDF document via MCP server and verify query returns detailed information
   5. Remove documents via agent and verify queries return no information
+  6. Test image collection listing using agent (multi-language support)
 
 ## Test Validation
 
@@ -198,10 +205,13 @@ The tests automatically:
 
 - **API Base URL**: `http://localhost:8021`
 - **MCP Base URL**: `http://localhost:8022`
-- **Test Collection Name**: `test_integration`
+- **Test Collection Names**: 
+  - Text: `test_integration`
+  - Images: `test_integration_images`
 - **Test Documents**: 
   - URL: `https://maximilien.org`
   - PDF: `tests/fixtures/pdfs/ragme-io.pdf`
+  - Image: `small_test_image.jpg`
 
 ### Manual Configuration Cleanup
 
@@ -223,10 +233,11 @@ This will restore your original `config.yaml` and remove backup files.
    ./start.sh
    ```
 
-2. **Test PDF missing**:
+2. **Test files missing**:
    ```bash
-   # Ensure the test PDF exists
+   # Ensure the test files exist
    ls tests/fixtures/pdfs/ragme-io.pdf
+   ls small_test_image.jpg
    ```
 
 3. **Configuration issues**:
@@ -272,10 +283,11 @@ Check the following logs for debugging:
 ## Future Enhancements
 
 1. **MCP Agent Integration**: Currently PDFs are added via MCP server directly. Future TODO is to integrate MCP tools with the RagMeAgent.
-2. **Additional Document Types**: Extend tests to cover more document types (DOCX, TXT, etc.)
-3. **Performance Testing**: Add performance benchmarks and load testing
-4. **Multi-User Testing**: Test concurrent user scenarios
-5. **Error Recovery**: Test system behavior under various error conditions
+2. **Image Agent Integration**: Currently images are added via API directly. Future TODO is to integrate image upload tools with the RagMeAgent.
+3. **Additional Document Types**: Extend tests to cover more document types (DOCX, TXT, etc.)
+4. **Performance Testing**: Add performance benchmarks and load testing
+5. **Multi-User Testing**: Test concurrent user scenarios
+6. **Error Recovery**: Test system behavior under various error conditions
 
 ## Contributing
 

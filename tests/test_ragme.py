@@ -118,7 +118,8 @@ def test_write_webpages_to_weaviate():
         # Check that write_documents was called with the expected documents
         call_args = mock_db_instance.write_documents.call_args[0][0]
         assert len(call_args) == 2
-        assert call_args[0]["url"] == "url1"
+        # Now we use the original URLs instead of doc.id_
+        assert call_args[0]["url"] == "http://test1"
         assert call_args[0]["text"] == "text1"
-        assert call_args[1]["url"] == "url2"
+        assert call_args[1]["url"] == "http://test2"
         assert call_args[1]["text"] == "text2"

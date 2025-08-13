@@ -44,16 +44,16 @@ stop_processes() {
     fi
 
     # Also kill any processes using our specific ports
-    kill_port_process 3020 "New Frontend"
+    kill_port_process 8020 "New Frontend"
     kill_port_process 8021 "FastAPI"
     kill_port_process 8022 "MCP"
 
     # Check if any processes are still running
     echo "Checking for any remaining processes..."
-    if lsof -Pi :3020 -sTCP:LISTEN -t >/dev/null 2>&1 || \
+    if lsof -Pi :8020 -sTCP:LISTEN -t >/dev/null 2>&1 || \
        lsof -Pi :8021 -sTCP:LISTEN -t >/dev/null 2>&1 || \
        lsof -Pi :8022 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "Warning: Some processes may still be running on ports 3020, 8021, or 8022"
+        echo "Warning: Some processes may still be running on ports 8020, 8021, or 8022"
         return 1
     else
         echo "All RAGme processes stopped successfully."
@@ -68,7 +68,7 @@ stop_service() {
     
     case $service in
         "frontend")
-            kill_port_process 3020 "New Frontend"
+            kill_port_process 8020 "New Frontend"
             # Remove frontend PID from .pid file if it exists
             if [ -f .pid ]; then
                 # Create a temporary file without frontend PIDs
@@ -173,7 +173,7 @@ show_status() {
     echo "🌐 Port Status:"
     
     # Check each port
-    local ports=("3020:New Frontend" "8021:FastAPI" "8022:MCP")
+    local ports=("8020:New Frontend" "8021:FastAPI" "8022:MCP")
     local all_running=true
     
     for port_info in "${ports[@]}"; do
@@ -190,7 +190,7 @@ show_status() {
     echo ""
     if [ "$all_running" = true ]; then
         echo "🎉 All RAGme services are running!"
-        echo "   • New Frontend: http://localhost:3020"
+        echo "   • New Frontend: http://localhost:8020"
         echo "   • API: http://localhost:8021"
         echo "   • MCP: http://localhost:8022"
     else

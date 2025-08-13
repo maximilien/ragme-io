@@ -25,7 +25,10 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
-- **🖼️ AI-Powered Image Support**: Complete image processing pipeline with TensorFlow ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
+- **🖼️ AI-Powered Image Support**: Complete image processing pipeline with PyTorch ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
+- **🎯 Enhanced AI Image Summaries**: Fixed image summary generation to show rich classification data with confidence scores and file information. Images now display meaningful summaries like "Yorkshire terrier with 95.1% confidence" ⭐ **FIXED!**
+- **🧹 Clean PyTorch Codebase**: Removed all TensorFlow dependencies and updated to PyTorch-only implementation with proper dependency management ⭐ **CLEANED!**
+- **🔧 Enhanced VDB Management**: Improved `vdb.sh` tool to show source information, AI classifications, and better metadata for image documents ⭐ **ENHANCED!**
 - **🔄 Environment Switching Fix**: Fixed critical bug where changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) wasn't taking effect after restart. Now seamlessly switch between different application environments (e.g., RAGme ↔ Viewfinder.ai) ⭐ **FIXED!**
 - **🤖 Three-Agent Architecture**: Sophisticated agent system with intelligent query routing and specialized processing ⭐ **NEW!**
 - **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment
@@ -34,6 +37,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient popup button
 - **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
 - **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
+- **🖼️ Image Collection Testing**: Complete integration test coverage for image collections including listing, adding, checking, and deleting images
 - **💾 Save Chat Responses**: Save individual AI responses as markdown files with smart filename generation
 - **📧 Email Chat Responses**: Send AI responses via email with pre-filled subject and content
 - **📄 Smart Document Chunking**: Large documents are automatically split into manageable chunks while preserving readability
@@ -139,7 +143,7 @@ RAGME_MCP_URL=http://localhost:8022
 # Optional: Custom ports for services
 RAGME_API_PORT=8021
 RAGME_MCP_PORT=8022
-RAGME_FRONTEND_PORT=3020
+RAGME_FRONTEND_PORT=8020
 ```
 
 ### 🎛️ Advanced Configuration (NEW!)
@@ -187,7 +191,7 @@ vector_databases:
         - name: "RagMeDocs"
           type: "text"
         - name: "RagMeImages"
-          type: "images"
+          type: "image"
 ```
 
 #### 🖼️ Image Processing Features
@@ -200,7 +204,7 @@ RAGme now includes comprehensive image support with AI-powered analysis:
 - Dedicated `/upload-images` API endpoint
 
 **🤖 AI-Powered Processing:**
-- **TensorFlow Classification**: Uses ResNet50 trained on ImageNet to classify image content
+- **PyTorch Classification**: Uses ResNet50 trained on ImageNet to classify image content
 - **EXIF Metadata Extraction**: Extracts camera settings, GPS data, and other technical metadata
 - **Smart Storage**: Images stored as base64 BLOB data in Weaviate with rich metadata
 
@@ -209,11 +213,11 @@ RAGme now includes comprehensive image support with AI-powered analysis:
 # For full AI classification features (optional)
 pip install ragme-ai[ml]
 
-# Or install TensorFlow separately
-pip install tensorflow>=2.15.0
+# Or install PyTorch separately
+pip install torch>=2.0.0 torchvision>=0.15.0
 ```
 
-> **Note**: AI classification requires TensorFlow, which is an optional dependency. Images will still be processed and stored without it, but won't include AI-generated labels.
+> **Note**: AI classification requires PyTorch, which is an optional dependency. Images will still be processed and stored without it, but won't include AI-generated labels.
 
 **💬 Agent Tools:**
 - `write_image_to_collection(image_url)` - Add images from URLs to the collection
@@ -247,7 +251,7 @@ chmod +x start.sh
 ./start.sh
 ```
 
-This will start all services and you can access the **new frontend** at `http://localhost:3020`
+This will start all services and you can access the **new frontend** at `http://localhost:8020`
 
 ### Process Management
 
@@ -289,7 +293,7 @@ This will start all services and you can access the **new frontend** at `http://
 # Monitor specific services
 ./tools/tail-logs.sh api        # API logs (port 8021)
 ./tools/tail-logs.sh mcp        # MCP logs (port 8022)
-./tools/tail-logs.sh frontend   # Frontend logs (port 3020)
+./tools/tail-logs.sh frontend   # Frontend logs (port 8020)
 ```
 
 For detailed process management, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).
@@ -328,7 +332,7 @@ A modern, responsive web interface with three-pane layout:
 - **Content addition** via URLs, file uploads, or JSON data
 - **WebSocket communication** for real-time updates
 
-**Access**: `http://localhost:3020` (default when running `./start.sh`)
+**Access**: `http://localhost:8020` (default when running `./start.sh`)
 
 ### Chrome Extension
 
@@ -380,8 +384,8 @@ RAGme.io uses a multi-service architecture with a sophisticated three-agent syst
 
 ```mermaid
 flowchart TB
-    new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
-    new-ui[New Frontend<br/>Port 3020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
+    new-ui[New Frontend<br/>Port 8020] --> api[API Server<br/>Port 8021]
+new-ui[New Frontend<br/>Port 8020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
     chrome[Chrome Extension] --> api
     subgraph "AI Agent Layer"
       agent-local[File Monitor Local Agent] --> mcp[MCP Server<br/>Port 8022]
@@ -458,7 +462,7 @@ The system automatically routes queries based on content:
 
 ### Components
 
-- **New Frontend** (port 3020): Modern web interface with three-pane layout ⭐ **DEFAULT**
+- **New Frontend** (port 8020): Modern web interface with three-pane layout ⭐ **DEFAULT**
 - **API Server** (port 8021): REST API for URL and JSON ingestion
 - **MCP Server** (port 8022): Document processing for PDF and DOCX files
 - **File Monitor Agent**: Watches `watch_directory/` for new files

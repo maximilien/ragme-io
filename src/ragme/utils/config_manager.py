@@ -238,7 +238,7 @@ class ConfigManager:
         placeholder_pattern = re.compile(r"^\$\{[^}]+\}$")
 
         for collection in collections:
-            if isinstance(collection, dict) and collection.get("type") == "images":
+            if isinstance(collection, dict) and collection.get("type") == "image":
                 name = collection.get("name", "RagMeImages")
                 if isinstance(name, str) and placeholder_pattern.match(name):
                     continue
