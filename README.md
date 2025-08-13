@@ -204,6 +204,17 @@ RAGme now includes comprehensive image support with AI-powered analysis:
 - **EXIF Metadata Extraction**: Extracts camera settings, GPS data, and other technical metadata
 - **Smart Storage**: Images stored as base64 BLOB data in Weaviate with rich metadata
 
+**📦 Dependencies:**
+```bash
+# For full AI classification features (optional)
+pip install ragme-ai[ml]
+
+# Or install TensorFlow separately
+pip install tensorflow>=2.15.0
+```
+
+> **Note**: AI classification requires TensorFlow, which is an optional dependency. Images will still be processed and stored without it, but won't include AI-generated labels.
+
 **💬 Agent Tools:**
 - `write_image_to_collection(image_url)` - Add images from URLs to the collection
 - `list_image_collection(limit, offset)` - List images with AI classifications
