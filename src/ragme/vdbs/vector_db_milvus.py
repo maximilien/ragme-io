@@ -499,10 +499,27 @@ class MilvusVectorDatabase(VectorDatabase):
         return MilvusQueryAgent(self)
 
     def cleanup(self):
-        """Clean up Milvus client."""
-        # No explicit cleanup needed for MilvusClient
-        if self.client is not None:
-            self.client = None
+        """Clean up resources and close connections."""
+        if self.client:
+            self.client.close()
+
+    def write_images(self, images: list[dict[str, Any]]):
+        """Write images to Milvus (converted to text representation)."""
+        # For now, store images as text documents with metadata
+        documents = []
+        for img in images:
+            documents.append(
+                {
+                    "url": img.get("url", ""),
+                    "text": f"Image: {img.get('url', 'unknown')} - {json.dumps(img.get('metadata', {}))}",
+                    "metadata": img.get("metadata", {}),
+                }
+            )
+        self.write_documents(documents)
+
+    def supports_images(self) -> bool:
+        """Milvus doesn't directly support BLOB storage for images."""
+        return False
 
     @property
     def db_type(self) -> str:

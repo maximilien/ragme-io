@@ -364,27 +364,27 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
         return QueryAgent(client=self.client, collections=[self.collection_name])
 
     def cleanup(self):
-        """Clean up local Weaviate client."""
+        """Clean up resources and close connections."""
         if self.client:
-            try:
-                # Close any open connections
-                if hasattr(self.client, "close"):
-                    self.client.close()
-                # Also try to close the underlying connection if it exists
-                if hasattr(self.client, "_connection") and self.client._connection:
-                    if hasattr(self.client._connection, "close"):
-                        try:
-                            self.client._connection.close()
-                        except TypeError:
-                            # Some connection objects don't take arguments
-                            pass
-            except Exception as e:
-                # Log the error but don't raise it to avoid breaking shutdown
-                import warnings
+            self.client.close()
 
-                warnings.warn(f"Error during local Weaviate cleanup: {e}")
-            finally:
-                self.client = None
+    def write_images(self, images: list[dict[str, Any]]):
+        """Write images to local Weaviate (limited BLOB support)."""
+        # For now, store images as metadata only since local Weaviate may not support BLOB
+        documents = []
+        for img in images:
+            documents.append(
+                {
+                    "url": img.get("url", ""),
+                    "text": f"Image: {img.get('url', 'unknown')}",
+                    "metadata": img.get("metadata", {}),
+                }
+            )
+        self.write_documents(documents)
+
+    def supports_images(self) -> bool:
+        """Local Weaviate has limited image support."""
+        return False  # Conservative default
 
     @property
     def db_type(self) -> str:

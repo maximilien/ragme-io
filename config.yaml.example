@@ -86,6 +86,8 @@ vector_databases:
       collections:
         - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
           type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "images"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000
@@ -99,6 +101,8 @@ vector_databases:
       collections:
         - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
           type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "images"
       embedding_model: "text-embedding-3-large"
       text_splitter: "recursive"
       chunk_size: 1000

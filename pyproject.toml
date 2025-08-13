@@ -24,8 +24,10 @@ dependencies = [
     "PyPDF2>=3.0.0",
     "pydantic>=2.0.0",
     "python-docx>=0.8.11",
+    "python-dotenv>=1.0.0",
     "python-magic>=0.4.27",
     "python-multipart>=0.0.5",
+    "PyYAML>=6.0",
     "requests>=2.31.0",
     "streamlit",
     "uvicorn>=0.27.0",
@@ -33,6 +35,9 @@ dependencies = [
     "weaviate-client>=4.0.0",
     "weaviate-client[agents]",
     "pymilvus>=2.4.4",
+    # Essential image processing dependencies
+    "exif>=1.6.1",
+    "pillow>=9.0.0",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +47,10 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.23.0",
     "requests-mock>=1.12.0",
+]
+ml = [
+    # Optional ML dependencies that might be heavy or cause CI issues
+    "tensorflow>=2.15.0",
 ]
 
 [tool.ruff]
