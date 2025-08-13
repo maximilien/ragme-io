@@ -486,23 +486,20 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
 // Delete document endpoint
 app.delete('/delete-document/:documentId', async (req, res) => {
+  const documentId = req.params.documentId;
+
   try {
-    const { documentId } = req.params;
+    const apiResult = await callRAGmeAPI(`/delete-document/${documentId}`, null, 'DELETE');
 
-    const apiResult = await callRAGmeAPI(
-      `/delete-document/${documentId}`,
-      undefined,
-      undefined,
-      false,
-      'DELETE'
-    );
-
-    if (apiResult) {
-      res.json(apiResult);
+    if (apiResult && apiResult.status === 'success') {
+      res.json({
+        status: 'success',
+        message: 'Document deleted successfully',
+      });
     } else {
-      res.status(500).json({
+      res.status(400).json({
         status: 'error',
-        message: 'Failed to delete document',
+        message: apiResult?.message || 'Failed to delete document',
       });
     }
   } catch (error) {
@@ -510,6 +507,52 @@ app.delete('/delete-document/:documentId', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to delete document',
+    });
+  }
+});
+
+// Image upload endpoint
+app.post('/upload-images', upload.array('files'), async (req, res) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No images uploaded',
+      });
+    }
+
+    // Forward to backend API
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', new Blob([file.buffer]), file.originalname);
+    });
+
+    const response = await fetch('http://localhost:8021/upload-images', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.status === 'success') {
+      res.json({
+        status: 'success',
+        message: result.message,
+        files_processed: result.files_processed,
+      });
+    } else {
+      res.status(response.status || 500).json({
+        status: 'error',
+        message: result.message || 'Image upload failed',
+      });
+    }
+  } catch (error) {
+    logger.error('Image upload error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Image upload failed',
     });
   }
 });
