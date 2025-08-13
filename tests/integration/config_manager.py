@@ -21,14 +21,20 @@ import yaml
 class TestConfigManager:
     """Manages configuration for integration tests to avoid polluting main collections."""
 
-    def __init__(self, test_collection_name: str = "test_integration"):
+    def __init__(
+        self,
+        test_collection_name: str = "test_integration",
+        test_image_collection_name: str = "test_integration_images",
+    ):
         """
         Initialize the test configuration manager.
 
         Args:
-            test_collection_name: Name of the test collection to use
+            test_collection_name: Name of the test text collection to use
+            test_image_collection_name: Name of the test image collection to use
         """
         self.test_collection_name = test_collection_name
+        self.test_image_collection_name = test_image_collection_name
         self.original_config_path = Path("config.yaml")
         self.backup_config_path = Path("config.yaml.test_backup")
         self.temp_config_path = Path("config.yaml.test_temp")
@@ -112,6 +118,22 @@ class TestConfigManager:
                     f"🔧 Added VECTOR_DB_TEXT_COLLECTION_NAME={self.test_collection_name} to .env file"
                 )
 
+            # Replace VECTOR_DB_IMAGE_COLLECTION_NAME value
+            if re.search(r"^VECTOR_DB_IMAGE_COLLECTION_NAME=", env_content, re.M):
+                env_content = re.sub(
+                    r"(VECTOR_DB_IMAGE_COLLECTION_NAME=).*",
+                    f"\\1{self.test_image_collection_name}",
+                    env_content,
+                )
+                print(
+                    f"🔧 Updated existing VECTOR_DB_IMAGE_COLLECTION_NAME to {self.test_image_collection_name}"
+                )
+            else:
+                env_content += f"\nVECTOR_DB_IMAGE_COLLECTION_NAME={self.test_image_collection_name}\n"
+                print(
+                    f"🔧 Added VECTOR_DB_IMAGE_COLLECTION_NAME={self.test_image_collection_name} to .env file"
+                )
+
             # Remove legacy collection name if present (migrating to new vars)
             if re.search(r"^VECTOR_DB_COLLECTION_NAME=", env_content, re.M):
                 env_content = re.sub(
@@ -169,7 +191,8 @@ class TestConfigManager:
                     collections = db_config.get("collections")
                     if isinstance(collections, list) and collections:
                         # Replace text collection name
-                        updated = False
+                        text_updated = False
+                        image_updated = False
                         for col in collections:
                             if isinstance(col, dict) and col.get("type") == "text":
                                 original = col.get("name", "")
@@ -177,15 +200,32 @@ class TestConfigManager:
                                 print(
                                     f"🔄 Modifying text collection '{original}' to '{self.test_collection_name}'"
                                 )
-                                updated = True
-                                break
-                        if not updated:
-                            # If no text collection present, add one
+                                text_updated = True
+                            elif isinstance(col, dict) and col.get("type") == "image":
+                                original = col.get("name", "")
+                                col["name"] = self.test_image_collection_name
+                                print(
+                                    f"🔄 Modifying image collection '{original}' to '{self.test_image_collection_name}'"
+                                )
+                                image_updated = True
+
+                        # Add missing collections if not present
+                        if not text_updated:
                             collections.append(
                                 {"name": self.test_collection_name, "type": "text"}
                             )
                             print(
                                 f"➕ Added text collection '{self.test_collection_name}' to database config"
+                            )
+                        if not image_updated:
+                            collections.append(
+                                {
+                                    "name": self.test_image_collection_name,
+                                    "type": "image",
+                                }
+                            )
+                            print(
+                                f"➕ Added image collection '{self.test_image_collection_name}' to database config"
                             )
 
             # Enable bypass_delete_confirmation for tests
@@ -209,7 +249,7 @@ class TestConfigManager:
             # Replace original config with modified version
             shutil.copy2(self.temp_config_path, self.original_config_path)
             print(
-                f"✅ Modified config.yaml to use test collection '{self.test_collection_name}'"
+                f"✅ Modified config.yaml to use test collections '{self.test_collection_name}' and '{self.test_image_collection_name}'"
             )
 
             return True
@@ -271,15 +311,21 @@ class TestConfigManager:
                         with open(self.env_file_path) as f:
                             env_content = f.read()
 
-                        # Remove the test collection name line
+                        # Remove the test collection name lines
                         original_content = re.sub(
                             rf"^VECTOR_DB_TEXT_COLLECTION_NAME={re.escape(self.test_collection_name)}\n?",
                             "",
                             env_content,
                             flags=re.M,
                         )
+                        original_content = re.sub(
+                            rf"^VECTOR_DB_IMAGE_COLLECTION_NAME={re.escape(self.test_image_collection_name)}\n?",
+                            "",
+                            original_content,
+                            flags=re.M,
+                        )
 
-                        # Check if we need to restore the original collection name
+                        # Check if we need to restore the original collection names
                         # If the original content doesn't have VECTOR_DB_TEXT_COLLECTION_NAME, add it back
                         if not re.search(
                             r"^VECTOR_DB_TEXT_COLLECTION_NAME=", original_content, re.M
@@ -306,12 +352,37 @@ class TestConfigManager:
                                 "🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs to .env file"
                             )
 
+                        # Check if we need to restore the original image collection name
+                        if not re.search(
+                            r"^VECTOR_DB_IMAGE_COLLECTION_NAME=", original_content, re.M
+                        ):
+                            # Add the original image collection name back (assuming it was "RagMeImages")
+                            if re.search(
+                                r"^# Vector Database Configuration",
+                                original_content,
+                                re.M,
+                            ):
+                                # Insert after the Vector Database Configuration comment
+                                original_content = re.sub(
+                                    r"(^# Vector Database Configuration\n)",
+                                    r"\1VECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs\nVECTOR_DB_IMAGE_COLLECTION_NAME=RagMeImages\n",
+                                    original_content,
+                                    flags=re.M,
+                                )
+                            else:
+                                # Add at the end if no Vector Database Configuration section
+                                original_content += "\n# Vector Database Configuration\nVECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs\nVECTOR_DB_IMAGE_COLLECTION_NAME=RagMeImages\n"
+
+                            print(
+                                "🔧 Restored VECTOR_DB_IMAGE_COLLECTION_NAME=RagMeImages to .env file"
+                            )
+
                         # Write back the cleaned content
                         with open(self.env_file_path, "w") as f:
                             f.write(original_content)
 
                         print(
-                            "🔧 Restored .env file by removing test collection name and restoring original"
+                            "🔧 Restored .env file by removing test collection names and restoring original"
                         )
                         self.env_modified = False
                         return True
@@ -412,8 +483,12 @@ class TestConfigManager:
             return False
 
     def get_test_collection_name(self) -> str:
-        """Get the test collection name."""
+        """Get the test text collection name."""
         return self.test_collection_name
+
+    def get_test_image_collection_name(self) -> str:
+        """Get the test image collection name."""
+        return self.test_image_collection_name
 
     def is_test_config_active(self) -> bool:
         """
@@ -429,7 +504,7 @@ class TestConfigManager:
             with open(self.original_config_path, encoding="utf-8") as f:
                 current_config = yaml.safe_load(f)
 
-            # Check if any database is using the test collection name
+            # Check if any database is using the test collection names
             if "vector_databases" in current_config:
                 databases = current_config["vector_databases"].get("databases", [])
                 for db_config in databases:
@@ -443,6 +518,12 @@ class TestConfigManager:
                             isinstance(col, dict)
                             and col.get("type") == "text"
                             and col.get("name") == self.test_collection_name
+                        ):
+                            return True
+                        if (
+                            isinstance(col, dict)
+                            and col.get("type") == "image"
+                            and col.get("name") == self.test_image_collection_name
                         ):
                             return True
 
@@ -467,8 +548,13 @@ def teardown_test_config() -> bool:
 
 
 def get_test_collection_name() -> str:
-    """Get test collection name (global function for easy access)."""
+    """Get test text collection name (global function for easy access)."""
     return test_config_manager.get_test_collection_name()
+
+
+def get_test_image_collection_name() -> str:
+    """Get test image collection name (global function for easy access)."""
+    return test_config_manager.get_test_image_collection_name()
 
 
 if __name__ == "__main__":

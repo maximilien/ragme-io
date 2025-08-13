@@ -37,6 +37,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient popup button
 - **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
 - **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
+- **🖼️ Image Collection Testing**: Complete integration test coverage for image collections including listing, adding, checking, and deleting images
 - **💾 Save Chat Responses**: Save individual AI responses as markdown files with smart filename generation
 - **📧 Email Chat Responses**: Send AI responses via email with pre-filled subject and content
 - **📄 Smart Document Chunking**: Large documents are automatically split into manageable chunks while preserving readability
