@@ -82,13 +82,13 @@ The CI pipeline uploads test artifacts:
 ./test.sh integration  # Integration tests only
 
 # Run specific test file
-uv run pytest tests/test_api.py
+uv run --active python -m pytest tests/test_api.py
 
 # Run with verbose output
-uv run pytest -v
+uv run --active python -m pytest -v
 
 # Run with coverage
-uv run pytest --cov=src/ragme
+uv run --active python -m pytest --cov=src/ragme
 
 # Show test help
 ./test.sh help
@@ -257,10 +257,10 @@ cache:
 
 ```bash
 # Run tests with detailed output
-uv run pytest -vvv
+uv run --active python -m pytest -vvv
 
 # Run specific failing test
-uv run pytest tests/test_specific.py::test_specific_function -v
+uv run --active python -m pytest tests/test_specific.py::test_specific_function -v
 
 # Check test dependencies
 uv run pip list
@@ -309,7 +309,7 @@ Before committing code:
 
 1. ✅ **Run tests**: `./test.sh`
 2. ✅ **Run linting**: `./tools/lint.sh`
-3. ✅ **Format code**: `uv run ruff format src/ tests/ examples/`
+3. ✅ **Format code**: `uv run --active ruff format src/ tests/ examples/`
 4. ✅ **Build frontend**: `cd frontend && npm run build`
 5. ✅ **Check integration**: `./tools/test-integration.sh` (if services are running)
 
@@ -362,10 +362,10 @@ cd ..
 
 ```bash
 # Python development
-uv run pytest tests/                    # Run tests
-uv run ruff check src/                  # Lint code
-uv run ruff format src/                 # Format code
-uv run ruff check --fix src/            # Auto-fix issues
+uv run --active python -m pytest tests/                    # Run tests
+uv run --active ruff check src/                  # Lint code
+uv run --active ruff format src/                 # Format code
+uv run --active ruff check --fix src/            # Auto-fix issues
 
 # Frontend development
 cd frontend

@@ -9,19 +9,19 @@ echo "🔍 Running Ruff linter on source and test files..."
 
 # Run ruff check on all source, test, and example files
 echo "📁 Checking source files..."
-uv run ruff check src/
+uv run --active ruff check src/
 
 echo "🧪 Checking test files..."
-uv run ruff check tests/
+uv run --active ruff check tests/
 
 echo "📚 Checking example files..."
-uv run ruff check examples/
+uv run --active ruff check examples/
 
 echo "✅ Python linting checks passed!"
 
 # Optional: Run ruff format to check formatting
 echo "🎨 Checking Python code formatting..."
-uv run ruff format --check src/ tests/ examples/
+uv run --active ruff format --check src/ tests/ examples/
 
 echo "✨ Python formatting checks passed!"
 

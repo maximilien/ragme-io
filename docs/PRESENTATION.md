@@ -1,6 +1,8 @@
 # RAGme.io: Personal RAG Agent for Web Content
 ## A Comprehensive Overview
 
+**Maximilien.ai** 
+
 <!-- 
 To generate PDF or HTML from this presentation:
 npx @marp-team/marp-cli@latest PRESENTATION.md -o ~/Desktop/ragme-io.pdf

@@ -178,7 +178,7 @@ cython_debug/
 .pypirc
 
 # Code workspace
-ragme-ai.code-workspace
+ragme-io.code-workspace
 
 # VSCode
 .vscode
