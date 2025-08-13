@@ -73,8 +73,18 @@ class TestConfigManager:
         """
         try:
             if not self.env_file_path.exists():
-                print(f"Warning: {self.env_file_path} does not exist")
-                return True  # Not an error if .env doesn't exist
+                print(
+                    "⚠️ .env file does not exist, creating one with test collection name"
+                )
+                # Create a new .env file with the test collection name
+                env_content = (
+                    f"VECTOR_DB_TEXT_COLLECTION_NAME={self.test_collection_name}\n"
+                )
+                with open(self.env_file_path, "w") as f:
+                    f.write(env_content)
+                self.env_modified = True
+                print("🔧 Created .env file with test collection name")
+                return True
 
             # Backup original .env
             shutil.copy2(self.env_file_path, self.env_backup_path)
@@ -83,7 +93,7 @@ class TestConfigManager:
             with open(self.env_file_path) as f:
                 env_content = f.read()
 
-            # Replace VECTOR_DB_COLLECTION_NAME value
+            # Replace VECTOR_DB_TEXT_COLLECTION_NAME value
             # Prefer new env vars for collections; also set legacy for compatibility
             if re.search(r"^VECTOR_DB_TEXT_COLLECTION_NAME=", env_content, re.M):
                 env_content = re.sub(
@@ -91,18 +101,26 @@ class TestConfigManager:
                     f"\\1{self.test_collection_name}",
                     env_content,
                 )
+                print(
+                    f"🔧 Updated existing VECTOR_DB_TEXT_COLLECTION_NAME to {self.test_collection_name}"
+                )
             else:
                 env_content += (
                     f"\nVECTOR_DB_TEXT_COLLECTION_NAME={self.test_collection_name}\n"
                 )
+                print(
+                    f"🔧 Added VECTOR_DB_TEXT_COLLECTION_NAME={self.test_collection_name} to .env file"
+                )
 
             # Remove legacy collection name if present (migrating to new vars)
-            env_content = re.sub(
-                r"^VECTOR_DB_COLLECTION_NAME=.*\n?",
-                "",
-                env_content,
-                flags=re.M,
-            )
+            if re.search(r"^VECTOR_DB_COLLECTION_NAME=", env_content, re.M):
+                env_content = re.sub(
+                    r"^VECTOR_DB_COLLECTION_NAME=.*\n?",
+                    "",
+                    env_content,
+                    flags=re.M,
+                )
+                print("🔧 Removed legacy VECTOR_DB_COLLECTION_NAME from .env file")
 
             # Write modified content back
             with open(self.env_file_path, "w") as f:
@@ -114,6 +132,9 @@ class TestConfigManager:
 
         except Exception as e:
             print(f"❌ Error modifying .env file: {e}")
+            import traceback
+
+            traceback.print_exc()
             return False
 
     def modify_config_for_tests(self) -> bool:
@@ -231,22 +252,60 @@ class TestConfigManager:
         """
         try:
             if not self.env_modified:
+                print("🔧 .env file was not modified, nothing to restore")
                 return True  # Nothing to restore
 
             if self.env_backup_path.exists():
+                # Restore from backup
                 shutil.copy2(self.env_backup_path, self.env_file_path)
                 self.env_backup_path.unlink()
-                print("🔧 Restored original .env file")
+                print("🔧 Restored original .env file from backup")
                 self.env_modified = False
                 return True
             else:
-                print(f"Warning: .env backup file {self.env_backup_path} not found")
-                # Still mark as restored to avoid repeated warnings
-                self.env_modified = False
-                return True  # Return True to not fail the cleanup
+                print(f"⚠️ .env backup file {self.env_backup_path} not found")
+
+                # If no backup exists but we modified the file, try to restore by removing the test collection name
+                if self.env_file_path.exists():
+                    try:
+                        with open(self.env_file_path) as f:
+                            env_content = f.read()
+
+                        # Remove the test collection name line
+                        original_content = re.sub(
+                            rf"^VECTOR_DB_TEXT_COLLECTION_NAME={re.escape(self.test_collection_name)}\n?",
+                            "",
+                            env_content,
+                            flags=re.M,
+                        )
+
+                        # Write back the cleaned content
+                        with open(self.env_file_path, "w") as f:
+                            f.write(original_content)
+
+                        print("🔧 Restored .env file by removing test collection name")
+                        self.env_modified = False
+                        return True
+                    except Exception as e:
+                        print(
+                            f"❌ Failed to restore .env file by removing test collection name: {e}"
+                        )
+                        # Mark as restored to avoid repeated warnings
+                        self.env_modified = False
+                        return False
+                else:
+                    print("⚠️ .env file does not exist, nothing to restore")
+                    # Mark as restored to avoid repeated warnings
+                    self.env_modified = False
+                    return True
 
         except Exception as e:
             print(f"❌ Error restoring .env file: {e}")
+            import traceback
+
+            traceback.print_exc()
+            # Mark as restored to avoid repeated warnings
+            self.env_modified = False
             return False
 
     def cleanup(self):
@@ -304,15 +363,24 @@ class TestConfigManager:
         """
         print("🧹 Cleaning up configuration after integration tests...")
 
-        success = self.restore_config()
+        # Always try to restore both config and .env file
+        config_success = self.restore_config()
         env_success = self.restore_env_file()
 
-        if success and env_success:
-            print("✅ Configuration cleanup completed successfully")
-        else:
-            print("❌ Configuration cleanup failed")
+        # Clean up temporary files regardless of success
+        self.cleanup()
 
-        return success and env_success
+        if config_success and env_success:
+            print("✅ Configuration cleanup completed successfully")
+            return True
+        else:
+            print("❌ Configuration cleanup had issues:")
+            if not config_success:
+                print("  - Failed to restore config.yaml")
+            if not env_success:
+                print("  - Failed to restore .env file")
+            print("⚠️ Please check your configuration files manually")
+            return False
 
     def get_test_collection_name(self) -> str:
         """Get the test collection name."""
