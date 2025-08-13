@@ -56,7 +56,7 @@ stop_existing() {
     fi
     
     # Also kill any processes using our ports
-    check_port ${RAGME_FRONTEND_PORT:-3020}  # New Frontend
+    check_port ${RAGME_FRONTEND_PORT:-8020}  # New Frontend
     check_port ${RAGME_API_PORT:-8021}  # API
     check_port ${RAGME_MCP_PORT:-8022}  # MCP
 }
@@ -105,7 +105,7 @@ start_service() {
     
     case $service in
         "frontend")
-            check_port ${RAGME_FRONTEND_PORT:-3020}
+            check_port ${RAGME_FRONTEND_PORT:-8020}
             start_new_frontend
             ;;
         "api")
@@ -182,7 +182,7 @@ restart_frontend() {
     echo "🔄 Restarting frontend only..."
     
     # Kill existing frontend process
-    check_port 3020
+    check_port 8020
     
     # Remove frontend PID from .pid file if it exists
     if [ -f .pid ]; then
@@ -195,7 +195,7 @@ restart_frontend() {
     start_new_frontend
     
     echo "✅ Frontend restarted successfully!"
-    echo "   • New Frontend: http://localhost:3020"
+    echo "   • New Frontend: http://localhost:8020"
 }
 
 # Function to restart backend services only (API, MCP, Agent)
@@ -278,7 +278,7 @@ if [ "$1" = "default" ] || [ -z "$1" ]; then
     echo "  ./start.sh restart-backend  # Restart backend services only"
     echo ""
     echo "Access your RAGme services:"
-    echo "  • New Frontend: http://localhost:3020"
+    echo "  • New Frontend: http://localhost:8020"
     echo "  • API: http://localhost:8021"
     echo "  • MCP: http://localhost:8022"
 fi 

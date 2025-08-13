@@ -2,27 +2,20 @@
 # Copyright (c) 2025 dr.max
 
 import base64
-import warnings
 from typing import Any
 
 import requests
 from exif import Image as ExifImage
-from PIL import Image
-
-# Suppress TensorFlow warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module="tensorflow")
-warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
 
 
 class ImageProcessor:
     """
-    Image processing utilities for EXIF extraction, TensorFlow classification,
+    Image processing utilities for EXIF extraction, PyTorch classification,
     and metadata handling.
     """
 
     def __init__(self):
         """Initialize the image processor."""
-        self._tf_model = None
 
     def get_image_metadata(self, image_source: str) -> dict[str, Any]:
         """
@@ -63,11 +56,11 @@ class ImageProcessor:
             print(f"Error getting image metadata: {e}")
             return {"type": "image", "source": image_source, "error": str(e)}
 
-    def classify_image_with_tensorflow(
+    def classify_image_with_pytorch(
         self, image_source: str, top_k: int = 5
     ) -> dict[str, Any]:
         """
-        Classify an image using TensorFlow with a pre-trained ResNet50 model.
+        Classify an image using PyTorch with a pre-trained ResNet50 model.
 
         Args:
             image_source: URL of the image or local file path (with file:// prefix)
@@ -79,13 +72,13 @@ class ImageProcessor:
         try:
             import io
 
-            import numpy as np
-            from tensorflow.keras.applications import ResNet50
-            from tensorflow.keras.applications.resnet50 import (
-                decode_predictions,
-                preprocess_input,
-            )
-            from tensorflow.keras.preprocessing import image
+            import torch
+            import torch.nn.functional as F
+            from PIL import Image
+            from torchvision import models, transforms
+
+            # Set PyTorch to use CPU to avoid GPU conflicts
+            device = torch.device("cpu")
 
             if image_source.startswith("file://"):
                 # Local file path
@@ -101,32 +94,54 @@ class ImageProcessor:
             # Load and preprocess the image
             img = Image.open(io.BytesIO(image_data))
             img = img.convert("RGB")  # Ensure RGB format
-            img = img.resize((224, 224))  # ResNet50 expects 224x224
 
-            # Convert to numpy array and preprocess
-            x = image.img_to_array(img)
-            x = np.expand_dims(x, axis=0)
-            x = preprocess_input(x)
+            # Define the same transforms as used in training
+            transform = transforms.Compose(
+                [
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    ),
+                ]
+            )
+
+            # Apply transforms
+            img_tensor = transform(img).unsqueeze(0).to(device)
 
             # Load pre-trained ResNet50 model (lazy loading)
-            if self._tf_model is None:
-                self._tf_model = ResNet50(weights="imagenet")
+            if not hasattr(self, "_pytorch_model"):
+                self._pytorch_model = models.resnet50(pretrained=True)
+                self._pytorch_model.eval()
+                self._pytorch_model.to(device)
 
             # Make prediction
-            preds = self._tf_model.predict(x, verbose=0)
+            with torch.no_grad():
+                output = self._pytorch_model(img_tensor)
+                probabilities = F.softmax(output, dim=1)
+                top_probs, top_indices = torch.topk(probabilities, top_k)
 
-            # Decode predictions
-            results = decode_predictions(preds, top=top_k)[0]
+            # Load ImageNet class labels
+            if not hasattr(self, "_imagenet_labels"):
+                # Load ImageNet labels from torchvision
+                from torchvision.models.resnet import _IMAGENET_CATEGORIES
+
+                self._imagenet_labels = _IMAGENET_CATEGORIES
 
             # Format results
             classifications = []
-            for i, (imagenet_id, label, score) in enumerate(results):
+            for i in range(top_k):
+                idx = top_indices[0][i].item()
+                prob = top_probs[0][i].item()
+                label = self._imagenet_labels[idx]
+
                 classifications.append(
                     {
                         "rank": i + 1,
                         "label": label,
-                        "confidence": float(score),
-                        "imagenet_id": imagenet_id,
+                        "confidence": prob,
+                        "imagenet_id": str(idx),
                     }
                 )
 
@@ -139,26 +154,26 @@ class ImageProcessor:
                 "top_k": top_k,
                 "classifications": classifications,
                 "top_prediction": classifications[0] if classifications else None,
-                "tensorflow_processing": True,
+                "pytorch_processing": True,
             }
 
             return classification_info
 
         except ImportError:
-            print("TensorFlow not installed. Install with: pip install tensorflow")
+            print("PyTorch not installed. Install with: pip install torch torchvision")
             return {
                 "source": image_source,
                 "type": "image_classification",
-                "error": "TensorFlow not available",
-                "tensorflow_processing": False,
+                "error": "PyTorch not available",
+                "pytorch_processing": False,
             }
         except Exception as e:
-            print(f"Error classifying image with TensorFlow: {e}")
+            print(f"Error classifying image with PyTorch: {e}")
             return {
                 "source": image_source,
                 "type": "image_classification",
                 "error": str(e),
-                "tensorflow_processing": False,
+                "pytorch_processing": False,
             }
 
     def process_image(self, image_source: str) -> dict[str, Any]:
@@ -175,7 +190,7 @@ class ImageProcessor:
         metadata = self.get_image_metadata(image_source)
 
         # Get image classification
-        classification = self.classify_image_with_tensorflow(image_source)
+        classification = self.classify_image_with_pytorch(image_source)
 
         # Combine results
         processed_data = {

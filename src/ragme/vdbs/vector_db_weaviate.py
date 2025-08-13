@@ -82,6 +82,11 @@ class WeaviateVectorDatabase(VectorDatabase):
                         ),
                         properties=[
                             Property(
+                                name="url",
+                                data_type=DataType.TEXT,
+                                description="the source URL or filename of the image",
+                            ),
+                            Property(
                                 name="image",
                                 data_type=DataType.BLOB,
                                 description="the base64 encoded image",
@@ -106,7 +111,7 @@ class WeaviateVectorDatabase(VectorDatabase):
                         properties=[
                             Property(
                                 name="image",
-                                data_type=DataType.BLOB,
+                                data_type=DataType.TEXT,
                                 description="the base64 encoded image",
                             ),
                             Property(
@@ -151,7 +156,7 @@ class WeaviateVectorDatabase(VectorDatabase):
             if (
                 isinstance(collection, dict)
                 and collection.get("name") == self.collection_name
-                and collection.get("type") == "images"
+                and collection.get("type") == "image"
             ):
                 return True
 
@@ -181,16 +186,38 @@ class WeaviateVectorDatabase(VectorDatabase):
         collection = self.client.collections.get(self.collection_name)
         with collection.batch.dynamic() as batch:
             for img in images:
-                metadata_text = json.dumps(img.get("metadata", {}), ensure_ascii=False)
+                # Get image data and metadata
+                image_data = img.get("image_data", "")
+                metadata = img.get("metadata", {})
+
+                # Remove image_data from metadata to avoid duplication
+                if "image_data" in metadata:
+                    del metadata["image_data"]
+
+                metadata_text = json.dumps(metadata, ensure_ascii=False)
+
+                print(f"Writing image with data length: {len(image_data)}")
+                print(
+                    f"Image data starts with: {image_data[:50] if image_data else 'None'}"
+                )
+                print(
+                    f"Classification data: {metadata.get('classification', {}).get('top_prediction', {})}"
+                )
+
                 try:
                     batch.add_object(
                         properties={
-                            "image": img.get("image_data", ""),
-                            "metadata": metadata_text,
+                            "url": img.get("url", ""),  # Store URL/filename
+                            "image": image_data,  # Store in BLOB field
+                            "metadata": metadata_text,  # Store classification in metadata
                         }
                     )
+                    print("Image object added to batch successfully")
                 except Exception as e:
                     print(f"Error writing image to Weaviate: {e}")
+                    import traceback
+
+                    traceback.print_exc()
 
     def supports_images(self) -> bool:
         """Check if this Weaviate implementation supports images."""
@@ -216,6 +243,10 @@ class WeaviateVectorDatabase(VectorDatabase):
                 "text": obj.properties.get("text", ""),
                 "metadata": obj.properties.get("metadata", "{}"),
             }
+
+            # For image collections, include the image data from BLOB field
+            if self._is_image_collection():
+                doc["image_data"] = obj.properties.get("image", "")
 
             # Try to parse metadata if it's a JSON string
             try:
@@ -312,9 +343,23 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             # Get all documents and search manually since the where clause doesn't work
             all_docs = collection.query.fetch_objects(
-                limit=100,  # Get more documents to search through
+                limit=1000,  # Increased limit to search more documents
                 include_vector=False,
             )
+
+            # Normalize URL for comparison (remove protocol and fragments)
+            def normalize_url(url_str):
+                """Normalize URL by removing protocol and fragments."""
+                if not url_str:
+                    return ""
+                # Remove protocol
+                url_without_protocol = url_str.replace("https://", "").replace(
+                    "http://", ""
+                )
+                # Remove fragments
+                return url_without_protocol.split("#")[0]
+
+            target_normalized = normalize_url(url)
 
             # Search through all documents for a matching URL
             for obj in all_docs.objects:
@@ -337,11 +382,9 @@ class WeaviateVectorDatabase(VectorDatabase):
 
                     return doc
 
-                # Try matching without fragments (remove everything after #)
-                stored_url_base = stored_url.split("#")[0]
-                url_base = url.split("#")[0]
-
-                if stored_url_base == url_base:
+                # Try normalized URL match (ignoring protocol and fragments)
+                stored_normalized = normalize_url(stored_url)
+                if stored_normalized == target_normalized:
                     doc = {
                         "id": obj.uuid,
                         "url": stored_url,

@@ -254,8 +254,55 @@ class RagMeTools:
         """
         if urls is None:
             urls = []
-        self.ragme.write_webpages_to_weaviate(urls)
-        return f"Successfully added {len(urls)} URLs to the collection"
+
+        # Normalize URLs to ensure they have a protocol
+        normalized_urls = []
+        skipped_urls = []
+
+        for url in urls:
+            if url and not url.startswith(("http://", "https://")):
+                normalized_url = f"https://{url}"
+            else:
+                normalized_url = url
+
+            # Check if a document with this URL already exists (ignoring protocol)
+            url_without_protocol = normalized_url.replace("https://", "").replace(
+                "http://", ""
+            )
+            existing_doc = None
+
+            # Try to find existing document by checking both http and https versions
+            for protocol in ["https://", "http://"]:
+                test_url = f"{protocol}{url_without_protocol}"
+                existing_doc = self.ragme.vector_db.find_document_by_url(test_url)
+                if existing_doc:
+                    break
+
+            if existing_doc:
+                skipped_urls.append(url)
+            else:
+                normalized_urls.append(normalized_url)
+
+        if not normalized_urls:
+            if skipped_urls:
+                return "The document is already present in the collection"
+            else:
+                return "No valid URLs provided"
+
+        try:
+            self.ragme.write_webpages_to_weaviate(normalized_urls)
+
+            # Build response message
+            added_count = len(normalized_urls)
+            skipped_count = len(skipped_urls)
+
+            if skipped_count > 0:
+                return f"Successfully added {added_count} URLs to the collection. The document is already present in the collection"
+            else:
+                return f"Successfully added {added_count} URLs to the collection"
+
+        except Exception as e:
+            return f"Error adding URLs to collection: {str(e)}"
 
     def get_vector_db_info(self) -> str:
         """

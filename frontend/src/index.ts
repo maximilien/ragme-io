@@ -197,6 +197,8 @@ interface APIResponse {
   urls_processed?: number;
   files_processed?: number;
   documents?: Document[];
+  items?: Document[];
+  document?: Document;
   pagination?: PaginationInfo;
 }
 
@@ -484,22 +486,59 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
   }
 });
 
+// Get document endpoint
+app.get('/api/document/:documentId', async (req, res) => {
+  const documentId = req.params.documentId;
+
+  try {
+    // Call the backend API directly
+    const response = await fetch(`${RAGME_API_URL}/document/${documentId}`);
+
+    const apiResult = (await response.json()) as APIResponse;
+
+    if (response.ok && apiResult.status === 'success') {
+      res.json({
+        status: 'success',
+        document: apiResult.document,
+      });
+    } else {
+      // Forward the backend's error response
+      res.status(response.status).json({
+        status: 'error',
+        message: apiResult.message || 'Failed to get document',
+      });
+    }
+  } catch (error) {
+    logger.error('Get document error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get document',
+    });
+  }
+});
+
 // Delete document endpoint
 app.delete('/delete-document/:documentId', async (req, res) => {
   const documentId = req.params.documentId;
 
   try {
-    const apiResult = await callRAGmeAPI(`/delete-document/${documentId}`, null, 'DELETE');
+    // Call the backend API directly to get better error handling
+    const response = await fetch(`${RAGME_API_URL}/delete-document/${documentId}`, {
+      method: 'DELETE',
+    });
 
-    if (apiResult && apiResult.status === 'success') {
+    const apiResult = (await response.json()) as APIResponse;
+
+    if (response.ok && apiResult.status === 'success') {
       res.json({
         status: 'success',
-        message: 'Document deleted successfully',
+        message: apiResult.message || 'Document deleted successfully',
       });
     } else {
-      res.status(400).json({
+      // Forward the backend's error response
+      res.status(response.status).json({
         status: 'error',
-        message: apiResult?.message || 'Failed to delete document',
+        message: apiResult.message || 'Failed to delete document',
       });
     }
   } catch (error) {
@@ -514,36 +553,80 @@ app.delete('/delete-document/:documentId', async (req, res) => {
 // Image upload endpoint
 app.post('/upload-images', upload.array('files'), async (req, res) => {
   try {
+    logger.info('Image upload request received');
+    logger.info('Request headers:', req.headers);
+    logger.info('Request body type:', typeof req.body);
+    logger.info('Request files:', req.files);
+
     const files = req.files as Express.Multer.File[];
 
     if (!files || files.length === 0) {
+      logger.error('No files found in request');
       return res.status(400).json({
         status: 'error',
         message: 'No images uploaded',
       });
     }
 
-    // Forward to backend API
+    // Forward to backend API using proper Node.js FormData
+    logger.info('Creating FormData for backend forwarding');
+    const FormData = require('form-data');
     const formData = new FormData();
+
     files.forEach(file => {
-      formData.append('files', new Blob([file.buffer]), file.originalname);
+      logger.info(
+        `Adding file to FormData: ${file.originalname}, type: ${file.mimetype}, size: ${file.size}`
+      );
+      formData.append('files', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
     });
 
-    const response = await fetch('http://localhost:8021/upload-images', {
-      method: 'POST',
-      body: formData,
-    });
+    logger.info('Sending request to backend API');
+    let result;
+    try {
+      const axios = require('axios');
+      const response = await axios.post('http://localhost:8021/upload-images', formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
 
-    const result = await response.json();
+      logger.info(`Backend response status: ${response.status}`);
+      logger.info(`Backend response headers:`, response.headers);
+      result = response.data;
+      logger.info('Backend response parsed:', result);
+    } catch (axiosError: unknown) {
+      logger.error('Axios error:', axiosError);
+      if (axiosError && typeof axiosError === 'object' && 'response' in axiosError) {
+        const error = axiosError as { response: { status: number; data: { message?: string } } };
+        logger.error('Backend error response:', error.response.data);
+        return res.status(error.response.status).json({
+          status: 'error',
+          message: error.response.data?.message || 'Backend request failed',
+        });
+      } else {
+        const errorMessage = axiosError instanceof Error ? axiosError.message : 'Unknown error';
+        return res.status(500).json({
+          status: 'error',
+          message: `Failed to forward request to backend: ${errorMessage}`,
+        });
+      }
+    }
 
-    if (response.ok && result.status === 'success') {
+    if (result.status === 'success') {
+      logger.info('Image upload successful');
       res.json({
         status: 'success',
         message: result.message,
         files_processed: result.files_processed,
       });
     } else {
-      res.status(response.status || 500).json({
+      logger.error('Backend returned error:', result);
+      res.status(500).json({
         status: 'error',
         message: result.message || 'Image upload failed',
       });
@@ -655,18 +738,51 @@ io.on('connection', socket => {
     }
   });
 
+  // Handle content listing (documents + images)
+  socket.on('list_content', async data => {
+    logger.info('Listing content:', data);
+
+    const limit = data.limit || 10;
+    const offset = data.offset || 0;
+    const dateFilter = data.dateFilter || 'all';
+    const contentType = data.contentType || 'both';
+
+    const apiResult = await callRAGmeAPI(
+      `/list-content?limit=${limit}&offset=${offset}&date_filter=${dateFilter}&content_type=${contentType}`
+    );
+
+    if (apiResult && apiResult.status === 'success') {
+      socket.emit('content_listed', {
+        success: true,
+        items: apiResult.items || [],
+        pagination: apiResult.pagination || { limit: 0, offset: 0, count: 0 },
+      });
+    } else {
+      socket.emit('content_listed', {
+        success: false,
+        message: 'Failed to list content. Please try again.',
+      });
+    }
+  });
+
   // Handle vector database info request
   socket.on('get_vector_db_info', async () => {
     logger.info('Getting vector database info...');
 
     try {
+      // Ensure configuration is loaded before proceeding
+      if (!appConfig || Object.keys(appConfig).length === 0) {
+        logger.info('Configuration not loaded yet, attempting to load...');
+        await loadConfiguration();
+      }
+
       // Get vector DB info from the loaded configuration
       const vectorDbInfo = {
         dbType: appConfig?.vector_database?.type || 'weaviate-local',
         type: appConfig?.vector_database?.type || 'weaviate-local',
         collections: appConfig?.vector_database?.collections || [
           { name: 'RagMeDocs', type: 'text' },
-          { name: 'ImageDocs', type: 'images' },
+          { name: 'RagMeImages', type: 'image' },
         ],
       };
 
@@ -742,6 +858,7 @@ app.get('/api/config', (req, res) => {
       title: appConfig.application?.title || 'RAGme.io Assistant',
       version: appConfig.application?.version || '1.0.0',
     },
+    vector_database: appConfig.vector_database || null,
     frontend: appConfig.frontend || {},
     client: appConfig.client || {},
     mcp_servers: (appConfig.mcp_servers || []).map(server => ({
@@ -766,7 +883,7 @@ async function startServer() {
     process.env.PORT ||
     process.env.RAGME_FRONTEND_PORT ||
     appConfig.network?.frontend?.port ||
-    3020;
+    8020;
 
   server.listen(finalPort, () => {
     const appName = appConfig.application?.name || 'RAGme.io Assistant';

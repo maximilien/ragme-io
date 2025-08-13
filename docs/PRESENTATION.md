@@ -141,8 +141,8 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 
 ```mermaid
 flowchart TB
-    new-ui[New Frontend<br/>Port 3020] --> api[API Server<br/>Port 8021]
-    new-ui[New Frontend<br/>Port 3020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
+    new-ui[New Frontend<br/>Port 8020] --> api[API Server<br/>Port 8021]
+new-ui[New Frontend<br/>Port 8020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
     chrome[Chrome Extension] --> api
     subgraph "AI Agent Layer"
       agent-local[File Monitor Local Agent] --> mcp[MCP Server<br/>Port 8022]
@@ -193,7 +193,7 @@ RAGme.io features a sophisticated three-agent system that provides intelligent q
 
 | Component | Port | Purpose |
 |-----------|------|---------|
-| **New Frontend** | 3020 | Modern web interface with three-pane layout ⭐ **DEFAULT** |
+| **New Frontend** | 8020 | Modern web interface with three-pane layout ⭐ **DEFAULT** |
 | **API Server** | 8021 | REST API for content ingestion |
 | **MCP Server** | 8022 | Document processing (PDF/DOCX) |
 | **File Monitor Local Agent** | - | Watches directory for new files |
@@ -447,7 +447,7 @@ cp env.example .env
 ```
 
 ### Access Points
-- **New Frontend**: http://localhost:3020 (default)
+- **New Frontend**: http://localhost:8020 (default)
 - **Legacy UI**: http://localhost:8020
 - **API Docs**: http://localhost:8021/docs
 - **Chrome Extension**: Load from `chrome_ext/` directory

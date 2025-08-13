@@ -251,8 +251,8 @@ if 'vector_databases' in config:
                         if not isinstance(ctype, str) or not ctype.strip():
                             print_error(f"Database {i} collection {j} missing or invalid 'type'")
                         else:
-                            if ctype not in ('text', 'images'):
-                                print_warning(f"Database {i} collection {j} has unrecognized type '{ctype}'. Expected 'text' or 'images'")
+                            if ctype not in ('text', 'image'):
+                                print_warning(f"Database {i} collection {j} has unrecognized type '{ctype}'. Expected 'text' or 'image'")
                             if ctype == 'text':
                                 text_found = True
                     if not text_found:

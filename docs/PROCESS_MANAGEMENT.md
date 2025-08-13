@@ -25,7 +25,7 @@ Starts all RAGme services with the new frontend:
 - Starts API server (port 8021)
 - Starts MCP server (port 8022)
 - Starts file monitoring agent
-- Starts new frontend (port 3020)
+- Starts new frontend (port 8020)
 - Provides status feedback
 
 ### `./start.sh restart-frontend`
@@ -37,7 +37,7 @@ Restarts only the new frontend service:
 ### `./stop.sh` or `./stop.sh stop`
 Stops all RAGme processes:
 - Kills processes from PID file
-- Forces kill processes on ports 3020, 8021, 8022
+- Forces kill processes on ports 8020, 8021, 8022
 - Cleans up PID file
 - Verifies all processes are stopped
 
@@ -61,7 +61,7 @@ RAGme.io runs four main services:
 
 | Service | Port | Description | URL | Default |
 |---------|------|-------------|-----|---------|
-| New Frontend | 3020 | Modern web interface with three-pane layout | http://localhost:3020 | ✅ **YES** |
+| New Frontend | 8020 | Modern web interface with three-pane layout | http://localhost:8020 | ✅ **YES** |
 | FastAPI | 8021 | REST API | http://localhost:8021 | ✅ **YES** |
 | MCP | 8022 | Model Context Protocol | http://localhost:8022 | ✅ **YES** |
 | Local Agent | - | File monitoring | Background process | ✅ **YES** |
@@ -91,7 +91,7 @@ RAGme.io runs four main services:
 ### Port Conflicts
 ```bash
 # Check what's using the ports
-lsof -i :3020  # New Frontend
+lsof -i :8020  # New Frontend
 lsof -i :8021  # API
 lsof -i :8022  # MCP
 
@@ -127,12 +127,12 @@ npm start
    ✅ Process 12348 is running
 
 🌐 Port Status:
-   ✅ New Frontend (port 3020) - Running (PID: 12345)
+   ✅ New Frontend (port 8020) - Running (PID: 12345)
    ✅ FastAPI (port 8021) - Running (PID: 12346)
    ✅ MCP (port 8022) - Running (PID: 12347)
 
 🎉 All RAGme services are running!
-   • New Frontend: http://localhost:3020
+   • New Frontend: http://localhost:8020
    • API: http://localhost:8021
    • MCP: http://localhost:8022
 ```
@@ -147,7 +147,7 @@ npm start
    ❌ Process 12346 is not running (stale PID)
 
 🌐 Port Status:
-   ✅ New Frontend (port 3020) - Running (PID: 12345)
+   ✅ New Frontend (port 8020) - Running (PID: 12345)
    ❌ FastAPI (port 8021) - Not running
    ❌ MCP (port 8022) - Not running
 
@@ -193,7 +193,7 @@ curl --max-time 10 http://localhost:8021/docs
 curl --max-time 10 http://localhost:8022/docs
 
 # Test new frontend
-open http://localhost:3020
+open http://localhost:8020
 ```
 
 ## 🚨 Emergency Procedures
@@ -234,7 +234,7 @@ cd ..
 ps aux | grep -E "(ragme|uvicorn|node)" | grep -v grep
 
 # Check port usage
-lsof -i :3020 -i :8020 -i :8021 -i :8022
+lsof -i :8020 -i :8021 -i :8022
 ```
 
 ### Memory and CPU
@@ -251,7 +251,7 @@ The process management system respects these environment variables:
 - `RAGME_MCP_URL`: MCP server URL (default: http://localhost:8022)
 - `RAGME_API_PORT`: API server port (default: 8021)
 - `RAGME_MCP_PORT`: MCP server port (default: 8022)
-- `RAGME_FRONTEND_PORT`: Frontend port (default: 3020)
+- `RAGME_FRONTEND_PORT`: Frontend port (default: 8020)
 - `VECTOR_DB_TYPE`: Vector database type (default: milvus)
 
 ### PID File Management
@@ -263,7 +263,7 @@ The system uses a `.pid` file to track running processes:
 
 ### Port Management
 The system manages these ports (configurable via RAGME_*_PORT environment variables):
-- **3020**: New frontend (default, configurable via `RAGME_FRONTEND_PORT`)
+- **8020**: New frontend (default, configurable via `RAGME_FRONTEND_PORT`)
 - **8020**: Legacy UI (optional)
 - **8021**: API server (required, configurable via `RAGME_API_PORT`)
 - **8022**: MCP server (required, configurable via `RAGME_MCP_PORT`)
@@ -294,7 +294,7 @@ The system manages these ports (configurable via RAGME_*_PORT environment variab
 ```
 
 ### Service URLs
-- **New Frontend**: http://localhost:3020 (default)
+- **New Frontend**: http://localhost:8020 (default)
 - **Legacy UI**: http://localhost:8020
 - **API Docs**: http://localhost:8021/docs
 - **MCP Docs**: http://localhost:8022/docs 

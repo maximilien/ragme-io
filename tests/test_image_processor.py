@@ -47,7 +47,6 @@ class TestImageProcessor:
 
             processor = ImageProcessor()
             assert processor is not None
-            assert processor._tf_model is None
         except ImportError as e:
             pytest.skip(
                 f"ImageProcessor import failed due to missing dependencies: {e}"
@@ -88,20 +87,20 @@ class TestImageProcessor:
                 f"ImageProcessor import failed due to missing dependencies: {e}"
             )
 
-    def test_classify_image_without_tensorflow(self):
-        """Test image classification when TensorFlow is not available."""
+    def test_classify_image_without_pytorch(self):
+        """Test image classification when PyTorch is not available."""
         try:
             from src.ragme.utils.image_processor import ImageProcessor
 
             processor = ImageProcessor()
 
             # This should handle the ImportError gracefully
-            result = processor.classify_image_with_tensorflow(
+            result = processor.classify_image_with_pytorch(
                 "http://example.com/test.jpg"
             )
 
-            # Should return error info for missing TensorFlow
-            assert "error" in result or "tensorflow_processing" in result
+            # Should return error info for missing PyTorch
+            assert "error" in result or "pytorch_processing" in result
 
         except ImportError as e:
             pytest.skip(
