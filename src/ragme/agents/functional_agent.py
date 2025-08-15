@@ -64,10 +64,12 @@ class FunctionalAgent:
             llm=self.llm,
             system_prompt="""You are a helpful assistant that can perform functional operations on the RagMeDocs collection and RagMeImages collection.
 
+IMPORTANT: When users ask to add URLs, extract ONLY the URL part from their request and pass it to the write_to_ragme_collection function.
+
 You can perform the following operations:
 
 TEXT DOCUMENTS:
-- Add URLs to the collection using write_to_ragme_collection(urls)
+- Add URLs to the collection using write_to_ragme_collection(urls) - IMPORTANT: Extract only the URL from user requests
 - List documents in the collection using list_ragme_collection(limit, offset)
 - Count documents in the collection using count_documents(date_filter)
 - Delete specific documents using delete_document(doc_id)
@@ -86,16 +88,18 @@ GENERAL:
 - Get vector database information using get_vector_db_info()
 
 For functional queries like:
-- "add this URL to my collection"
-- "add this image to the collection" or "add image from URL"
-- "delete document with ID 123"
-- "delete image with ID abc"
-- "delete document https://example.com"
-- "list all documents" or "list all images"
-- "count documents" or "how many documents are there?"
-- "count documents from this week/month/year"
-- "delete all documents matching pattern test_*"
-- "reset the collection"
+- "add maximilien.org" → call write_to_ragme_collection(["maximilien.org"])
+- "add https://example.com" → call write_to_ragme_collection(["https://example.com"])
+- "add this URL to my collection" → extract the URL and call write_to_ragme_collection([url])
+- "add this image to the collection" or "add image from URL" → extract the image URL and call write_image_to_collection(image_url)
+- "delete document with ID 123" → call delete_document("123")
+- "delete image with ID abc" → call delete_image_from_collection("abc")
+- "delete document https://example.com" → call delete_document_by_url("https://example.com")
+- "list all documents" or "list all images" → call list_ragme_collection() or list_image_collection()
+- "count documents" or "how many documents are there?" → call count_documents()
+- "count documents from this week/month/year" → call count_documents("current"/"month"/"year")
+- "delete all documents matching pattern test_*" → call delete_documents_by_pattern("test_*")
+- "reset the collection" → call delete_ragme_collection()
 
 Use the appropriate tool to perform the requested operation.
 
@@ -133,11 +137,18 @@ Focus only on functional operations that modify or query the collection structur
         logger.info(f"FunctionalAgent received query: '{query}'")
 
         try:
+            # Check if this is an "add URL" operation and handle it directly
+            if self._is_add_url_query(query):
+                return self._handle_add_url_directly(query)
+
+            # Pre-process the query to extract URLs for add operations
+            processed_query = self._preprocess_query(query)
             logger.info(
-                f"FunctionalAgent calling FunctionAgent.run with query: '{query}'"
+                f"FunctionalAgent calling FunctionAgent.run with processed query: '{processed_query}'"
             )
+
             # Use the simple approach that was working before
-            response = await self.agent.run(query)
+            response = await self.agent.run(processed_query)
             logger.info(
                 f"FunctionalAgent got response: {type(response)} - {str(response)[:100]}..."
             )
@@ -146,6 +157,45 @@ Focus only on functional operations that modify or query the collection structur
         except Exception as e:
             logger.error(f"FunctionalAgent error: {str(e)}")
             return f"Error executing functional operation: {str(e)}"
+
+    def _is_add_url_query(self, query: str) -> bool:
+        """Check if the query is asking to add a URL."""
+        query_lower = query.lower().strip()
+        return query_lower.startswith("add ") and not query_lower.startswith(
+            "add image"
+        )
+
+    def _handle_add_url_directly(self, query: str) -> str:
+        """Handle add URL operations directly without going through the LLM."""
+        # Extract the URL part after "add "
+        url_part = query[4:].strip()
+        if not url_part:
+            return "No URL provided. Please specify a URL to add."
+
+        # Call the tool directly
+        return self.tools.write_to_ragme_collection([url_part])
+
+    def _preprocess_query(self, query: str) -> str:
+        """
+        Pre-process the query to extract URLs and make it easier for the LLM to understand.
+
+        Args:
+            query (str): The original query
+
+        Returns:
+            str: The processed query
+        """
+        query_lower = query.lower().strip()
+
+        # Handle "add URL" patterns
+        if query_lower.startswith("add "):
+            # Extract the URL part after "add "
+            url_part = query[4:].strip()
+            if url_part:
+                # Return a more explicit instruction
+                return f"add URL: {url_part}"
+
+        return query
 
     def is_functional_query(self, query: str) -> bool:
         """

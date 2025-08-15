@@ -60,6 +60,7 @@ vector_databases:
         - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
           type: "image"
       embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
       text_splitter: "recursive"
       chunk_size: 1000
       chunk_overlap: 100
@@ -75,6 +76,7 @@ vector_databases:
         - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
           type: "image"
       embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
       text_splitter: "recursive"
       chunk_size: 1000
       chunk_overlap: 100
@@ -89,6 +91,7 @@ vector_databases:
         - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
           type: "image"
       embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
       text_splitter: "recursive"
       chunk_size: 1000
       chunk_overlap: 100
@@ -104,6 +107,7 @@ vector_databases:
         - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
           type: "image"
       embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
       text_splitter: "recursive"
       chunk_size: 1000
       chunk_overlap: 100
@@ -298,7 +302,7 @@ client:
   custom_styles: ""              # Additional CSS for customization
   
   # Welcome message
-  welcome_message: "Welcome to RAGme! Upload documents or add URLs to get started."
+  welcome_message: "Welcome to RAGme! Upload documents and images or add URLs to get started."
   
   # Footer text
   footer_text: "Powered by RAGme AI"

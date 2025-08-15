@@ -329,7 +329,7 @@ test_file_monitoring() {
 # Fast integration test function - minimal testing for quick validation
 fast_integration_test() {
     local all_tests_passed=true
-    local total_tests=8
+    local total_tests=11
     local current_test=0
     
     echo -e "\n${BLUE}🚀 Starting RAGme services...${NC}"
@@ -347,7 +347,7 @@ fast_integration_test() {
     sleep 3
     
     # Show test plan
-    echo -e "\n${BLUE}📋 Fast Integration Test Plan (8 tests):${NC}"
+    echo -e "\n${BLUE}📋 Fast Integration Test Plan (11 tests):${NC}"
     echo -e "  1. Service Connectivity"
     echo -e "  2. Check Empty Collection"
     echo -e "  3. Add URL"
@@ -355,7 +355,10 @@ fast_integration_test() {
     echo -e "  5. Add PDF"
     echo -e "  6. Check Collection After PDF"
     echo -e "  7. Cleanup Documents"
-    echo -e "  8. Final Empty Check"
+    echo -e "  8. Add Image"
+    echo -e "  9. Check Image Collection"
+    echo -e "  10. Cleanup Images"
+    echo -e "  11. Final Empty Check"
     echo -e "\n${BLUE}🚀 Starting tests...${NC}"
     
     # Test 1: Basic service connectivity
@@ -471,7 +474,77 @@ fast_integration_test() {
         echo -e "  ${YELLOW}⚠️ Cleanup: SKIP (could not retrieve documents)${NC}"
     fi
     
-    # Test 8: Final empty check
+    # Test 8: Add Image
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Add Image${NC}"
+    
+    # Create a simple test image (1x1 pixel PNG)
+    local test_image="tests/fixtures/test_image.png"
+    if [ ! -f "$test_image" ]; then
+        # Create a minimal test image if it doesn't exist
+        echo -e "  ${YELLOW}⚠️ Creating test image...${NC}"
+        mkdir -p tests/fixtures
+        # Create a 1x1 pixel PNG using ImageMagick or fallback to a simple file
+        if command -v convert >/dev/null 2>&1; then
+            convert -size 1x1 xc:white "$test_image"
+        else
+            # Fallback: create a minimal PNG file (base64 encoded 1x1 white pixel)
+            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" | base64 -d > "$test_image"
+        fi
+    fi
+    
+    if [ -f "$test_image" ]; then
+        local image_response=$(curl -s --max-time 15 -X POST "$API_URL/upload-images" \
+            -F "files=@$test_image" 2>/dev/null || echo "{}")
+        
+        if echo "$image_response" | grep -q "status.*success"; then
+            echo -e "  ${GREEN}✅ Add Image: PASS${NC}"
+        else
+            echo -e "  ${RED}❌ Add Image: FAIL${NC}"
+            all_tests_passed=false
+        fi
+    else
+        echo -e "  ${YELLOW}⚠️ Test image not found, skipping image test${NC}"
+    fi
+    
+    # Test 9: Check Image Collection
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Check Image Collection${NC}"
+    sleep 2
+    response=$(curl -s --max-time 10 "$API_URL/list-documents?content_type=image&limit=10" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        echo -e "  ${GREEN}✅ Check Image Collection: PASS${NC}"
+    else
+        echo -e "  ${RED}❌ Check Image Collection: FAIL${NC}"
+        all_tests_passed=false
+    fi
+    
+    # Test 10: Cleanup Images
+    ((current_test++))
+    echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Cleanup Images${NC}"
+    
+    # Get list of images and delete them
+    response=$(curl -s --max-time 10 "$API_URL/list-documents?content_type=image&limit=100" 2>/dev/null || echo "{}")
+    
+    if echo "$response" | grep -q "status.*success"; then
+        # Extract image IDs and delete them
+        local image_ids=$(echo "$response" | grep -o '"id":"[^"]*"' | sed 's/"id":"//g' | sed 's/"//g')
+        local deleted_count=0
+        
+        for image_id in $image_ids; do
+            local delete_response=$(curl -s --max-time 10 -X DELETE "$API_URL/delete-document/$image_id" 2>/dev/null || echo "{}")
+            if echo "$delete_response" | grep -q "status.*success"; then
+                ((deleted_count++))
+            fi
+        done
+        
+        echo -e "  ${GREEN}✅ Image Cleanup: PASS (deleted $deleted_count images)${NC}"
+    else
+        echo -e "  ${YELLOW}⚠️ Image Cleanup: SKIP (could not retrieve images)${NC}"
+    fi
+    
+    # Test 11: Final empty check
     ((current_test++))
     echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Final Empty Check${NC}"
     sleep 2

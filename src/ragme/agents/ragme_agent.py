@@ -45,7 +45,7 @@ class RagMeAgent:
 
         # Initialize the specialized agents
         self.functional_agent = FunctionalAgent(ragme_instance)
-        self.query_agent = QueryAgent(ragme_instance)
+        self.query_agent = QueryAgent(ragme_instance.vector_db)
 
         # Get agent configuration
         agent_config = config.get_agent_config("ragme-agent")

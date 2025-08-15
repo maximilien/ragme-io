@@ -40,6 +40,22 @@ class VDBManager:
         ).get("default", "weaviate-cloud")
         self.text_collection_name = self.config_manager.get_text_collection_name()
         self.image_collection_name = self.config_manager.get_image_collection_name()
+        self.vdb = None
+
+    def _get_vdb(self):
+        """Get or create VDB instance."""
+        if self.vdb is None:
+            self.vdb = create_vector_database()
+        return self.vdb
+
+    def cleanup(self):
+        """Clean up VDB resources."""
+        if self.vdb is not None:
+            try:
+                self.vdb.cleanup()
+            except Exception:
+                pass  # Ignore cleanup errors
+            self.vdb = None
 
     def show_config(self) -> dict[str, Any]:
         """Show currently configured VDB information."""
@@ -59,58 +75,66 @@ class VDBManager:
             "errors": [],
         }
 
-        text_vdb = None
-        image_vdb = None
-
         try:
-            # Test text collection
-            text_vdb = create_vector_database(collection_name=self.text_collection_name)
-            text_count = text_vdb.count_documents()
-            results["collections"]["text"] = {
-                "name": self.text_collection_name,
-                "status": "healthy",
-                "document_count": text_count,
-            }
-        except Exception as e:
-            results["collections"]["text"] = {
-                "name": self.text_collection_name,
-                "status": "error",
-                "error": str(e),
-            }
-            results["errors"].append(f"Text collection error: {e}")
-        finally:
-            # Clean up text VDB connection
-            if text_vdb:
-                try:
-                    text_vdb.cleanup()
-                except Exception:
-                    pass
+            # Get VDB instance
+            vdb = self._get_vdb()
 
-        try:
-            # Test image collection
-            image_vdb = create_vector_database(
-                collection_name=self.image_collection_name
-            )
-            image_count = image_vdb.count_documents()
-            results["collections"]["image"] = {
-                "name": self.image_collection_name,
-                "status": "healthy",
-                "document_count": image_count,
-            }
-        except Exception as e:
-            results["collections"]["image"] = {
-                "name": self.image_collection_name,
-                "status": "error",
-                "error": str(e),
-            }
-            results["errors"].append(f"Image collection error: {e}")
-        finally:
-            # Clean up image VDB connection
-            if image_vdb:
+            # Test text collection if available
+            if vdb.has_text_collection():
                 try:
-                    image_vdb.cleanup()
-                except Exception:
-                    pass
+                    text_count = vdb.count_documents()
+                    results["collections"]["text"] = {
+                        "name": vdb.get_text_collection_name(),
+                        "status": "healthy",
+                        "document_count": text_count,
+                        "item_type": "documents",
+                    }
+                except Exception as e:
+                    results["collections"]["text"] = {
+                        "name": vdb.get_text_collection_name(),
+                        "status": "error",
+                        "error": str(e),
+                        "item_type": "documents",
+                    }
+                    results["errors"].append(f"Text collection error: {e}")
+            else:
+                results["collections"]["text"] = {
+                    "name": "not configured",
+                    "status": "not available",
+                    "document_count": 0,
+                    "item_type": "documents",
+                }
+
+            # Test image collection if available
+            if vdb.has_image_collection():
+                try:
+                    image_count = vdb.count_images()
+                    results["collections"]["image"] = {
+                        "name": vdb.get_image_collection_name(),
+                        "status": "healthy",
+                        "document_count": image_count,
+                        "item_type": "images",
+                    }
+                except Exception as e:
+                    results["collections"]["image"] = {
+                        "name": vdb.get_image_collection_name(),
+                        "status": "error",
+                        "error": str(e),
+                        "item_type": "images",
+                    }
+                    results["errors"].append(f"Image collection error: {e}")
+            else:
+                results["collections"]["image"] = {
+                    "name": "not configured",
+                    "status": "not available",
+                    "document_count": 0,
+                    "item_type": "images",
+                }
+
+        except Exception as e:
+            results["status"] = "error"
+            results["errors"].append(f"VDB connection error: {e}")
+            return results
 
         # Overall status
         if results["errors"]:
@@ -122,81 +146,107 @@ class VDBManager:
 
     def list_collections(self) -> dict[str, Any]:
         """List collection names and basic info."""
-        return {
-            "text_collection": {"name": self.text_collection_name, "type": "text"},
-            "image_collection": {"name": self.image_collection_name, "type": "image"},
-        }
+        try:
+            vdb = self._get_vdb()
+            collections = {}
+
+            if vdb.has_text_collection():
+                collections["text_collection"] = {
+                    "name": vdb.get_text_collection_name(),
+                    "type": "text",
+                }
+
+            if vdb.has_image_collection():
+                collections["image_collection"] = {
+                    "name": vdb.get_image_collection_name(),
+                    "type": "image",
+                }
+
+            return collections
+        except Exception:
+            return {
+                "text_collection": {"name": self.text_collection_name, "type": "text"},
+                "image_collection": {
+                    "name": self.image_collection_name,
+                    "type": "image",
+                },
+            }
 
     def list_text_documents(self, limit: int = 50) -> dict[str, Any]:
         """List documents in the text collection."""
-        text_vdb = None
         try:
-            text_vdb = create_vector_database(collection_name=self.text_collection_name)
-            documents = text_vdb.list_documents(limit=limit, offset=0)
+            vdb = self._get_vdb()
+
+            if not vdb.has_text_collection():
+                return {
+                    "status": "error",
+                    "collection": "text",
+                    "error": "Text collection not configured",
+                }
+
+            documents = vdb.list_documents(limit=limit, offset=0)
 
             return {
                 "status": "success",
-                "collection": self.text_collection_name,
+                "collection": vdb.get_text_collection_name(),
                 "count": len(documents),
                 "documents": documents,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "collection": self.text_collection_name,
+                "collection": "text",
                 "error": str(e),
             }
-        finally:
-            # Clean up VDB connection
-            if text_vdb:
-                try:
-                    text_vdb.cleanup()
-                except Exception:
-                    pass
 
     def list_image_documents(self, limit: int = 50) -> dict[str, Any]:
         """List documents in the image collection."""
-        image_vdb = None
         try:
-            image_vdb = create_vector_database(
-                collection_name=self.image_collection_name
-            )
-            documents = image_vdb.list_documents(limit=limit, offset=0)
+            vdb = self._get_vdb()
+
+            if not vdb.has_image_collection():
+                return {
+                    "status": "error",
+                    "collection": "image",
+                    "error": "Image collection not configured",
+                }
+
+            # Use list_images method to get images from the image collection
+            images = vdb.list_images(limit=limit, offset=0)
 
             return {
                 "status": "success",
-                "collection": self.image_collection_name,
-                "count": len(documents),
-                "documents": documents,
+                "collection": vdb.get_image_collection_name(),
+                "count": len(images),
+                "documents": images,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "collection": self.image_collection_name,
+                "collection": "image",
                 "error": str(e),
             }
-        finally:
-            # Clean up VDB connection
-            if image_vdb:
-                try:
-                    image_vdb.cleanup()
-                except Exception:
-                    pass
 
     def delete_text_collection_content(self) -> dict[str, Any]:
         """Delete all content from the text collection."""
-        text_vdb = None
         try:
-            text_vdb = create_vector_database(collection_name=self.text_collection_name)
+            vdb = self._get_vdb()
+
+            if not vdb.has_text_collection():
+                return {
+                    "status": "error",
+                    "collection": "text",
+                    "error": "Text collection not configured",
+                }
 
             # Get all documents first to show what will be deleted
-            all_docs = text_vdb.list_documents(limit=10000, offset=0)
+            all_docs = vdb.list_documents(limit=10000, offset=0)
             doc_count = len(all_docs)
 
             if doc_count == 0:
                 return {
                     "status": "success",
-                    "collection": self.text_collection_name,
+                    "collection": vdb.get_text_collection_name(),
                     "message": "Collection is already empty",
                     "deleted_count": 0,
                 }
@@ -205,79 +255,69 @@ class VDBManager:
             deleted_count = 0
             for doc in all_docs:
                 try:
-                    text_vdb.delete_document(doc["id"])
+                    vdb.delete_document(doc["id"])
                     deleted_count += 1
                 except Exception as e:
                     print(f"Warning: Failed to delete document {doc['id']}: {e}")
 
             return {
                 "status": "success",
-                "collection": self.text_collection_name,
+                "collection": vdb.get_text_collection_name(),
                 "message": f"Successfully deleted {deleted_count} documents",
                 "deleted_count": deleted_count,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "collection": self.text_collection_name,
+                "collection": "text",
                 "error": str(e),
             }
-        finally:
-            # Clean up VDB connection
-            if text_vdb:
-                try:
-                    text_vdb.cleanup()
-                except Exception:
-                    pass
 
     def delete_image_collection_content(self) -> dict[str, Any]:
         """Delete all content from the image collection."""
-        image_vdb = None
         try:
-            image_vdb = create_vector_database(
-                collection_name=self.image_collection_name
-            )
+            vdb = self._get_vdb()
 
-            # Get all documents first to show what will be deleted
-            all_docs = image_vdb.list_documents(limit=10000, offset=0)
-            doc_count = len(all_docs)
+            if not vdb.has_image_collection():
+                return {
+                    "status": "error",
+                    "collection": "image",
+                    "error": "Image collection not configured",
+                }
 
-            if doc_count == 0:
+            # Get all images first to show what will be deleted
+            all_images = vdb.list_images(limit=10000, offset=0)
+            image_count = len(all_images)
+
+            if image_count == 0:
                 return {
                     "status": "success",
-                    "collection": self.image_collection_name,
+                    "collection": vdb.get_image_collection_name(),
                     "message": "Collection is already empty",
                     "deleted_count": 0,
                 }
 
-            # Delete each document
+            # Delete each image
             deleted_count = 0
-            for doc in all_docs:
+            for image in all_images:
                 try:
-                    image_vdb.delete_document(doc["id"])
+                    vdb.delete_image(image["id"])
                     deleted_count += 1
                 except Exception as e:
-                    print(f"Warning: Failed to delete document {doc['id']}: {e}")
+                    print(f"Warning: Failed to delete image {image['id']}: {e}")
 
             return {
                 "status": "success",
-                "collection": self.image_collection_name,
-                "message": f"Successfully deleted {deleted_count} documents",
+                "collection": vdb.get_image_collection_name(),
+                "message": f"Successfully deleted {deleted_count} images",
                 "deleted_count": deleted_count,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "collection": self.image_collection_name,
+                "collection": "image",
                 "error": str(e),
             }
-        finally:
-            # Clean up VDB connection
-            if image_vdb:
-                try:
-                    image_vdb.cleanup()
-                except Exception:
-                    pass
 
 
 def print_emoji_status(status: str, message: str):
@@ -294,6 +334,15 @@ def print_emoji_status(status: str, message: str):
     }
     emoji = emojis.get(status, "ℹ️")
     print(f"{emoji} {message}")
+
+
+def cleanup_and_exit(manager: VDBManager, exit_code: int = 0):
+    """Clean up resources and exit."""
+    try:
+        manager.cleanup()
+    except Exception:
+        pass  # Ignore cleanup errors
+    sys.exit(exit_code)
 
 
 def main():
@@ -353,9 +402,10 @@ def main():
 
             for coll_type, coll_info in health_info["collections"].items():
                 if coll_info["status"] == "healthy":
+                    item_type = coll_info.get("item_type", "documents")
                     print_emoji_status(
                         "success",
-                        f"{coll_type.title()} Collection: {coll_info['name']} ({coll_info['document_count']} documents)",
+                        f"{coll_type.title()} Collection: {coll_info['name']} ({coll_info['document_count']} {item_type})",
                     )
                 else:
                     print_emoji_status(
@@ -371,7 +421,7 @@ def main():
         elif command == "collections":
             if len(sys.argv) < 3:
                 print("❌ Error: collections command requires additional arguments")
-                sys.exit(1)
+                cleanup_and_exit(manager, 1)
 
             subcommand = sys.argv[2]
 
@@ -386,7 +436,7 @@ def main():
                     print(
                         "❌ Error: --text requires additional argument (--list or --delete)"
                     )
-                    sys.exit(1)
+                    cleanup_and_exit(manager, 1)
 
                 action = sys.argv[3]
 
@@ -464,7 +514,7 @@ def main():
                     print(
                         "❌ Error: --image requires additional argument (--list or --delete)"
                     )
-                    sys.exit(1)
+                    cleanup_and_exit(manager, 1)
 
                 action = sys.argv[3]
 
@@ -473,7 +523,7 @@ def main():
                     if result["status"] == "success":
                         print_emoji_status(
                             "list",
-                            f"Image Collection Documents ({result['count']} found):",
+                            f"Image Collection Images ({result['count']} found):",
                         )
                         for i, doc in enumerate(
                             result["documents"][:10], 1
@@ -547,15 +597,21 @@ def main():
                         print_emoji_status("info", "Operation cancelled")
             else:
                 print("❌ Error: Unknown collections subcommand")
-                sys.exit(1)
+                cleanup_and_exit(manager, 1)
         else:
             print("❌ Error: Unknown command")
             print("Use './tools/vdb.sh help' for usage information")
-            sys.exit(1)
+            cleanup_and_exit(manager, 1)
 
     except Exception as e:
         print_emoji_status("error", f"Unexpected error: {e}")
-        sys.exit(1)
+        cleanup_and_exit(manager, 1)
+    finally:
+        # Ensure cleanup happens even if there's an exception
+        try:
+            manager.cleanup()
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 if __name__ == "__main__":

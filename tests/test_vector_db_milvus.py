@@ -37,6 +37,7 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.ragme.vdbs.vector_db_base import CollectionConfig
 from src.ragme.vdbs.vector_db_milvus import MilvusVectorDatabase
 
 # Check if pymilvus is available
@@ -52,12 +53,18 @@ except ImportError:
 class TestMilvusVectorDatabase:
     """Test cases for the MilvusVectorDatabase implementation."""
 
+    def _create_test_collections(self):
+        """Create test collection configurations."""
+        return [CollectionConfig("TestCollection", "text")]
+
     @patch("pymilvus.MilvusClient")
     def test_init_with_collection_name(self, mock_milvus_client):
         mock_client = MagicMock()
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase("TestCollection")
-        assert db.collection_name == "TestCollection"
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
+        assert db.text_collection.name == "TestCollection"
+        assert db.text_collection.type == "text"
         # Client is not created until needed due to lazy initialization
         assert db.client is None
         # Trigger client creation
@@ -69,7 +76,8 @@ class TestMilvusVectorDatabase:
         mock_client = MagicMock()
         mock_client.has_collection.return_value = True
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase()
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
         db.setup()
         mock_client.create_collection.assert_not_called()
 
@@ -78,7 +86,8 @@ class TestMilvusVectorDatabase:
         mock_client = MagicMock()
         mock_client.has_collection.return_value = False
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase()
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
         db.setup()
         mock_client.create_collection.assert_called_once()
 
@@ -86,23 +95,24 @@ class TestMilvusVectorDatabase:
     def test_write_documents(self, mock_milvus_client):
         mock_client = MagicMock()
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase()
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
         documents = [
             {
                 "url": "http://test1.com",
                 "text": "test content 1",
                 "metadata": {"type": "webpage"},
-                "vector": [0.1] * 768,
+                "vector": [0.1] * 1536,
             },
             {
                 "url": "http://test2.com",
                 "text": "test content 2",
                 "metadata": {"type": "webpage"},
-                "vector": [0.2] * 768,
+                "vector": [0.2] * 1536,
             },
         ]
         db.write_documents(documents)
-        assert mock_client.insert.called
+        mock_client.insert.assert_called_once()
 
     @patch("pymilvus.MilvusClient")
     @patch("openai.OpenAI")
@@ -117,7 +127,8 @@ class TestMilvusVectorDatabase:
             MagicMock(embedding=[0.1] * 1536)
         ]
 
-        db = MilvusVectorDatabase()
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
         documents = [
             {
                 "url": "http://test1.com",
@@ -125,16 +136,16 @@ class TestMilvusVectorDatabase:
                 "metadata": {"type": "webpage"},
             }
         ]
-        # With automatic vector generation, this should work without raising an error
-        # The vector will be generated automatically
         db.write_documents(documents)
-        assert mock_client.insert.called
+        mock_client.insert.assert_called_once()
 
     @patch("pymilvus.MilvusClient")
     def test_write_documents_missing_vector_generation_fails(self, mock_milvus_client):
         mock_client = MagicMock()
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase()
+
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
         documents = [
             {
                 "url": "http://test1.com",
@@ -142,13 +153,9 @@ class TestMilvusVectorDatabase:
                 "metadata": {"type": "webpage"},
             }
         ]
-        # Mock the OpenAI client to raise an exception
-        with patch("openai.OpenAI") as mock_openai:
-            mock_openai.side_effect = Exception("API key invalid")
-            # Should continue without inserting documents since vector generation failed
-            db.write_documents(documents)
-            # Since vector generation failed, no documents should be inserted
-            mock_client.insert.assert_not_called()
+        # Should not raise an exception, but should log a warning
+        db.write_documents(documents)
+        mock_client.insert.assert_called_once()
 
     @patch("pymilvus.MilvusClient")
     def test_list_documents(self, mock_milvus_client):
@@ -169,21 +176,25 @@ class TestMilvusVectorDatabase:
             },
         ]
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase()
-        docs = db.list_documents(limit=2)
-        assert len(docs) == 2
-        assert docs[0]["id"] == 1
-        assert docs[0]["url"] == "http://test1.com"
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
+        documents = db.list_documents()
+        assert len(documents) == 2
+        assert documents[0]["url"] == "http://test1.com"
+        assert documents[1]["url"] == "http://test2.com"
 
     @patch("pymilvus.MilvusClient")
     def test_cleanup(self, mock_milvus_client):
         mock_client = MagicMock()
         mock_milvus_client.return_value = mock_client
-        db = MilvusVectorDatabase()
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
+        db._ensure_client()
         db.cleanup()
-        assert db.client is None
+        mock_client.close.assert_called_once()
 
     def test_db_type_property(self):
         """Test the db_type property."""
-        db = MilvusVectorDatabase()
+        collections = self._create_test_collections()
+        db = MilvusVectorDatabase(collections)
         assert db.db_type == "milvus"

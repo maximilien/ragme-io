@@ -550,6 +550,39 @@ app.delete('/delete-document/:documentId', async (req, res) => {
   }
 });
 
+// Delete image endpoint
+app.delete('/delete-image/:imageId', async (req, res) => {
+  const imageId = req.params.imageId;
+
+  try {
+    // Call the backend API directly to get better error handling
+    const response = await fetch(`${RAGME_API_URL}/delete-image/${imageId}`, {
+      method: 'DELETE',
+    });
+
+    const apiResult = (await response.json()) as APIResponse;
+
+    if (response.ok && apiResult.status === 'success') {
+      res.json({
+        status: 'success',
+        message: apiResult.message || 'Image deleted successfully',
+      });
+    } else {
+      // Forward the backend's error response
+      res.status(response.status).json({
+        status: 'error',
+        message: apiResult.message || 'Failed to delete image',
+      });
+    }
+  } catch (error) {
+    logger.error('Delete image error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete image',
+    });
+  }
+});
+
 // Image upload endpoint
 app.post('/upload-images', upload.array('files'), async (req, res) => {
   try {
@@ -751,17 +784,22 @@ io.on('connection', socket => {
       `/list-content?limit=${limit}&offset=${offset}&date_filter=${dateFilter}&content_type=${contentType}`
     );
 
+    logger.info('API result status:', apiResult?.status);
+    logger.info('API result items count:', apiResult?.items?.length || 0);
+
     if (apiResult && apiResult.status === 'success') {
       socket.emit('content_listed', {
         success: true,
         items: apiResult.items || [],
         pagination: apiResult.pagination || { limit: 0, offset: 0, count: 0 },
       });
+      logger.info('Emitted content_listed with', apiResult.items?.length || 0, 'items');
     } else {
       socket.emit('content_listed', {
         success: false,
         message: 'Failed to list content. Please try again.',
       });
+      logger.error('Failed to list content, API result:', apiResult);
     }
   });
 
