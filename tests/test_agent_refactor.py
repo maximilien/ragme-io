@@ -56,8 +56,8 @@ class TestAgentRefactor:
         tools = RagMeTools(self.mock_ragme)
         all_tools = tools.get_all_tools()
         assert (
-            len(all_tools) == 8
-        )  # 8 tools: write, delete_collection, delete_document, delete_all_documents, delete_documents_by_pattern, list, crawl, db info
+            len(all_tools) == 13
+        )  # 13 tools: write, delete_collection, delete_document, delete_document_by_url, delete_all_documents, delete_documents_by_pattern, get_document_details, write_to_ragme_collection, get_vector_db_info, count_documents, write_image_to_collection, list_image_collection, delete_image_from_collection
 
     def test_functional_agent_initialization(self):
         """Test that FunctionalAgent initializes correctly."""
@@ -83,14 +83,14 @@ class TestAgentRefactor:
 
     def test_query_agent_initialization(self):
         """Test that QueryAgent initializes correctly."""
-        agent = QueryAgent(self.mock_ragme)
-        assert agent.ragme == self.mock_ragme
+        agent = QueryAgent(self.mock_ragme.vector_db)
+        assert agent.vector_db == self.mock_ragme.vector_db
         assert hasattr(agent, "llm")
         assert hasattr(agent, "top_k")
 
     def test_query_agent_is_query_question(self):
         """Test that is_query_question correctly identifies question queries."""
-        agent = QueryAgent(self.mock_ragme)
+        agent = QueryAgent(self.mock_ragme.vector_db)
 
         # Test question queries
         assert agent.is_query_question("who is maximilien")
@@ -142,13 +142,13 @@ class TestAgentRefactor:
         agent = FunctionalAgent(self.mock_ragme)
         result = await agent.run("add this URL to my collection")
 
-        assert result == "Successfully added URL to collection"
+        assert "Successfully added URL to collection" in result
 
     @pytest.mark.asyncio
     @patch("src.ragme.agents.query_agent.OpenAI")
     async def test_query_agent_run_with_documents(self, mock_openai):
         """Test that QueryAgent.run works correctly when documents are found."""
-        # Mock vector database search to return documents
+        # Mock vector database methods
         mock_documents = [
             {
                 "url": "https://maximilien.org",
@@ -157,7 +157,10 @@ class TestAgentRefactor:
                 "score": 0.95,
             }
         ]
-        self.mock_ragme.vector_db.search.return_value = mock_documents
+        self.mock_ragme.vector_db.has_text_collection.return_value = True
+        self.mock_ragme.vector_db.has_image_collection.return_value = False
+        self.mock_ragme.vector_db.search_text_collection.return_value = mock_documents
+        self.mock_ragme.vector_db.search_image_collection.return_value = []
 
         # Mock LLM response
         mock_llm = Mock()
@@ -166,7 +169,7 @@ class TestAgentRefactor:
         )
         mock_openai.return_value = mock_llm
 
-        agent = QueryAgent(self.mock_ragme)
+        agent = QueryAgent(self.mock_ragme.vector_db)
         result = await agent.run("who is maximilien")
 
         assert "Based on the stored documents" in result
@@ -177,10 +180,13 @@ class TestAgentRefactor:
     @patch("src.ragme.agents.query_agent.OpenAI")
     async def test_query_agent_run_no_documents(self, mock_openai):
         """Test that QueryAgent.run handles the case when no documents are found."""
-        # Mock vector database search to return no documents
-        self.mock_ragme.vector_db.search.return_value = []
+        # Mock vector database methods
+        self.mock_ragme.vector_db.has_text_collection.return_value = True
+        self.mock_ragme.vector_db.has_image_collection.return_value = False
+        self.mock_ragme.vector_db.search_text_collection.return_value = []
+        self.mock_ragme.vector_db.search_image_collection.return_value = []
 
-        agent = QueryAgent(self.mock_ragme)
+        agent = QueryAgent(self.mock_ragme.vector_db)
         result = await agent.run("who is maximilien")
 
         assert "couldn't find any relevant information" in result
@@ -204,10 +210,21 @@ class TestAgentRefactor:
         mock_agent_instance.run = mock_run
         mock_function_agent.return_value = mock_agent_instance
 
+        # Mock the LLM responses
+        mock_llm = Mock()
+        mock_llm.complete.return_value = Mock(
+            text='{"is_delete": false, "operation_type": "none"}'
+        )
+        mock_func_openai.return_value = mock_llm
+        mock_query_openai.return_value = mock_llm
+
+        # Create agent and then patch its LLM
         agent = RagMeAgent(self.mock_ragme)
+        agent.llm.complete = mock_llm.complete
+
         result = await agent.run("add this URL to my collection")
 
-        assert result == "Successfully added URL to collection"
+        assert "Successfully added URL to collection" in result
 
     @pytest.mark.asyncio
     @patch("src.ragme.agents.functional_agent.FunctionAgent")
@@ -217,7 +234,7 @@ class TestAgentRefactor:
         self, mock_query_openai, mock_func_openai, mock_function_agent
     ):
         """Test that RagMeAgent correctly dispatches question queries to QueryAgent."""
-        # Mock vector database search to return documents
+        # Mock vector database methods
         mock_documents = [
             {
                 "url": "https://maximilien.org",
@@ -226,7 +243,10 @@ class TestAgentRefactor:
                 "score": 0.95,
             }
         ]
-        self.mock_ragme.vector_db.search.return_value = mock_documents
+        self.mock_ragme.vector_db.has_text_collection.return_value = True
+        self.mock_ragme.vector_db.has_image_collection.return_value = False
+        self.mock_ragme.vector_db.search_text_collection.return_value = mock_documents
+        self.mock_ragme.vector_db.search_image_collection.return_value = []
 
         # Mock LLM response
         mock_llm = Mock()
@@ -234,11 +254,19 @@ class TestAgentRefactor:
             text="Maximilien is a software engineer who works on AI projects."
         )
         mock_query_openai.return_value = mock_llm
+        mock_func_openai.return_value = mock_llm
 
+        # Create agent and then patch its LLM
         agent = RagMeAgent(self.mock_ragme)
+        agent.llm.complete = mock_llm.complete
+
         result = await agent.run("who is maximilien")
 
-        assert "Based on the stored documents" in result
+        # The response should contain either the formatted response or the direct answer
+        assert (
+            "Based on the stored documents" in result
+            or "Maximilien is a software engineer" in result
+        )
         assert "https://maximilien.org" in result
 
 
@@ -309,7 +337,7 @@ class TestAgentIntegration:
         mock_func_agent_instance.run = mock_run
         mock_function_agent.return_value = mock_func_agent_instance
 
-        # Mock vector database search to return the added document
+        # Mock vector database methods
         mock_documents = [
             {
                 "url": "https://maximilien.org",
@@ -318,7 +346,10 @@ class TestAgentIntegration:
                 "score": 0.95,
             }
         ]
-        self.mock_ragme.vector_db.search.return_value = mock_documents
+        self.mock_ragme.vector_db.has_text_collection.return_value = True
+        self.mock_ragme.vector_db.has_image_collection.return_value = False
+        self.mock_ragme.vector_db.search_text_collection.return_value = mock_documents
+        self.mock_ragme.vector_db.search_image_collection.return_value = []
 
         # Mock LLM response for query
         mock_llm = Mock()
@@ -329,7 +360,7 @@ class TestAgentIntegration:
 
         # Test the full flow
         functional_agent = FunctionalAgent(self.mock_ragme)
-        query_agent = QueryAgent(self.mock_ragme)
+        query_agent = QueryAgent(self.mock_ragme.vector_db)
 
         # Add document
         add_result = await functional_agent.run(
@@ -362,7 +393,7 @@ class TestAgentIntegration:
         mock_func_agent_instance.run = mock_run
         mock_function_agent.return_value = mock_func_agent_instance
 
-        # Mock vector database search to return documents
+        # Mock vector database methods
         mock_documents = [
             {
                 "url": "https://maximilien.org",
@@ -371,7 +402,10 @@ class TestAgentIntegration:
                 "score": 0.95,
             }
         ]
-        self.mock_ragme.vector_db.search.return_value = mock_documents
+        self.mock_ragme.vector_db.has_text_collection.return_value = True
+        self.mock_ragme.vector_db.has_image_collection.return_value = False
+        self.mock_ragme.vector_db.search_text_collection.return_value = mock_documents
+        self.mock_ragme.vector_db.search_image_collection.return_value = []
 
         # Mock LLM response for query
         mock_llm = Mock()

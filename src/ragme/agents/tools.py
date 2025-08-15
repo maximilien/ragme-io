@@ -312,7 +312,21 @@ class RagMeTools:
         """
         db = self.ragme.vector_db
         db_type = getattr(db, "db_type", type(db).__name__)
-        config = f"Collection: {getattr(db, 'collection_name', 'unknown')}"
+
+        # Handle new collection structure
+        if hasattr(db, "text_collection") and db.text_collection:
+            text_collection = db.text_collection.name
+        elif hasattr(db, "collection_name"):
+            text_collection = getattr(db, "collection_name", "unknown")
+        else:
+            text_collection = "unknown"
+
+        if hasattr(db, "image_collection") and db.image_collection:
+            image_collection = db.image_collection.name
+            config = f"Text Collection: {text_collection}, Image Collection: {image_collection}"
+        else:
+            config = f"Text Collection: {text_collection}"
+
         return f"RagMe is currently using the '{db_type}' vector database. {config}."
 
     def count_documents(self, date_filter: str = "all") -> str:
@@ -385,15 +399,14 @@ class RagMeTools:
             str: Success or error message
         """
         try:
-            from ..utils.config_manager import config
+            import os
+
             from ..utils.image_processor import image_processor
             from ..vdbs.vector_db_factory import create_vector_database
 
-            # Get image collection name
-            image_collection_name = config.get_image_collection_name()
-
-            # Create image vector database
-            image_vdb = create_vector_database(collection_name=image_collection_name)
+            # Create image vector database using the configured database type
+            db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
+            image_vdb = create_vector_database(db_type)
             image_vdb.setup()
 
             # Process the image
@@ -452,14 +465,13 @@ class RagMeTools:
             str: Formatted list of images with metadata
         """
         try:
-            from ..utils.config_manager import config
+            import os
+
             from ..vdbs.vector_db_factory import create_vector_database
 
-            # Get image collection name
-            image_collection_name = config.get_image_collection_name()
-
-            # Create image vector database
-            image_vdb = create_vector_database(collection_name=image_collection_name)
+            # Create image vector database using the configured database type
+            db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
+            image_vdb = create_vector_database(db_type)
 
             # List images
             images = image_vdb.list_documents(limit=limit, offset=offset)
@@ -515,14 +527,13 @@ class RagMeTools:
             str: Success or error message
         """
         try:
-            from ..utils.config_manager import config
+            import os
+
             from ..vdbs.vector_db_factory import create_vector_database
 
-            # Get image collection name
-            image_collection_name = config.get_image_collection_name()
-
-            # Create image vector database
-            image_vdb = create_vector_database(collection_name=image_collection_name)
+            # Create image vector database using the configured database type
+            db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
+            image_vdb = create_vector_database(db_type)
 
             # Delete the image
             success = image_vdb.delete_document(image_id)

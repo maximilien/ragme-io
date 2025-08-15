@@ -6,7 +6,7 @@ import os
 import warnings
 from typing import Any
 
-from .vector_db_base import VectorDatabase
+from .vector_db_base import CollectionConfig, VectorDatabase
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(
@@ -25,10 +25,9 @@ warnings.filterwarnings(
 class MilvusVectorDatabase(VectorDatabase):
     """Milvus implementation of the vector database interface."""
 
-    def __init__(self, collection_name: str = "RagMeDocs"):
-        super().__init__(collection_name)
+    def __init__(self, collections: list[CollectionConfig]):
+        super().__init__(collections)
         self.client = None
-        self.collection_name = collection_name
         self._client_created = False
 
     def _ensure_client(self):
@@ -85,442 +84,416 @@ class MilvusVectorDatabase(VectorDatabase):
                 os.environ["MILVUS_URI"] = original_milvus_uri
 
     def setup(self):
-        """Set up Milvus collection if it doesn't exist."""
+        """Set up Milvus collections if they don't exist."""
         self._ensure_client()
         if self.client is None:
             warnings.warn("Milvus client is not available. Setup skipped.")
             return
 
-        # Create collection if it doesn't exist
-        if not self.client.has_collection(self.collection_name):
-            # Use the correct API for MilvusClient
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                dimension=1536,  # Vector dimension
-                primary_field_name="id",
-                vector_field_name="vector",
-            )
+        for collection in self.collections:
+            # Create collection if it doesn't exist
+            if not self.client.has_collection(collection.name):
+                # Use the correct API for MilvusClient
+                self.client.create_collection(
+                    collection_name=collection.name,
+                    dimension=1536,  # Vector dimension
+                    primary_field_name="id",
+                    vector_field_name="vector",
+                    metric_type="COSINE",
+                )
+
+    @property
+    def db_type(self) -> str:
+        """Return the type/name of the vector database."""
+        return "milvus"
 
     def write_documents(self, documents: list[dict[str, Any]]):
-        """Write documents to Milvus."""
+        """Write documents to the text collection."""
+        if not self.has_text_collection():
+            raise ValueError("No text collection configured for this VDB")
+
         self._ensure_client()
         if self.client is None:
-            warnings.warn("Milvus client is not available. Documents not written.")
+            warnings.warn("Milvus client is not available. Document writing skipped.")
             return
 
-        # Each document should have 'url', 'text', 'metadata', and optionally 'vector'
+        # Prepare data for insertion
         data = []
-        for i, doc in enumerate(documents):
-            # Generate vector if not provided
-            if "vector" not in doc or doc["vector"] is None:
-                try:
-                    # Use OpenAI embeddings to generate vector
-                    from openai import OpenAI
+        for doc in documents:
+            # Generate embeddings for text
+            embedding = self._get_text_embedding(doc.get("text", ""))
 
-                    # Get OpenAI API key from environment
-                    api_key = os.getenv("OPENAI_API_KEY")
-                    if not api_key:
-                        raise ValueError(
-                            "OPENAI_API_KEY environment variable is required for vector generation"
-                        )
-
-                    client = OpenAI(api_key=api_key)
-
-                    # Generate embedding for the text content
-                    text_content = doc.get("text", "")
-                    if not text_content:
-                        # Skip documents with empty text
-                        continue
-
-                    response = client.embeddings.create(
-                        model="text-embedding-3-small", input=text_content
-                    )
-
-                    # Extract the vector
-                    vector = response.data[0].embedding
-                    doc["vector"] = vector
-
-                except Exception as e:
-                    warnings.warn(f"Failed to generate vector for document {i}: {e}")
-                    continue
-
-            # Only add documents that have a valid vector
-            if "vector" in doc and doc["vector"] is not None:
-                data.append(
-                    {
-                        "id": i,  # Use integer index instead of UUID
-                        "url": doc.get("url", ""),
-                        "text": doc.get("text", ""),
-                        "metadata": json.dumps(
-                            doc.get("metadata", {}), ensure_ascii=False
-                        ),
-                        "vector": doc["vector"],
-                    }
-                )
-
-        if data:
-            self.client.insert(self.collection_name, data)
-
-    def list_documents(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
-        """List documents from Milvus."""
-        self._ensure_client()
-        if self.client is None:
-            warnings.warn("Milvus client is not available. Returning empty list.")
-            return []
-
-        # Query all documents, paginated and sorted by creation time (most recent first)
-        results = self.client.query(
-            self.collection_name,
-            output_fields=["id", "url", "text", "metadata"],
-            limit=limit,
-            offset=offset,
-            sort=[
-                {"field": "id", "order": "desc"}
-            ],  # Sort by ID (which represents creation order), newest first
-        )
-
-        docs = []
-        for doc in results:
-            try:
-                metadata = json.loads(doc.get("metadata", "{}"))
-            except Exception:
-                metadata = {}
-            docs.append(
+            data.append(
                 {
-                    "id": doc.get("id"),
+                    "id": doc.get("id", f"doc_{len(data)}"),
                     "url": doc.get("url", ""),
                     "text": doc.get("text", ""),
-                    "metadata": metadata,
+                    "metadata": json.dumps(doc.get("metadata", {}), ensure_ascii=False),
+                    "vector": embedding,
                 }
             )
-        return docs
 
-    def count_documents(self, date_filter: str = "all") -> int:
-        """Count documents in Milvus efficiently."""
+        # Insert into text collection
+        self.client.insert(collection_name=self.text_collection.name, data=data)
+
+    def write_images(self, images: list[dict[str, Any]]):
+        """Write images to the image collection."""
+        if not self.has_image_collection():
+            raise ValueError("No image collection configured for this VDB")
+
         self._ensure_client()
         if self.client is None:
-            warnings.warn("Milvus client is not available. Returning 0.")
-            return 0
+            warnings.warn("Milvus client is not available. Image writing skipped.")
+            return
+
+        # Prepare data for insertion
+        data = []
+        for img in images:
+            # For images, we'll use metadata embedding since Milvus doesn't have native image support
+            metadata = img.get("metadata", {})
+            metadata_text = json.dumps(metadata, ensure_ascii=False)
+            embedding = self._get_text_embedding(metadata_text)
+
+            data.append(
+                {
+                    "id": img.get("id", f"img_{len(data)}"),
+                    "url": img.get("url", ""),
+                    "text": f"Image: {img.get('url', 'unknown')}",
+                    "metadata": metadata_text,
+                    "vector": embedding,
+                }
+            )
+
+        # Insert into image collection
+        self.client.insert(collection_name=self.image_collection.name, data=data)
+
+    def list_documents(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
+        """List documents from the text collection."""
+        if not self.has_text_collection():
+            return []
+
+        self._ensure_client()
+        if self.client is None:
+            return []
 
         try:
-            # For Milvus, we'll use a simple count query
-            # Note: Milvus doesn't have direct date filtering in count, so we'll use a query approach
-            if date_filter == "all":
-                # Get total count by querying with no filters
-                total_results = self.client.query(
-                    self.collection_name,
-                    output_fields=["id"],
-                    limit=16384,  # Milvus max limit
-                )
-                return len(total_results)
-            else:
-                # For date filtering, we need to fall back to listing and filtering
-                # since Milvus metadata filtering is more complex
-                all_docs = self.list_documents(limit=10000, offset=0)
-                if date_filter == "all":
-                    return len(all_docs)
+            # Get documents from text collection
+            response = self.client.query(
+                collection_name=self.text_collection.name,
+                filter="",
+                output_fields=["id", "url", "text", "metadata"],
+                limit=limit,
+                offset=offset,
+            )
 
-                # Simple date filtering
-                import datetime
-
-                now = datetime.datetime.now()
-
-                if date_filter == "current":
-                    start_of_week = now - datetime.timedelta(days=now.weekday())
-                    cutoff = start_of_week.isoformat()
-                elif date_filter == "month":
-                    cutoff = now.replace(day=1).isoformat()
-                elif date_filter == "year":
-                    cutoff = now.replace(month=1, day=1).isoformat()
-                else:
-                    return len(all_docs)
-
-                count = 0
-                for doc in all_docs:
-                    date_added = doc.get("metadata", {}).get("date_added", "")
-                    if date_added >= cutoff:
-                        count += 1
-                return count
-
+            return self._convert_milvus_response(response)
         except Exception as e:
-            print(f"Error counting documents in Milvus: {str(e)}")
-            return 0
+            warnings.warn(f"Error listing documents from Milvus: {e}")
+            return []
 
     def delete_document(self, document_id: str) -> bool:
-        """Delete a document from Milvus by ID."""
+        """Delete a document from the text collection by ID."""
+        if not self.has_text_collection():
+            return False
+
         self._ensure_client()
         if self.client is None:
-            warnings.warn("Milvus client is not available. Cannot delete document.")
             return False
 
         try:
-            # Delete the document by ID
-            self.client.delete(self.collection_name, pks=[document_id])
+            self.client.delete(
+                collection_name=self.text_collection.name, pks=[document_id]
+            )
             return True
-        except Exception as e:
-            warnings.warn(f"Failed to delete document {document_id}: {e}")
+        except Exception:
             return False
 
     def find_document_by_url(self, url: str) -> dict[str, Any] | None:
-        """Find a document by its URL."""
-        try:
-            self._ensure_client()
-            if self.client is None:
-                return None
+        """Find a document by its URL in the text collection."""
+        if not self.has_text_collection():
+            return None
 
-            # Query for documents with the specific URL
-            results = self.client.query(
-                self.collection_name,
-                output_fields=["id", "url", "text", "metadata"],
+        self._ensure_client()
+        if self.client is None:
+            return None
+
+        try:
+            response = self.client.query(
+                collection_name=self.text_collection.name,
                 filter=f'url == "{url}"',
+                output_fields=["id", "url", "text", "metadata"],
                 limit=1,
             )
 
-            if results:
-                doc = results[0]
-                try:
-                    metadata = json.loads(doc.get("metadata", "{}"))
-                except Exception:
-                    metadata = {}
-                return {
-                    "id": doc.get("id"),
-                    "url": doc.get("url", ""),
-                    "text": doc.get("text", ""),
-                    "metadata": metadata,
-                }
-
-            return None
-        except Exception as e:
-            warnings.warn(f"Failed to find document by URL {url}: {e}")
+            results = self._convert_milvus_response(response)
+            return results[0] if results else None
+        except Exception:
             return None
 
     def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
-        """
-        Search for documents using Milvus vector similarity search.
+        """Search both text and image collections in parallel."""
+        results = []
 
-        Args:
-            query: The search query text
-            limit: Maximum number of results to return
+        # Search text collection if available
+        if self.has_text_collection():
+            text_results = self.search_text_collection(query, limit)
+            results.extend(text_results)
 
-        Returns:
-            List of documents sorted by relevance
-        """
+        # Search image collection if available
+        if self.has_image_collection():
+            image_results = self.search_image_collection(query, limit)
+            results.extend(image_results)
+
+        # Sort by score if available
+        results.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+        return results[:limit]
+
+    def search_text_collection(
+        self, query: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Search only the text collection."""
+        if not self.has_text_collection():
+            return []
+
+        self._ensure_client()
+        if self.client is None:
+            return []
+
         try:
-            self._ensure_client()
-            if self.client is None:
-                warnings.warn("Milvus client is not available. Returning empty list.")
-                return []
+            # Generate embedding for query
+            query_embedding = self._get_text_embedding(query)
 
-            # Generate embedding for the query
-            import os
-
-            from openai import OpenAI
-
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                warnings.warn(
-                    "OPENAI_API_KEY not found. Falling back to keyword search."
-                )
-                return self._fallback_keyword_search(query, limit)
-
-            client = OpenAI(api_key=api_key)
-            response = client.embeddings.create(
-                model="text-embedding-3-small", input=query
-            )
-            query_vector = response.data[0].embedding
-
-            # Perform vector similarity search
-            results = self.client.search(
-                self.collection_name,
-                data=[query_vector],
+            # Search text collection
+            response = self.client.search(
+                collection_name=self.text_collection.name,
+                data=[query_embedding],
                 anns_field="vector",
                 param={"metric_type": "COSINE", "params": {"nprobe": 10}},
                 limit=limit,
                 output_fields=["id", "url", "text", "metadata"],
             )
 
-            documents = []
-            for hits in results:
-                for hit in hits:
-                    try:
-                        metadata = json.loads(hit.entity.get("metadata", "{}"))
-                    except Exception:
-                        metadata = {}
-
-                    doc = {
-                        "id": hit.entity.get("id"),
-                        "url": hit.entity.get("url", ""),
-                        "text": hit.entity.get("text", ""),
-                        "metadata": metadata,
-                        "score": hit.score,  # Include similarity score
-                    }
-                    documents.append(doc)
-
-            return documents
-
+            return self._convert_milvus_search_response(response)
         except Exception as e:
-            warnings.warn(f"Failed to perform vector search for query '{query}': {e}")
-            # Fallback to simple keyword matching if vector search fails
-            return self._fallback_keyword_search(query, limit)
-
-    def _fallback_keyword_search(
-        self, query: str, limit: int = 5
-    ) -> list[dict[str, Any]]:
-        """
-        Fallback to simple keyword matching if vector search fails.
-
-        Args:
-            query: The search query text
-            limit: Maximum number of results to return
-
-        Returns:
-            List of documents sorted by relevance
-        """
-        try:
-            # Get all documents and perform keyword matching
-            documents = self.list_documents(limit=100, offset=0)
-
-            query_lower = query.lower()
-            query_words = query_lower.split()
-            relevant_docs = []
-
-            for doc in documents:
-                text = doc.get("text", "").lower()
-                url = doc.get("url", "").lower()
-                metadata = doc.get("metadata", {})
-                metadata_text = str(metadata).lower()
-
-                # Count how many query words match
-                matches = 0
-                for word in query_words:
-                    if word in text or word in url or word in metadata_text:
-                        matches += 1
-
-                # If at least one word matches, consider it relevant
-                if matches > 0:
-                    relevant_docs.append(
-                        {"doc": doc, "matches": matches, "text_length": len(text)}
-                    )
-
-            if relevant_docs:
-                # Sort by relevance (more matches first, then by text length)
-                relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
-
-                # Return the top results
-                return [item["doc"] for item in relevant_docs[:limit]]
-
+            warnings.warn(f"Error searching text collection in Milvus: {e}")
             return []
 
+    def search_image_collection(
+        self, query: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Search only the image collection using metadata."""
+        if not self.has_image_collection():
+            return []
+
+        self._ensure_client()
+        if self.client is None:
+            return []
+
+        try:
+            # Generate embedding for query
+            query_embedding = self._get_text_embedding(query)
+
+            # Search image collection
+            response = self.client.search(
+                collection_name=self.image_collection.name,
+                data=[query_embedding],
+                anns_field="vector",
+                param={"metric_type": "COSINE", "params": {"nprobe": 10}},
+                limit=limit,
+                output_fields=["id", "url", "text", "metadata"],
+            )
+
+            return self._convert_milvus_search_response(response)
         except Exception as e:
-            warnings.warn(f"Fallback keyword search also failed: {e}")
+            warnings.warn(f"Error searching image collection in Milvus: {e}")
             return []
 
     def create_query_agent(self):
-        """Create a query agent for Milvus."""
+        """Create and return a query agent for this vector database."""
+        from ..agents.query_agent import QueryAgent
 
-        # Create a simple query agent that can perform vector similarity search
-        class MilvusQueryAgent:
-            def __init__(self, vector_db):
-                self.vector_db = vector_db
-                self.client = vector_db.client
-                self.collection_name = vector_db.collection_name
+        return QueryAgent(self)
 
-            def run(self, query: str):
-                """Run a query using vector similarity search."""
-                try:
-                    # For now, use simple keyword matching as fallback
-                    # In a full implementation, you would:
-                    # 1. Generate embeddings for the query
-                    # 2. Perform vector similarity search
-                    # 3. Return the most relevant documents
+    def count_documents(self, date_filter: str = "all") -> int:
+        """Count documents in the text collection."""
+        if not self.has_text_collection():
+            return 0
 
-                    # Get all documents and perform keyword matching - increase limit
-                    documents = self.vector_db.list_documents(limit=100, offset=0)
+        self._ensure_client()
+        if self.client is None:
+            return 0
 
-                    # Improved keyword matching for chunked documents
-                    query_lower = query.lower()
-                    query_words = query_lower.split()
-                    relevant_docs = []
+        try:
+            # Get total count from text collection
+            response = self.client.query(
+                collection_name=self.text_collection.name,
+                filter="",
+                output_fields=["id"],
+                limit=1,
+            )
 
-                    for doc in documents:
-                        text = doc.get("text", "").lower()
-                        url = doc.get("url", "").lower()
+            # This is a simplified count - in a real implementation you'd want to use aggregation
+            return len(response) if response else 0
+        except Exception:
+            return 0
 
-                        # Check if any query word appears in text or URL
-                        # Also check metadata for chunked documents
-                        metadata = doc.get("metadata", {})
-                        metadata_text = str(metadata).lower()
+    def count_images(self, date_filter: str = "all") -> int:
+        """Count images in the image collection."""
+        if not self.has_image_collection():
+            return 0
 
-                        # Count how many query words match
-                        matches = 0
-                        for word in query_words:
-                            if word in text or word in url or word in metadata_text:
-                                matches += 1
+        self._ensure_client()
+        if self.client is None:
+            return 0
 
-                        # If at least one word matches, consider it relevant
-                        if matches > 0:
-                            relevant_docs.append(
-                                {
-                                    "doc": doc,
-                                    "matches": matches,
-                                    "text_length": len(text),
-                                }
-                            )
+        try:
+            # Get total count from image collection
+            response = self.client.query(
+                collection_name=self.image_collection.name,
+                filter="",
+                output_fields=["id"],
+                limit=1,
+            )
 
-                    if relevant_docs:
-                        # Sort by relevance (more matches first, then by text length)
-                        relevant_docs.sort(
-                            key=lambda x: (-x["matches"], -x["text_length"])
-                        )
+            # This is a simplified count - in a real implementation you'd want to use aggregation
+            return len(response) if response else 0
+        except Exception:
+            return 0
 
-                        # Get the most relevant document
-                        most_relevant = relevant_docs[0]["doc"]
-                        content = most_relevant.get("text", "")
-                        url = most_relevant.get("url", "")
-                        metadata = most_relevant.get("metadata", {})
+    def list_images(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
+        """List images from the image collection."""
+        if not self.has_image_collection():
+            return []
 
-                        # For chunked documents, provide more context
-                        if metadata.get("is_chunked") or metadata.get("is_chunk"):
-                            chunk_info = f" (Chunked document with {metadata.get('total_chunks', 'unknown')} chunks)"
-                        else:
-                            chunk_info = ""
+        self._ensure_client()
+        if self.client is None:
+            return []
 
-                        # Truncate content if too long
-                        if len(content) > 2000:
-                            content = content[:2000] + "..."
+        try:
+            response = self.client.query(
+                collection_name=self.image_collection.name,
+                filter="",
+                output_fields=["id", "url", "text", "metadata"],
+                limit=limit,
+                offset=offset,
+            )
+            return self._convert_milvus_response(response)
+        except Exception:
+            return []
 
-                        return f"Based on the stored documents, here's what I found:\n\nURL: {url}{chunk_info}\n\nContent: {content}"
-                    else:
-                        return f"I couldn't find any relevant information about '{query}' in the stored documents."
+    def delete_image(self, image_id: str) -> bool:
+        """Delete an image from the image collection by ID."""
+        if not self.has_image_collection():
+            return False
 
-                except Exception as e:
-                    return f"Error performing query: {str(e)}"
+        self._ensure_client()
+        if self.client is None:
+            return False
 
-        return MilvusQueryAgent(self)
+        try:
+            self.client.delete(
+                collection_name=self.image_collection.name, pks=[image_id]
+            )
+            return True
+        except Exception:
+            return False
+
+    def find_image_by_url(self, url: str) -> dict[str, Any] | None:
+        """Find an image by its URL in the image collection."""
+        if not self.has_image_collection():
+            return None
+
+        self._ensure_client()
+        if self.client is None:
+            return None
+
+        try:
+            response = self.client.query(
+                collection_name=self.image_collection.name,
+                filter=f'url == "{url}"',
+                output_fields=["id", "url", "text", "metadata"],
+                limit=1,
+            )
+            results = self._convert_milvus_response(response)
+            return results[0] if results else None
+        except Exception:
+            return None
 
     def cleanup(self):
         """Clean up resources and close connections."""
         if self.client:
-            self.client.close()
-
-    def write_images(self, images: list[dict[str, Any]]):
-        """Write images to Milvus (converted to text representation)."""
-        # For now, store images as text documents with metadata
-        documents = []
-        for img in images:
-            documents.append(
-                {
-                    "url": img.get("url", ""),
-                    "text": f"Image: {img.get('url', 'unknown')} - {json.dumps(img.get('metadata', {}))}",
-                    "metadata": img.get("metadata", {}),
-                }
-            )
-        self.write_documents(documents)
+            try:
+                self.client.close()
+            except Exception:
+                pass
 
     def supports_images(self) -> bool:
-        """Milvus doesn't directly support BLOB storage for images."""
-        return False
+        """Check if this vector database implementation supports image storage."""
+        return self.has_image_collection()
 
-    @property
-    def db_type(self) -> str:
-        return "milvus"
+    def _get_text_embedding(self, text: str) -> list[float]:
+        """Generate text embedding using OpenAI API."""
+        try:
+            import openai
+
+            # Get API key from environment
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable is required")
+
+            # Generate embedding
+            response = openai.Embedding.create(
+                model="text-embedding-3-large", input=text
+            )
+
+            return response["data"][0]["embedding"]
+        except Exception as e:
+            warnings.warn(f"Failed to generate embedding: {e}")
+            # Return zero vector as fallback
+            return [0.0] * 1536
+
+    def _convert_milvus_response(self, response) -> list[dict[str, Any]]:
+        """Convert Milvus query response to standard format."""
+        results = []
+        for item in response:
+            result = {
+                "id": item.get("id", ""),
+                "url": item.get("url", ""),
+                "text": item.get("text", ""),
+                "metadata": {},
+            }
+
+            # Parse metadata if it exists
+            if "metadata" in item:
+                try:
+                    result["metadata"] = json.loads(item["metadata"])
+                except (json.JSONDecodeError, TypeError):
+                    result["metadata"] = {}
+
+            results.append(result)
+
+        return results
+
+    def _convert_milvus_search_response(self, response) -> list[dict[str, Any]]:
+        """Convert Milvus search response to standard format."""
+        results = []
+        for hit in response[0]:  # response is a list of hits for each query
+            result = {
+                "id": hit.entity.get("id", ""),
+                "url": hit.entity.get("url", ""),
+                "text": hit.entity.get("text", ""),
+                "metadata": {},
+                "score": hit.score,
+            }
+
+            # Parse metadata if it exists
+            if "metadata" in hit.entity:
+                try:
+                    result["metadata"] = json.loads(hit.entity["metadata"])
+                except (json.JSONDecodeError, TypeError):
+                    result["metadata"] = {}
+
+            results.append(result)
+
+        return results

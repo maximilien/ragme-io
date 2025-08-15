@@ -429,9 +429,6 @@ async def list_content(
         dict: List of items and pagination info
     """
     try:
-        from ..utils.config_manager import config
-        from ..vdbs.vector_db_factory import create_vector_database
-
         all_items = []
 
         # Get documents if requested
@@ -444,16 +441,8 @@ async def list_content(
         # Get images if requested
         if content_type in ["image", "both"]:
             try:
-                # Get image collection name from config
-                image_collection_name = config.get_image_collection_name()
-
-                # Create image-specific vector database instance
-                image_vdb = create_vector_database(
-                    collection_name=image_collection_name
-                )
-
-                # List images from image collection
-                images = image_vdb.list_documents(limit=1000, offset=0)
+                # Use the existing ragme instance which has the correct VDB with both collections
+                images = ragme.vector_db.list_images(limit=1000, offset=0)
                 for img in images:
                     img["content_type"] = "image"
                 all_items.extend(images)
@@ -560,17 +549,8 @@ async def summarize_document(input_data: SummarizeInput):
         # Get images
         images = []  # Initialize images list
         try:
-            from ..utils.config_manager import config
-            from ..vdbs.vector_db_factory import create_vector_database
-
-            # Get image collection name
-            image_collection_name = config.get_image_collection_name()
-
-            # Create image vector database
-            image_vdb = create_vector_database(collection_name=image_collection_name)
-
-            # List images from image collection
-            images = image_vdb.list_documents(limit=1000, offset=0)
+            # Use the existing ragme instance which has the correct VDB with both collections
+            images = ragme.vector_db.list_images(limit=1000, offset=0)
             for img in images:
                 img["content_type"] = "image"
             all_items.extend(images)
@@ -957,16 +937,16 @@ async def upload_images(files: list[UploadFile] = File(...)):
 @app.delete("/delete-document/{document_id}")
 async def delete_document(document_id: str):
     """
-    Delete a document or image from the RAG system by ID.
+    Delete a document from the RAG system by ID.
 
     Args:
-        document_id: ID of the document or image to delete
+        document_id: ID of the document to delete
 
     Returns:
         dict: Status message
     """
     try:
-        # First check if document exists in text collection
+        # Check if document exists in text collection
         documents = ragme.list_documents(limit=1000, offset=0)
 
         # Convert Weaviate UUID to string for comparison
@@ -990,57 +970,13 @@ async def delete_document(document_id: str):
                     status_code=500, detail=f"Failed to delete document {document_id}"
                 )
 
-        # If not found in text collection, try image collection
-        try:
-            from ..utils.config_manager import config
-            from ..vdbs.vector_db_factory import create_vector_database
-
-            # Get image collection name
-            image_collection_name = config.get_image_collection_name()
-
-            # Create image vector database
-            image_vdb = create_vector_database(collection_name=image_collection_name)
-
-            # Check if image exists in image collection
-            images = image_vdb.list_documents(limit=1000, offset=0)
-
-            # Convert Weaviate UUID to string for comparison
-            image_document = None
-            for img in images:
-                img_id = str(img.get("id")) if img.get("id") else None
-                if img_id == document_id:
-                    image_document = img
-                    break
-
-            if image_document:
-                # Image exists in image collection, delete it
-                image_success = image_vdb.delete_document(document_id)
-                if image_success:
-                    return {
-                        "status": "success",
-                        "message": f"Image {document_id} deleted successfully",
-                    }
-                else:
-                    raise HTTPException(
-                        status_code=500, detail=f"Failed to delete image {document_id}"
-                    )
-
-        except Exception as image_error:
-            print(f"Error trying to delete from image collection: {str(image_error)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error accessing image collection: {str(image_error)}",
-            ) from image_error
-
-        # If not found in either collection
-        raise HTTPException(
-            status_code=404, detail=f"Document or image {document_id} not found"
-        )
+        # If not found in text collection
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting document/image {document_id}: {str(e)}")
+        print(f"Error deleting document {document_id}: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -1071,17 +1007,8 @@ async def get_document(document_id: str):
 
         # If not found in text collection, try image collection
         try:
-            from ..utils.config_manager import config
-            from ..vdbs.vector_db_factory import create_vector_database
-
-            # Get image collection name
-            image_collection_name = config.get_image_collection_name()
-
-            # Create image vector database
-            image_vdb = create_vector_database(collection_name=image_collection_name)
-
-            # Try to get from image collection
-            images = image_vdb.list_documents(limit=1000, offset=0)
+            # Use the existing ragme instance which has the correct VDB with both collections
+            images = ragme.vector_db.list_images(limit=1000, offset=0)
             image = next((img for img in images if img.get("id") == document_id), None)
 
             if image:
@@ -1172,6 +1099,387 @@ async def reset_chat_session():
         return {"status": "error", "message": f"Failed to reset chat session: {str(e)}"}
 
 
+# Socket.IO support for real-time communication
+try:
+    import socketio
+    from socketio import AsyncServer
+
+    # Create Socket.IO server
+    sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+    socket_app = socketio.ASGIApp(sio, app)
+
+    # Socket event handlers
+    @sio.event
+    async def connect(sid, environ):
+        print(f"Client connected: {sid}")
+
+    @sio.event
+    async def disconnect(sid):
+        print(f"Client disconnected: {sid}")
+
+    @sio.event
+    async def summarize_document(sid, data):
+        """Handle document summarization requests from frontend."""
+        try:
+            document_id = data.get("documentId")
+            if not document_id:
+                await sio.emit(
+                    "document_summarized",
+                    {"success": False, "message": "Document ID is required"},
+                    room=sid,
+                )
+                return
+
+            # Use the existing summarize_document endpoint logic
+            # Note: We don't need to import SummarizeInput here since we're not using it
+
+            # Get all documents and images
+            all_items = []
+
+            # Get text documents
+            documents = ragme.list_documents(limit=1000, offset=0)
+            for doc in documents:
+                doc["content_type"] = "document"
+            all_items.extend(documents)
+
+            # Get images
+            images = []
+            try:
+                images = ragme.vector_db.list_images(limit=1000, offset=0)
+                for img in images:
+                    img["content_type"] = "image"
+                all_items.extend(images)
+            except Exception as e:
+                print(f"Error listing images: {e}")
+
+            # Find the document by ID
+            document = None
+            print(f"Looking for document with ID: {document_id}")
+            print(f"Number of documents: {len(documents)}")
+            print(f"Number of images: {len(images)}")
+
+            # First try to find by ID in documents
+            for doc in documents:
+                doc_id = doc.get("id")
+                doc_id_str = str(doc_id) if doc_id else None
+                if doc_id_str == document_id:
+                    document = doc
+                    document["content_type"] = "document"
+                    print(f"Found document: {doc.get('url', 'No URL')}")
+                    break
+
+            # If not found in documents, try to find in images
+            if not document:
+                for img in images:
+                    img_id = img.get("id")
+                    img_id_str = str(img_id) if img_id else None
+                    if img_id_str == document_id:
+                        document = img
+                        document["content_type"] = "image"
+                        print(
+                            f"Found image: {img.get('metadata', {}).get('filename', 'No filename')}"
+                        )
+                        break
+
+            if not document:
+                await sio.emit(
+                    "document_summarized",
+                    {"success": False, "message": "Document not found"},
+                    room=sid,
+                )
+                return
+
+            # Handle different content types
+            content_type = document.get("content_type", "document")
+
+            if content_type == "image":
+                # For images, create a summary based on metadata and classification
+                metadata = document.get("metadata", {})
+                classification = metadata.get("classification", {})
+                top_prediction = classification.get("top_prediction", {})
+                confidence = top_prediction.get("confidence", 0)
+                label = top_prediction.get("label", "Unknown")
+
+                summary = f"Image Analysis:\n- Filename: {metadata.get('filename', 'Unknown')}\n- File Size: {metadata.get('file_size', 'Unknown')} bytes\n- Classification: {label} (confidence: {confidence:.2%})\n- Date Added: {metadata.get('date_added', 'Unknown')}"
+
+                await sio.emit(
+                    "document_summarized",
+                    {"success": True, "summary": summary},
+                    room=sid,
+                )
+            else:
+                # For text documents, use the existing summarize logic
+                try:
+                    # Call the existing summarize_document endpoint
+                    from .api import SummarizeInput
+
+                    input_data = SummarizeInput(document_id=document_id)
+                    result = await summarize_document(input_data)
+
+                    await sio.emit(
+                        "document_summarized",
+                        {"success": True, "summary": result["summary"]},
+                        room=sid,
+                    )
+                except Exception as e:
+                    print(f"Error summarizing document: {e}")
+                    await sio.emit(
+                        "document_summarized",
+                        {
+                            "success": False,
+                            "message": f"Error summarizing document: {str(e)}",
+                        },
+                        room=sid,
+                    )
+
+        except Exception as e:
+            print(f"Error in summarize_document socket handler: {e}")
+            await sio.emit(
+                "document_summarized",
+                {"success": False, "message": f"Error: {str(e)}"},
+                room=sid,
+            )
+
+    @sio.event
+    async def list_content(sid, data):
+        """Handle content listing requests from frontend."""
+        try:
+            limit = data.get("limit", 10)
+            offset = data.get("offset", 0)
+            date_filter = data.get("dateFilter", "all")
+            content_type = data.get("contentType", "both")
+
+            print(
+                f"List content request - limit: {limit}, offset: {offset}, date: {date_filter}, type: {content_type}"
+            )
+
+            # Get all content based on filters
+            all_items = []
+
+            # Get text documents
+            if content_type in ["both", "documents"]:
+                documents = ragme.list_documents(limit=1000, offset=0)
+                for doc in documents:
+                    doc["content_type"] = "document"
+                all_items.extend(documents)
+
+            # Get images
+            if content_type in ["both", "images"]:
+                try:
+                    images = ragme.vector_db.list_images(limit=1000, offset=0)
+                    for img in images:
+                        img["content_type"] = "image"
+                    all_items.extend(images)
+                except Exception as e:
+                    print(f"Error listing images: {e}")
+
+            # Apply date filtering if specified
+            if date_filter != "all":
+                filtered_items = []
+                current_time = datetime.now()
+
+                for item in all_items:
+                    date_added = item.get("metadata", {}).get("date_added")
+                    if date_added:
+                        try:
+                            item_date = datetime.fromisoformat(
+                                date_added.replace("Z", "+00:00")
+                            )
+
+                            if date_filter == "current":
+                                # Current day
+                                if item_date.date() == current_time.date():
+                                    filtered_items.append(item)
+                            elif date_filter == "month":
+                                # Current month
+                                if (
+                                    item_date.year == current_time.year
+                                    and item_date.month == current_time.month
+                                ):
+                                    filtered_items.append(item)
+                            elif date_filter == "year":
+                                # Current year
+                                if item_date.year == current_time.year:
+                                    filtered_items.append(item)
+                        except Exception as e:
+                            print(f"Error parsing date {date_added}: {e}")
+                            # Include items with invalid dates
+                            filtered_items.append(item)
+                    else:
+                        # Include items without date_added
+                        filtered_items.append(item)
+
+                all_items = filtered_items
+
+            # Apply pagination
+            total_count = len(all_items)
+            paginated_items = all_items[offset : offset + limit]
+
+            print(f"Returning {len(paginated_items)} items out of {total_count} total")
+
+            await sio.emit(
+                "content_listed",
+                {
+                    "success": True,
+                    "items": paginated_items,
+                    "pagination": {
+                        "limit": limit,
+                        "offset": offset,
+                        "count": len(paginated_items),
+                        "total": total_count,
+                    },
+                },
+                room=sid,
+            )
+
+        except Exception as e:
+            print(f"Error in list_content socket handler: {e}")
+            await sio.emit(
+                "content_listed",
+                {"success": False, "message": f"Error listing content: {str(e)}"},
+                room=sid,
+            )
+
+    # Set the socket manager for other parts of the application
+    from ..utils.socket_manager import set_socket_manager
+
+    set_socket_manager(sio)
+
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    print("Socket.IO not available - real-time features will be disabled")
+    SOCKETIO_AVAILABLE = False
+    socket_app = app
+
+
+@app.get("/list-images")
+async def list_images(limit: int = 10, offset: int = 0):
+    """
+    List images in the RAG system.
+
+    Args:
+        limit: Maximum number of images to return
+        offset: Number of images to skip
+
+    Returns:
+        dict: List of images with pagination info
+    """
+    try:
+        # Get images from image collection
+        images = ragme.vector_db.list_images(limit=limit, offset=offset)
+
+        return {
+            "images": images,
+            "pagination": {"limit": limit, "offset": offset, "count": len(images)},
+        }
+    except Exception as e:
+        print(f"Error listing images: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.delete("/delete-image/{image_id}")
+async def delete_image(image_id: str):
+    """
+    Delete an image from the RAG system by ID.
+
+    Args:
+        image_id: ID of the image to delete
+
+    Returns:
+        dict: Status message
+    """
+    try:
+        from ..utils.config_manager import config
+        from ..vdbs.vector_db_factory import create_vector_database
+
+        # Get image collection name
+        image_collection_name = config.get_image_collection_name()
+
+        # Create image vector database
+        image_vdb = create_vector_database(collection_name=image_collection_name)
+
+        # Check if image exists in image collection
+        images = image_vdb.list_images(limit=1000, offset=0)
+
+        # Convert Weaviate UUID to string for comparison
+        image_document = None
+        for img in images:
+            img_id = str(img.get("id")) if img.get("id") else None
+            if img_id == image_id:
+                image_document = img
+                break
+
+        if image_document:
+            # Image exists in image collection, delete it
+            image_success = image_vdb.delete_image(image_id)
+            if image_success:
+                return {
+                    "status": "success",
+                    "message": f"Image {image_id} deleted successfully",
+                }
+            else:
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to delete image {image_id}"
+                )
+
+        # If not found in image collection
+        raise HTTPException(status_code=404, detail=f"Image {image_id} not found")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting image {image_id}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/image/{image_id}")
+async def get_image(image_id: str):
+    """
+    Get an image from the RAG system by ID.
+
+    Args:
+        image_id: ID of the image to retrieve
+
+    Returns:
+        dict: Image data
+    """
+    try:
+        # Get images from image collection
+        images = ragme.vector_db.list_images(limit=1000, offset=0)
+
+        # Find the specific image
+        for img in images:
+            img_id = str(img.get("id")) if img.get("id") else None
+            if img_id == image_id:
+                return img
+
+        raise HTTPException(status_code=404, detail=f"Image {image_id} not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error retrieving image {image_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/count-images")
+async def count_images():
+    """
+    Count the number of images in the RAG system.
+
+    Returns:
+        dict: Count of images
+    """
+    try:
+        # Get all images to count them
+        images = ragme.vector_db.list_images(limit=10000, offset=0)
+
+        return {"count": len(images), "type": "images"}
+    except Exception as e:
+        print(f"Error counting images: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 if __name__ == "__main__":
     import uvicorn
 
@@ -1180,4 +1488,6 @@ if __name__ == "__main__":
     host = api_config.get("host", "0.0.0.0")
     port = api_config.get("port", 8021)
 
-    uvicorn.run(app, host=host, port=port)
+    # Use socket app if available, otherwise use regular app
+    app_to_run = socket_app if SOCKETIO_AVAILABLE else app
+    uvicorn.run(app_to_run, host=host, port=port)

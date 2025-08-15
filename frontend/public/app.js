@@ -231,8 +231,10 @@ class RAGmeAssistant {
             console.log('Content listed result:', result);
             console.log('Current filters - date:', this.currentDateFilter, 'content:', this.currentContentFilter);
             if (result.success) {
+                console.log('Previous documents count:', this.documents.length);
                 this.documents = result.items;
-                console.log('Loaded content items:', this.documents.length);
+                console.log('New documents count:', this.documents.length);
+                console.log('Documents after update:', this.documents.map(d => ({ id: d.id, url: d.url, content_type: d.content_type })));
                 this.renderDocuments();
                 this.updateVisualization();
                 
@@ -2041,12 +2043,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     loadDocuments() {
         console.log('Loading content with filters - date:', this.currentDateFilter, 'content:', this.currentContentFilter);
+        console.log('Socket connected:', this.socket?.connected);
+        console.log('Emitting list_content event...');
         this.socket.emit('list_content', {
             limit: this.settings.maxDocuments,
             offset: 0,
             dateFilter: this.currentDateFilter,
             contentType: this.currentContentFilter
         });
+        console.log('list_content event emitted');
     }
 
     refreshDocuments() {
@@ -2942,8 +2947,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <img src="data:${mimeType};base64,${imageData}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
                     </div>
                 `;
-            } else if (imageUrl) {
-                // If we have a URL, display it
+            } else if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:'))) {
+                // If we have a valid URL, display it
                 contentPreview.innerHTML = `
                     <div class="image-preview">
                         <img src="${imageUrl}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
@@ -3764,10 +3769,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('Found chunks to delete:', chunksToDelete.length);
         
         // Delete all chunks
-        const deletePromises = chunksToDelete.map(chunk => 
-            fetch(`/delete-document/${chunk.id}`, { method: 'DELETE' })
-                .then(response => response.json())
-        );
+        const deletePromises = chunksToDelete.map(chunk => {
+            const endpoint = chunk.content_type === 'image' ? `/delete-image/${chunk.id}` : `/delete-document/${chunk.id}`;
+            return fetch(endpoint, { method: 'DELETE' })
+                .then(response => response.json());
+        });
         
         Promise.all(deletePromises)
             .then(results => {
@@ -3830,40 +3836,24 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     deleteSingleDocument(docIndex, doc) {
         console.log('deleteSingleDocument called with:', { docIndex, docId: doc.id, docType: doc.content_type });
         
-        // Call backend API to delete the document using the document ID
-        fetch(`/delete-document/${doc.id}`, {
+        // Determine the appropriate endpoint based on content type
+        const endpoint = doc.content_type === 'image' ? `/delete-image/${doc.id}` : `/delete-document/${doc.id}`;
+        
+        // Call backend API to delete the document/image using the appropriate endpoint
+        fetch(endpoint, {
             method: 'DELETE',
         })
         .then(response => response.json())
         .then(result => {
             console.log('Delete result:', result);
             if (result.status === 'success') {
-                // Remove from local array
-                if (docIndex >= 0 && docIndex < this.documents.length) {
-                    this.documents.splice(docIndex, 1);
-                    console.log('Document removed from local array. New count:', this.documents.length);
-                } else {
-                    console.warn('Invalid docIndex for removal:', docIndex, 'array length:', this.documents.length);
-                    // Try to find and remove by ID as fallback
-                    const indexById = this.documents.findIndex(d => d.id === doc.id);
-                    if (indexById !== -1) {
-                        this.documents.splice(indexById, 1);
-                        console.log('Document removed by ID. New count:', this.documents.length);
-                    } else {
-                        console.error('Could not find document to remove by ID:', doc.id);
-                    }
-                }
-                
-                // Re-render the documents list
-                this.renderDocuments();
-                
-                // Update visualization to reflect the changes
-                this.updateVisualization();
+                // Don't remove from local array immediately - let the server refresh handle it
+                console.log('Delete successful, refreshing data from server...');
+                console.log('About to call loadDocuments()...');
                 
                 // Force a refresh of the documents list to ensure everything is in sync
-                setTimeout(() => {
-                    this.loadDocuments();
-                }, 500);
+                this.loadDocuments();
+                console.log('loadDocuments() called');
                 
                 // Show success notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';

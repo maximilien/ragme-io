@@ -247,6 +247,38 @@ class ConfigManager:
         # Fallback to default
         return "RagMeImages"
 
+    def get_embedding_model(self, db_name: str | None = None) -> str:
+        """
+        Get the text embedding model from configuration.
+
+        Args:
+            db_name: Name of the database configuration. If None, uses default database.
+
+        Returns:
+            Text embedding model name, defaults to "text-embedding-3-large"
+        """
+        db_config = self.get_database_config(db_name)
+        if db_config is None:
+            return "text-embedding-3-large"
+
+        return db_config.get("embedding_model", "text-embedding-3-large")
+
+    def get_image_embedding_model(self, db_name: str | None = None) -> str:
+        """
+        Get the image embedding model from configuration.
+
+        Args:
+            db_name: Name of the database configuration. If None, uses default database.
+
+        Returns:
+            Image embedding model name, defaults to "text-embedding-3-large"
+        """
+        db_config = self.get_database_config(db_name)
+        if db_config is None:
+            return "text-embedding-3-large"
+
+        return db_config.get("image_embedding_model", "text-embedding-3-large")
+
     def get_agent_config(self, agent_name: str) -> dict[str, Any] | None:
         """
         Get agent configuration by name.

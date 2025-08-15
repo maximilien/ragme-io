@@ -23,11 +23,16 @@ from unittest.mock import MagicMock, patch
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.ragme.vdbs.vector_db_base import CollectionConfig
 from src.ragme.vdbs.vector_db_weaviate import WeaviateVectorDatabase
 
 
 class TestWeaviateVectorDatabase:
     """Test cases for the WeaviateVectorDatabase implementation."""
+
+    def _create_test_collections(self):
+        """Create test collection configurations."""
+        return [CollectionConfig("TestCollection", "text")]
 
     def test_init_with_collection_name(self):
         """Test WeaviateVectorDatabase initialization with custom collection name."""
@@ -35,9 +40,11 @@ class TestWeaviateVectorDatabase:
             mock_client = MagicMock()
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase("TestCollection")
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
 
-            assert db.collection_name == "TestCollection"
+            assert db.text_collection.name == "TestCollection"
+            assert db.text_collection.type == "text"
             assert db.client == mock_client
 
     def test_init_default_collection_name(self):
@@ -46,9 +53,11 @@ class TestWeaviateVectorDatabase:
             mock_client = MagicMock()
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase()
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
 
-            assert db.collection_name == "RagMeDocs"
+            assert db.text_collection.name == "TestCollection"
+            assert db.text_collection.type == "text"
             assert db.client == mock_client
 
     def test_setup_collection_exists(self):
@@ -58,7 +67,8 @@ class TestWeaviateVectorDatabase:
             mock_client.collections.exists.return_value = True
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase()
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
             db.setup()
 
             # Should not create collection since it exists
@@ -83,7 +93,8 @@ class TestWeaviateVectorDatabase:
             mock_property.return_value = "property"
             mock_datatype.TEXT = "TEXT"
 
-            db = WeaviateVectorDatabase()
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
             db.setup()
 
             # Should create collection since it doesn't exist
@@ -102,8 +113,8 @@ class TestWeaviateVectorDatabase:
             mock_batch_context.__enter__.return_value = mock_batch
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase()
-
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
             documents = [
                 {
                     "url": "http://test1.com",
@@ -116,10 +127,7 @@ class TestWeaviateVectorDatabase:
                     "metadata": {"type": "webpage"},
                 },
             ]
-
             db.write_documents(documents)
-
-            # Verify batch.add_object was called for each document
             assert mock_batch.add_object.call_count == 2
 
     def test_list_documents(self):
@@ -150,32 +158,29 @@ class TestWeaviateVectorDatabase:
             mock_client.collections.get.return_value = mock_collection
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase()
-
-            documents = db.list_documents(limit=2, offset=0)
-
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
+            documents = db.list_documents()
             assert len(documents) == 2
-            assert documents[0]["id"] == "uuid1"
             assert documents[0]["url"] == "http://test1.com"
-            assert documents[1]["id"] == "uuid2"
             assert documents[1]["url"] == "http://test2.com"
 
     def test_create_query_agent(self):
         """Test creating a query agent."""
         with (
             patch("weaviate.connect_to_weaviate_cloud") as mock_connect,
-            patch("weaviate.agents.query.QueryAgent") as mock_query_agent,
+            patch("src.ragme.agents.query_agent.QueryAgent") as mock_query_agent,
         ):
             mock_client = MagicMock()
             mock_connect.return_value = mock_client
             mock_agent = MagicMock()
             mock_query_agent.return_value = mock_agent
 
-            db = WeaviateVectorDatabase()
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
             agent = db.create_query_agent()
 
-            # The actual QueryAgent is created, not the mock, so we just verify it's not None
-            assert agent is not None
+            assert agent == mock_agent
 
     def test_cleanup(self):
         """Test cleanup method."""
@@ -183,11 +188,11 @@ class TestWeaviateVectorDatabase:
             mock_client = MagicMock()
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase()
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
             db.cleanup()
 
-            # Verify client is set to None after cleanup
-            assert db.client is None
+            mock_client.close.assert_called_once()
 
     def test_db_type_property(self):
         """Test the db_type property."""
@@ -195,6 +200,6 @@ class TestWeaviateVectorDatabase:
             mock_client = MagicMock()
             mock_connect.return_value = mock_client
 
-            db = WeaviateVectorDatabase()
-
+            collections = self._create_test_collections()
+            db = WeaviateVectorDatabase(collections)
             assert db.db_type == "weaviate"

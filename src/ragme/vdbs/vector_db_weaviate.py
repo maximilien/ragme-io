@@ -5,7 +5,7 @@ import json
 import warnings
 from typing import Any
 
-from .vector_db_base import VectorDatabase
+from .vector_db_base import CollectionConfig, VectorDatabase
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(
@@ -24,8 +24,8 @@ warnings.filterwarnings(
 class WeaviateVectorDatabase(VectorDatabase):
     """Weaviate implementation of the vector database interface."""
 
-    def __init__(self, collection_name: str = "RagMeDocs"):
-        super().__init__(collection_name)
+    def __init__(self, collections: list[CollectionConfig]):
+        super().__init__(collections)
         self.client = None
         self._create_client()
 
@@ -64,32 +64,82 @@ class WeaviateVectorDatabase(VectorDatabase):
             ) from e
 
     def setup(self):
-        """Set up Weaviate collection if it doesn't exist."""
+        """Set up Weaviate collections if they don't exist."""
         from weaviate.classes.config import Configure, DataType, Property
 
-        if not self.client.collections.exists(self.collection_name):
-            # Determine if this is an image collection based on collection name
-            is_image_collection = self._is_image_collection()
-
-            if is_image_collection:
-                # Create image collection with BLOB support
-                try:
+        for collection in self.collections:
+            if not self.client.collections.exists(collection.name):
+                if collection.type == "image":
+                    # Create image collection with BLOB support
+                    try:
+                        self.client.collections.create(
+                            collection.name,
+                            description="A dataset with image content for RagMe",
+                            vectorizer_config=Configure.Vectorizer.multi2vec_google(
+                                image_fields=["image"]
+                            ),
+                            properties=[
+                                Property(
+                                    name="url",
+                                    data_type=DataType.TEXT,
+                                    description="the source URL or filename of the image",
+                                ),
+                                Property(
+                                    name="image",
+                                    data_type=DataType.BLOB,
+                                    description="the base64 encoded image",
+                                ),
+                                Property(
+                                    name="metadata",
+                                    data_type=DataType.TEXT,
+                                    description="additional metadata in JSON format",
+                                ),
+                            ],
+                        )
+                    except Exception:
+                        # Fallback to text vectorizer if multi2vec-google is not available
+                        print(
+                            "multi2vec-google not available for images, "
+                            "falling back to text2vec-weaviate."
+                        )
+                        self.client.collections.create(
+                            collection.name,
+                            description="A dataset with image content for RagMe",
+                            vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
+                            properties=[
+                                Property(
+                                    name="url",
+                                    data_type=DataType.TEXT,
+                                    description="the source URL or filename of the image",
+                                ),
+                                Property(
+                                    name="image",
+                                    data_type=DataType.TEXT,
+                                    description="the base64 encoded image",
+                                ),
+                                Property(
+                                    name="metadata",
+                                    data_type=DataType.TEXT,
+                                    description="additional metadata in JSON format",
+                                ),
+                            ],
+                        )
+                else:
+                    # Create text collection
                     self.client.collections.create(
-                        self.collection_name,
-                        description="A dataset with image content for RagMe",
-                        vectorizer_config=Configure.Vectorizer.multi2vec_google(
-                            image_fields=["image"]
-                        ),
+                        collection.name,
+                        description="A dataset with the contents of RagMe docs and website",
+                        vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
                         properties=[
                             Property(
                                 name="url",
                                 data_type=DataType.TEXT,
-                                description="the source URL or filename of the image",
+                                description="the source URL of the webpage",
                             ),
                             Property(
-                                name="image",
-                                data_type=DataType.BLOB,
-                                description="the base64 encoded image",
+                                name="text",
+                                data_type=DataType.TEXT,
+                                description="the content of the webpage",
                             ),
                             Property(
                                 name="metadata",
@@ -98,78 +148,18 @@ class WeaviateVectorDatabase(VectorDatabase):
                             ),
                         ],
                     )
-                except Exception:
-                    # Fallback to text vectorizer if multi2vec-google is not available
-                    print(
-                        "multi2vec-google not available for images, "
-                        "falling back to text2vec-weaviate."
-                    )
-                    self.client.collections.create(
-                        self.collection_name,
-                        description="A dataset with image content for RagMe",
-                        vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
-                        properties=[
-                            Property(
-                                name="image",
-                                data_type=DataType.TEXT,
-                                description="the base64 encoded image",
-                            ),
-                            Property(
-                                name="metadata",
-                                data_type=DataType.TEXT,
-                                description="additional metadata in JSON format",
-                            ),
-                        ],
-                    )
-            else:
-                # Create text collection
-                self.client.collections.create(
-                    self.collection_name,
-                    description="A dataset with the contents of RagMe docs and website",
-                    vectorizer_config=Configure.Vectorizer.text2vec_weaviate(),
-                    properties=[
-                        Property(
-                            name="url",
-                            data_type=DataType.TEXT,
-                            description="the source URL of the webpage",
-                        ),
-                        Property(
-                            name="text",
-                            data_type=DataType.TEXT,
-                            description="the content of the webpage",
-                        ),
-                        Property(
-                            name="metadata",
-                            data_type=DataType.TEXT,
-                            description="additional metadata in JSON format",
-                        ),
-                    ],
-                )
 
-    def _is_image_collection(self) -> bool:
-        """Check if this collection is configured for images."""
-        from ..utils.config_manager import config
-
-        # Check if this collection name matches any image collection in config
-        collections = config.get_collections_config()
-        for collection in collections:
-            if (
-                isinstance(collection, dict)
-                and collection.get("name") == self.collection_name
-                and collection.get("type") == "image"
-            ):
-                return True
-
-        # Also check common image collection naming patterns
-        image_patterns = ["image", "images", "ragmeimages"]
-        return any(
-            pattern.lower() in self.collection_name.lower()
-            for pattern in image_patterns
-        )
+    @property
+    def db_type(self) -> str:
+        """Return the type/name of the vector database."""
+        return "weaviate"
 
     def write_documents(self, documents: list[dict[str, Any]]):
-        """Write documents to Weaviate."""
-        collection = self.client.collections.get(self.collection_name)
+        """Write documents to the text collection."""
+        if not self.has_text_collection():
+            raise ValueError("No text collection configured for this VDB")
+
+        collection = self.client.collections.get(self.text_collection.name)
         with collection.batch.dynamic() as batch:
             for doc in documents:
                 metadata_text = json.dumps(doc.get("metadata", {}), ensure_ascii=False)
@@ -182,8 +172,11 @@ class WeaviateVectorDatabase(VectorDatabase):
                 )
 
     def write_images(self, images: list[dict[str, Any]]):
-        """Write images to Weaviate."""
-        collection = self.client.collections.get(self.collection_name)
+        """Write images to the image collection."""
+        if not self.has_image_collection():
+            raise ValueError("No image collection configured for this VDB")
+
+        collection = self.client.collections.get(self.image_collection.name)
         with collection.batch.dynamic() as batch:
             for img in images:
                 # Get image data and metadata
@@ -198,361 +191,219 @@ class WeaviateVectorDatabase(VectorDatabase):
 
                 print(f"Writing image with data length: {len(image_data)}")
                 print(
-                    f"Image data starts with: {image_data[:50] if image_data else 'None'}"
-                )
-                print(
-                    f"Classification data: {metadata.get('classification', {}).get('top_prediction', {})}"
+                    f"Image metadata: {metadata.get('filename', 'unknown')} "
+                    f"({metadata.get('size', 'unknown')} bytes)"
                 )
 
-                try:
-                    batch.add_object(
-                        properties={
-                            "url": img.get("url", ""),  # Store URL/filename
-                            "image": image_data,  # Store in BLOB field
-                            "metadata": metadata_text,  # Store classification in metadata
-                        }
-                    )
-                    print("Image object added to batch successfully")
-                except Exception as e:
-                    print(f"Error writing image to Weaviate: {e}")
-                    import traceback
-
-                    traceback.print_exc()
-
-    def supports_images(self) -> bool:
-        """Check if this Weaviate implementation supports images."""
-        return True
+                batch.add_object(
+                    properties={
+                        "url": img.get("url", ""),
+                        "image": image_data,
+                        "metadata": metadata_text,
+                    }
+                )
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
-        """List documents from Weaviate."""
-        collection = self.client.collections.get(self.collection_name)
+        """List documents from the text collection."""
+        if not self.has_text_collection():
+            return []
 
-        # Query the collection
-        result = collection.query.fetch_objects(
-            limit=limit,
-            offset=offset,
-            include_vector=False,  # Don't include vector data in response
+        collection = self.client.collections.get(self.text_collection.name)
+        response = collection.query.fetch_objects(
+            limit=limit, offset=offset, include_vector=False
         )
-
-        # Process the results
-        documents = []
-        for obj in result.objects:
-            doc = {
-                "id": obj.uuid,
-                "url": obj.properties.get("url", ""),
-                "text": obj.properties.get("text", ""),
-                "metadata": obj.properties.get("metadata", "{}"),
-            }
-
-            # For image collections, include the image data from BLOB field
-            if self._is_image_collection():
-                doc["image_data"] = obj.properties.get("image", "")
-
-            # Try to parse metadata if it's a JSON string
-            try:
-                if doc["metadata"] is not None:
-                    doc["metadata"] = json.loads(doc["metadata"])
-                else:
-                    doc["metadata"] = {}
-            except json.JSONDecodeError:
-                doc["metadata"] = {}
-
-            documents.append(doc)
-
-        # Sort by creation time (most recent first) - Weaviate doesn't support
-        # sorting in query. So we'll sort the results after fetching
-        documents.sort(
-            key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
-        )
-
-        return documents
-
-    def count_documents(self, date_filter: str = "all") -> int:
-        """Count documents in Weaviate efficiently using aggregation."""
-        try:
-            collection = self.client.collections.get(self.collection_name)
-
-            # Build date filter condition if needed
-            where_filter = None
-            if date_filter != "all":
-                import datetime
-
-                now = datetime.datetime.now()
-
-                if date_filter == "current":
-                    # Current week
-                    start_of_week = now - datetime.timedelta(days=now.weekday())
-                    start_date = start_of_week.isoformat()
-                elif date_filter == "month":
-                    # Current month
-                    start_date = now.replace(day=1).isoformat()
-                elif date_filter == "year":
-                    # Current year
-                    start_date = now.replace(month=1, day=1).isoformat()
-                else:
-                    start_date = None
-
-                if start_date:
-                    where_filter = {
-                        "path": ["metadata", "date_added"],
-                        "operator": "GreaterThanEqual",
-                        "valueDate": start_date,
-                    }
-
-            # Use efficient aggregation to count
-            if where_filter:
-                result = collection.aggregate.over_all(
-                    total_count=True, where=where_filter
-                )
-            else:
-                result = collection.aggregate.over_all(total_count=True)
-
-            return result.total_count or 0
-
-        except Exception as e:
-            print(f"Error counting documents in Weaviate: {str(e)}")
-            # Fallback to list_documents approach
-            try:
-                # Import the filter function from the API module where it's defined
-                import os
-                import sys
-
-                sys.path.append(os.path.join(os.path.dirname(__file__), "..", "apis"))
-                from api import filter_documents_by_date
-
-                all_docs = self.list_documents(limit=10000, offset=0)
-                filtered_docs = filter_documents_by_date(all_docs, date_filter)
-                return len(filtered_docs)
-            except Exception:
-                return 0
+        return self._convert_weaviate_response(response)
 
     def delete_document(self, document_id: str) -> bool:
-        """Delete a document from Weaviate by ID."""
+        """Delete a document from the text collection by ID."""
+        if not self.has_text_collection():
+            return False
+
+        collection = self.client.collections.get(self.text_collection.name)
         try:
-            collection = self.client.collections.get(self.collection_name)
             collection.data.delete_by_id(document_id)
             return True
-        except Exception as e:
-            warnings.warn(f"Failed to delete document {document_id}: {e}")
+        except Exception:
             return False
 
     def find_document_by_url(self, url: str) -> dict[str, Any] | None:
-        """Find a document by its URL."""
-        try:
-            collection = self.client.collections.get(self.collection_name)
-
-            # Get all documents and search manually since the where clause doesn't work
-            all_docs = collection.query.fetch_objects(
-                limit=1000,  # Increased limit to search more documents
-                include_vector=False,
-            )
-
-            # Normalize URL for comparison (remove protocol and fragments)
-            def normalize_url(url_str):
-                """Normalize URL by removing protocol and fragments."""
-                if not url_str:
-                    return ""
-                # Remove protocol
-                url_without_protocol = url_str.replace("https://", "").replace(
-                    "http://", ""
-                )
-                # Remove fragments
-                return url_without_protocol.split("#")[0]
-
-            target_normalized = normalize_url(url)
-
-            # Search through all documents for a matching URL
-            for obj in all_docs.objects:
-                stored_url = obj.properties.get("url", "")
-
-                # Try exact match first
-                if stored_url == url:
-                    doc = {
-                        "id": obj.uuid,
-                        "url": stored_url,
-                        "text": obj.properties.get("text", ""),
-                        "metadata": obj.properties.get("metadata", "{}"),
-                    }
-
-                    # Try to parse metadata if it's a JSON string
-                    try:
-                        doc["metadata"] = json.loads(doc["metadata"])
-                    except json.JSONDecodeError:
-                        pass
-
-                    return doc
-
-                # Try normalized URL match (ignoring protocol and fragments)
-                stored_normalized = normalize_url(stored_url)
-                if stored_normalized == target_normalized:
-                    doc = {
-                        "id": obj.uuid,
-                        "url": stored_url,
-                        "text": obj.properties.get("text", ""),
-                        "metadata": obj.properties.get("metadata", "{}"),
-                    }
-
-                    # Try to parse metadata if it's a JSON string
-                    try:
-                        doc["metadata"] = json.loads(doc["metadata"])
-                    except json.JSONDecodeError:
-                        pass
-
-                    return doc
-
-                # Try matching filename only (for file:// URLs)
-                if stored_url.startswith("file://"):
-                    # Extract filename from stored URL (remove file:// and fragments)
-                    stored_filename = stored_url.replace("file://", "").split("#")[0]
-                    # If user provided just filename, try to match
-                    if stored_filename == url or stored_filename.endswith("/" + url):
-                        doc = {
-                            "id": obj.uuid,
-                            "url": stored_url,
-                            "text": obj.properties.get("text", ""),
-                            "metadata": obj.properties.get("metadata", "{}"),
-                        }
-
-                        # Try to parse metadata if it's a JSON string
-                        try:
-                            doc["metadata"] = json.loads(doc["metadata"])
-                        except json.JSONDecodeError:
-                            pass
-
-                        return doc
-
+        """Find a document by its URL in the text collection."""
+        if not self.has_text_collection():
             return None
 
-        except Exception as e:
-            warnings.warn(f"Failed to find document by URL {url}: {e}")
+        collection = self.client.collections.get(self.text_collection.name)
+        try:
+            # Use fetch_objects with a high limit and filter in Python
+            response = collection.query.fetch_objects(limit=1000, include_vector=False)
+            results = self._convert_weaviate_response(response)
+
+            # Filter by URL in Python
+            for result in results:
+                if result.get("url") == url:
+                    return result
+            return None
+        except Exception:
             return None
 
     def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
-        """
-        Search for documents using Weaviate's vector similarity search.
+        """Search both text and image collections in parallel."""
+        results = []
 
-        Args:
-            query: The search query text
-            limit: Maximum number of results to return
+        # Search text collection if available
+        if self.has_text_collection():
+            text_results = self.search_text_collection(query, limit)
+            results.extend(text_results)
 
-        Returns:
-            List of documents sorted by relevance
-        """
-        try:
-            collection = self.client.collections.get(self.collection_name)
+        # Search image collection if available
+        if self.has_image_collection():
+            image_results = self.search_image_collection(query, limit)
+            results.extend(image_results)
 
-            # Use Weaviate's near_text search for vector similarity
-            result = collection.query.near_text(
-                query=query,
-                limit=limit,
-                include_vector=False,
-            )
+        # Sort by score if available
+        results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
-            documents = []
-            for obj in result.objects:
-                doc = {
-                    "id": obj.uuid,
-                    "url": obj.properties.get("url", ""),
-                    "text": obj.properties.get("text", ""),
-                    "metadata": obj.properties.get("metadata", "{}"),
-                }
+        return results[:limit]
 
-                # Try to parse metadata if it's a JSON string
-                try:
-                    doc["metadata"] = json.loads(doc["metadata"])
-                except json.JSONDecodeError:
-                    pass
-
-                documents.append(doc)
-
-            return documents
-
-        except Exception as e:
-            warnings.warn(f"Failed to perform vector search for query '{query}': {e}")
-            # Fallback to simple keyword matching if vector search fails
-            return self._fallback_keyword_search(query, limit)
-
-    def _fallback_keyword_search(
+    def search_text_collection(
         self, query: str, limit: int = 5
     ) -> list[dict[str, Any]]:
-        """
-        Fallback to simple keyword matching if vector search fails.
-
-        Args:
-            query: The search query text
-            limit: Maximum number of results to return
-
-        Returns:
-            List of documents sorted by relevance
-        """
-        try:
-            # Get all documents and perform keyword matching
-            documents = self.list_documents(limit=100, offset=0)
-
-            query_lower = query.lower()
-            query_words = query_lower.split()
-            relevant_docs = []
-
-            for doc in documents:
-                text = doc.get("text", "").lower()
-                url = doc.get("url", "").lower()
-                metadata = doc.get("metadata", {})
-                metadata_text = str(metadata).lower()
-
-                # Count how many query words match
-                matches = 0
-                for word in query_words:
-                    if word in text or word in url or word in metadata_text:
-                        matches += 1
-
-                # If at least one word matches, consider it relevant
-                if matches > 0:
-                    relevant_docs.append(
-                        {"doc": doc, "matches": matches, "text_length": len(text)}
-                    )
-
-            if relevant_docs:
-                # Sort by relevance (more matches first, then by text length)
-                relevant_docs.sort(key=lambda x: (-x["matches"], -x["text_length"]))
-
-                # Return the top results
-                return [item["doc"] for item in relevant_docs[:limit]]
-
+        """Search only the text collection."""
+        if not self.has_text_collection():
             return []
 
-        except Exception as e:
-            warnings.warn(f"Fallback keyword search also failed: {e}")
+        collection = self.client.collections.get(self.text_collection.name)
+        response = collection.query.near_text(
+            query=query, limit=limit, include_vector=False
+        )
+        return self._convert_weaviate_response(response)
+
+    def search_image_collection(
+        self, query: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Search only the image collection using metadata."""
+        if not self.has_image_collection():
             return []
+
+        collection = self.client.collections.get(self.image_collection.name)
+        response = collection.query.near_text(
+            query=query, limit=limit, include_vector=False
+        )
+        return self._convert_weaviate_response(response)
 
     def create_query_agent(self):
-        """Create a Weaviate query agent."""
-        from weaviate.agents.query import QueryAgent
+        """Create and return a query agent for this vector database."""
+        from ..agents.query_agent import QueryAgent
 
-        return QueryAgent(client=self.client, collections=[self.collection_name])
+        return QueryAgent(self)
+
+    def count_documents(self, date_filter: str = "all") -> int:
+        """Count documents in the text collection."""
+        if not self.has_text_collection():
+            return 0
+
+        collection = self.client.collections.get(self.text_collection.name)
+        try:
+            # Use fetch_objects with a high limit to get all objects and count them
+            response = collection.query.fetch_objects(limit=10000, include_vector=False)
+            return len(response.objects)
+        except Exception:
+            # Fallback: try to get a reasonable estimate
+            return 0
+
+    def count_images(self, date_filter: str = "all") -> int:
+        """Count images in the image collection."""
+        if not self.has_image_collection():
+            return 0
+
+        collection = self.client.collections.get(self.image_collection.name)
+        try:
+            # Use fetch_objects with a high limit to get all objects and count them
+            response = collection.query.fetch_objects(limit=10000, include_vector=False)
+            return len(response.objects)
+        except Exception:
+            # Fallback: try to get a reasonable estimate
+            return 0
+
+    def list_images(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
+        """List images from the image collection."""
+        if not self.has_image_collection():
+            return []
+
+        collection = self.client.collections.get(self.image_collection.name)
+        response = collection.query.fetch_objects(
+            limit=limit, offset=offset, include_vector=False
+        )
+        return self._convert_weaviate_response(response)
+
+    def delete_image(self, image_id: str) -> bool:
+        """Delete an image from the image collection by ID."""
+        if not self.has_image_collection():
+            return False
+
+        collection = self.client.collections.get(self.image_collection.name)
+        try:
+            collection.data.delete_by_id(image_id)
+            return True
+        except Exception:
+            return False
+
+    def find_image_by_url(self, url: str) -> dict[str, Any] | None:
+        """Find an image by its URL in the image collection."""
+        if not self.has_image_collection():
+            return None
+
+        collection = self.client.collections.get(self.image_collection.name)
+        try:
+            # Use fetch_objects with a high limit and filter in Python
+            response = collection.query.fetch_objects(limit=1000, include_vector=False)
+            results = self._convert_weaviate_response(response)
+
+            # Filter by URL in Python
+            for result in results:
+                if result.get("url") == url:
+                    return result
+            return None
+        except Exception:
+            return None
 
     def cleanup(self):
-        """Clean up Weaviate client."""
+        """Clean up resources and close connections."""
         if self.client:
             try:
-                # Close any open connections
-                if hasattr(self.client, "close"):
-                    self.client.close()
-                # Also try to close the underlying connection if it exists
-                if hasattr(self.client, "_connection") and self.client._connection:
-                    if hasattr(self.client._connection, "close"):
-                        try:
-                            self.client._connection.close()
-                        except TypeError:
-                            # Some connection objects don't take arguments
-                            pass
-            except Exception as e:
-                # Log the error but don't raise it to avoid breaking shutdown
-                import warnings
+                self.client.close()
+            except Exception:
+                pass
 
-                warnings.warn(f"Error during Weaviate cleanup: {e}")
-            finally:
-                self.client = None
+    def supports_images(self) -> bool:
+        """Check if this vector database implementation supports image storage."""
+        return self.has_image_collection()
 
-    @property
-    def db_type(self) -> str:
-        return "weaviate"
+    def _convert_weaviate_response(self, response) -> list[dict[str, Any]]:
+        """Convert Weaviate response to standard format."""
+        results = []
+        for obj in response.objects:
+            result = {
+                "id": obj.uuid,
+                "url": obj.properties.get("url", ""),
+                "text": obj.properties.get("text", ""),
+                "metadata": {},
+            }
+
+            # Parse metadata if it exists
+            if "metadata" in obj.properties:
+                try:
+                    result["metadata"] = json.loads(obj.properties["metadata"])
+                except (json.JSONDecodeError, TypeError):
+                    result["metadata"] = {}
+
+            # Add image data if this is an image (check if 'image' field exists)
+            if "image" in obj.properties:
+                result["image_data"] = obj.properties["image"]
+
+            # Add score if available
+            if hasattr(obj, "score") and obj.score is not None:
+                result["score"] = obj.score
+
+            results.append(result)
+
+        return results

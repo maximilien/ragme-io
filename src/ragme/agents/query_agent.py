@@ -28,14 +28,14 @@ warnings.filterwarnings(
 class QueryAgent:
     """A query agent that answers questions about document content using vector search and LLM summarization."""
 
-    def __init__(self, ragme_instance):
+    def __init__(self, vector_db):
         """
-        Initialize the QueryAgent with a reference to the main RagMe instance.
+        Initialize the QueryAgent with a reference to a vector database.
 
         Args:
-            ragme_instance: The RagMe instance that provides access to vector database and methods
+            vector_db: The vector database instance that provides search capabilities
         """
-        self.ragme = ragme_instance
+        self.vector_db = vector_db
 
         # Get agent configuration
         agent_config = config.get_agent_config("query-agent")
@@ -72,13 +72,37 @@ class QueryAgent:
             logger.info(
                 f"QueryAgent searching vector database with query: '{query}' (top_k={self.top_k})"
             )
-            # Use vector similarity search to find relevant documents
-            documents = self.ragme.vector_db.search(query, limit=self.top_k)
-            logger.info(f"QueryAgent found {len(documents)} documents")
 
-            if documents:
-                # Get the most relevant documents
-                most_relevant = documents[0]
+            # Check what collections are available
+            has_text = self.vector_db.has_text_collection()
+            has_image = self.vector_db.has_image_collection()
+
+            if not has_text and not has_image:
+                return "No collections are configured for this vector database."
+
+            # Search collections based on availability
+            text_results = []
+            image_results = []
+
+            if has_text:
+                text_results = self.vector_db.search_text_collection(
+                    query, limit=self.top_k
+                )
+                logger.info(f"QueryAgent found {len(text_results)} text documents")
+
+            if has_image:
+                image_results = self.vector_db.search_image_collection(
+                    query, limit=self.top_k
+                )
+                logger.info(f"QueryAgent found {len(image_results)} image documents")
+
+            # Combine and sort results
+            all_results = text_results + image_results
+            all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+            if all_results:
+                # Get the most relevant result
+                most_relevant = all_results[0]
                 url = most_relevant.get("url", "")
                 metadata = most_relevant.get("metadata", {})
 
@@ -96,14 +120,33 @@ class QueryAgent:
                 logger.info(
                     f"QueryAgent generating answer with LLM for query: '{query}'"
                 )
+
                 # Use LLM to answer the query with the relevant content
-                answer = self._answer_query_with_chunks(query, documents)
+                answer = self._answer_query_with_results(
+                    query, text_results, image_results
+                )
 
-                result = f"**Based on the stored documents, here's what I found:**\n\n**URL:** [{url}]({url}){chunk_info}{score_info}\n\n**Answer:** {answer}"
+                # Build result message
+                result_parts = [
+                    "**Based on the stored documents, here's what I found:**\n"
+                ]
 
-                # If we have multiple relevant documents, mention them
-                if len(documents) > 1:
-                    result += f"\n\nFound {len(documents)} relevant documents and summarized the most relevant content."
+                if text_results:
+                    result_parts.append(
+                        f"**Text Documents:** Found {len(text_results)} relevant text documents"
+                    )
+
+                if image_results:
+                    result_parts.append(
+                        f"**Images:** Found {len(image_results)} relevant images"
+                    )
+
+                result_parts.append(
+                    f"\n**Most Relevant:** [{url}]({url}){chunk_info}{score_info}"
+                )
+                result_parts.append(f"\n**Answer:** {answer}")
+
+                result = "\n".join(result_parts)
 
                 logger.info(f"QueryAgent returning result for query: '{query}'")
                 return result
@@ -115,9 +158,76 @@ class QueryAgent:
             logger.error(f"QueryAgent error: {str(e)}")
             return f"Error searching documents: {str(e)}"
 
+    def _answer_query_with_results(
+        self, query: str, text_results: list[dict], image_results: list[dict]
+    ) -> str:
+        """
+        Use LLM to summarize relevant results from both text and image collections.
+
+        Args:
+            query (str): The user's query
+            text_results (list): List of relevant text documents
+            image_results (list): List of relevant image documents
+
+        Returns:
+            str: LLM-generated summary
+        """
+        try:
+            # Prepare context from the most relevant documents
+            context_parts = []
+
+            # Add text documents context
+            if text_results:
+                context_parts.append("**Text Documents:**")
+                for i, doc in enumerate(text_results[:3]):  # Use top 3 text documents
+                    content = doc.get("text", "")
+                    metadata = doc.get("metadata", {})
+                    filename = metadata.get("filename", "Unknown")
+
+                    # Truncate content if too long (keep more for summarization)
+                    if len(content) > 2000:
+                        content = content[:2000] + "..."
+
+                    context_parts.append(f"Document {i + 1} ({filename}):\n{content}\n")
+
+            # Add image documents context
+            if image_results:
+                context_parts.append("**Image Documents:**")
+                for i, img in enumerate(image_results[:3]):  # Use top 3 image documents
+                    metadata = img.get("metadata", {})
+                    filename = metadata.get("filename", "Unknown")
+                    description = metadata.get(
+                        "description", "No description available"
+                    )
+
+                    context_parts.append(
+                        f"Image {i + 1} ({filename}):\nDescription: {description}\n"
+                    )
+
+            context = "\n".join(context_parts)
+
+            # Create prompt for LLM summarization
+            prompt = f"""Based on the following documents and images, please provide a comprehensive answer to the user's question.
+
+User Question: {query}
+
+Relevant Content:
+{context}
+
+Please provide a clear, accurate answer based on the information above. If the content includes both text documents and images, mention both types of sources in your response."""
+
+            # Generate response using LLM
+            response = self.llm.complete(prompt)
+            return response.text
+
+        except Exception as e:
+            logger.error(f"Error generating LLM response: {str(e)}")
+            return f"Error generating response: {str(e)}"
+
     def _answer_query_with_chunks(self, query: str, documents: list[dict]) -> str:
         """
         Use LLM to summarize relevant chunks in the context of the query.
+        (Legacy method for backward compatibility)
 
         Args:
             query (str): The user's query
@@ -150,24 +260,15 @@ User Question: {query}
 Relevant Documents:
 {context}
 
-Please provide a clear, well-structured answer that directly addresses the user's question. Use information from the documents to support your response. If the documents don't contain enough information to fully answer the question, acknowledge this and provide what information is available.
+Please provide a clear, accurate answer based on the information above."""
 
-Answer:"""
-
-            # Use the LLM to generate the summary
+            # Generate response using LLM
             response = self.llm.complete(prompt)
-            return response.text.strip()
+            return response.text
 
-        except Exception:
-            # Fallback to simple text extraction if LLM summarization fails
-            most_relevant = documents[0]
-            content = most_relevant.get("text", "")
-
-            # Truncate content if too long
-            if len(content) > 1500:
-                content = content[:1500] + "..."
-
-            return f"Content: {content}"
+        except Exception as e:
+            logger.error(f"Error generating LLM response: {str(e)}")
+            return f"Error generating response: {str(e)}"
 
     def is_query_question(self, query: str) -> bool:
         """
