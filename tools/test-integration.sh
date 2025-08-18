@@ -8,6 +8,27 @@ set -a
 [ -f .env ] && . .env
 set +a
 
+# Import test configuration functions
+if [ -f "tests/integration/config_manager.py" ]; then
+    # Source the Python functions by running them
+    TEST_COLLECTION_NAME=$(python3 -c "
+import sys
+sys.path.append('tests/integration')
+from config_manager import get_test_collection_name
+print(get_test_collection_name())
+" 2>/dev/null || echo "test_integration")
+    
+    TEST_IMAGE_COLLECTION_NAME=$(python3 -c "
+import sys
+sys.path.append('tests/integration')
+from config_manager import get_test_image_collection_name
+print(get_test_image_collection_name())
+" 2>/dev/null || echo "test_integration_images")
+else
+    TEST_COLLECTION_NAME="test_integration"
+    TEST_IMAGE_COLLECTION_NAME="test_integration_images"
+fi
+
 set -e
 
 # Colors for output
@@ -326,6 +347,83 @@ test_file_monitoring() {
     fi
 }
 
+# Function to setup test configuration
+setup_test_environment() {
+    echo -e "\n${YELLOW}🔧 Setting up test environment...${NC}"
+    
+    # Backup .env file if it exists
+    if [ -f ".env" ]; then
+        echo -e "  💾 Backing up original .env file..."
+        if cp ".env" ".env.integration_backup" 2>/dev/null; then
+            echo -e "  ✅ .env file backed up"
+        else
+            echo -e "  ⚠️ Failed to backup .env file"
+        fi
+    fi
+    
+    # Setup test configuration using Python
+    if [ -f "tests/integration/config_manager.py" ]; then
+        local setup_result=$(python3 -c "
+import sys
+sys.path.append('tests/integration')
+from config_manager import setup_test_config
+print('SUCCESS' if setup_test_config() else 'FAILED')
+" 2>/dev/null || echo "FAILED")
+        
+        if [ "$setup_result" = "SUCCESS" ]; then
+            echo -e "  ✅ Test configuration setup successful"
+            echo -e "  📊 Using test collections: $TEST_COLLECTION_NAME, $TEST_IMAGE_COLLECTION_NAME"
+        else
+            echo -e "  ⚠️ Test configuration setup failed, using default collections"
+        fi
+    else
+        echo -e "  ⚠️ Test config manager not found, using default collections"
+    fi
+}
+
+# Function to cleanup test environment
+cleanup_test_environment() {
+    echo -e "\n${YELLOW}🧹 Cleaning up test environment...${NC}"
+    
+    # Always try to restore .env file if backup exists
+    if [ -f ".env.integration_backup" ]; then
+        echo -e "  🔄 Restoring original .env file..."
+        if cp ".env.integration_backup" ".env" 2>/dev/null; then
+            echo -e "  ✅ Original .env file restored"
+        else
+            echo -e "  ❌ Failed to restore .env file"
+        fi
+        rm -f ".env.integration_backup"
+    fi
+    
+    # Cleanup test configuration using Python
+    if [ -f "tests/integration/config_manager.py" ]; then
+        local cleanup_result=$(python3 -c "
+import sys
+sys.path.append('tests/integration')
+from config_manager import teardown_test_config
+print('SUCCESS' if teardown_test_config() else 'FAILED')
+" 2>/dev/null || echo "FAILED")
+        
+        if [ "$cleanup_result" = "SUCCESS" ]; then
+            echo -e "  ✅ Test configuration cleanup successful"
+        else
+            echo -e "  ⚠️ Test configuration cleanup failed"
+        fi
+    fi
+    
+    # Also try to restore config.yaml if backup exists
+    if [ -f "config.yaml.test_backup" ]; then
+        echo -e "  🔄 Restoring original config.yaml..."
+        if cp "config.yaml.test_backup" "config.yaml" 2>/dev/null; then
+            echo -e "  ✅ Original config.yaml restored"
+        else
+            echo -e "  ❌ Failed to restore config.yaml"
+        fi
+        rm -f "config.yaml.test_backup"
+    fi
+}
+
 # Fast integration test function - minimal testing for quick validation
 fast_integration_test() {
     local all_tests_passed=true
@@ -334,11 +432,15 @@ fast_integration_test() {
     
     echo -e "\n${BLUE}🚀 Starting RAGme services...${NC}"
     
+    # Setup test environment first
+    setup_test_environment
+    
     # Start all services
     if ./start.sh; then
         echo -e "  ✅ Services started successfully"
     else
         echo -e "  ❌ Failed to start services"
+        cleanup_test_environment
         exit 1
     fi
     
@@ -477,13 +579,14 @@ fast_integration_test() {
     # Test 8: Add Image
     ((current_test++))
     echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Add Image${NC}"
+    sleep 1  # Small delay to ensure services are ready
     
     # Create a simple test image (1x1 pixel PNG)
-    local test_image="tests/fixtures/test_image.png"
+    local test_image="tests/fixtures/images/test_image.png"
     if [ ! -f "$test_image" ]; then
         # Create a minimal test image if it doesn't exist
         echo -e "  ${YELLOW}⚠️ Creating test image...${NC}"
-        mkdir -p tests/fixtures
+        mkdir -p tests/fixtures/images
         # Create a 1x1 pixel PNG using ImageMagick or fallback to a simple file
         if command -v convert >/dev/null 2>&1; then
             convert -size 1x1 xc:white "$test_image"
@@ -494,15 +597,42 @@ fast_integration_test() {
     fi
     
     if [ -f "$test_image" ]; then
-        local image_response=$(curl -s --max-time 15 -X POST "$API_URL/upload-images" \
-            -F "files=@$test_image" 2>/dev/null || echo "{}")
-        
-        if echo "$image_response" | grep -q "status.*success"; then
-            echo -e "  ${GREEN}✅ Add Image: PASS${NC}"
-        else
-            echo -e "  ${RED}❌ Add Image: FAIL${NC}"
+        # Robust upload with explicit MIME type and response handling
+        echo -e "  ${YELLOW}📤 Uploading image: $test_image${NC}"
+        tmp_resp=$(mktemp)
+        http_code=$(curl -sS -w "%{http_code}" -o "$tmp_resp" -X POST "$API_URL/upload-images" \
+            -F "files=@$test_image;type=image/png" || echo "000")
+
+        # Show response body (first 200 chars) for debugging
+        resp_preview=$(head -c 200 "$tmp_resp" 2>/dev/null || echo "")
+        echo -e "  ${YELLOW}📥 Response (${http_code}): ${resp_preview}${NC}"
+
+        if [ "$http_code" != "200" ]; then
+            echo -e "  ${RED}❌ Add Image: FAIL (HTTP $http_code)${NC}"
             all_tests_passed=false
+        else
+            # Parse JSON status
+            upload_ok=false
+            if command -v jq >/dev/null 2>&1; then
+                status=$(jq -r '.status // empty' "$tmp_resp" 2>/dev/null)
+                if [ "$status" = "success" ]; then
+                    upload_ok=true
+                fi
+            else
+                if grep -q '"status":"success"' "$tmp_resp"; then
+                    upload_ok=true
+                fi
+            fi
+
+            if [ "$upload_ok" = true ]; then
+                echo -e "  ${GREEN}✅ Add Image: PASS${NC}"
+            else
+                echo -e "  ${RED}❌ Add Image: FAIL (unexpected response)${NC}"
+                all_tests_passed=false
+            fi
         fi
+
+        rm -f "$tmp_resp"
     else
         echo -e "  ${YELLOW}⚠️ Test image not found, skipping image test${NC}"
     fi
@@ -513,7 +643,7 @@ fast_integration_test() {
     sleep 2
     response=$(curl -s --max-time 10 "$API_URL/list-documents?content_type=image&limit=10" 2>/dev/null || echo "{}")
     
-    if echo "$response" | grep -q "status.*success"; then
+    if echo "$response" | grep -q '"status":"success"'; then
         echo -e "  ${GREEN}✅ Check Image Collection: PASS${NC}"
     else
         echo -e "  ${RED}❌ Check Image Collection: FAIL${NC}"
@@ -527,14 +657,14 @@ fast_integration_test() {
     # Get list of images and delete them
     response=$(curl -s --max-time 10 "$API_URL/list-documents?content_type=image&limit=100" 2>/dev/null || echo "{}")
     
-    if echo "$response" | grep -q "status.*success"; then
+    if echo "$response" | grep -q '"status":"success"'; then
         # Extract image IDs and delete them
         local image_ids=$(echo "$response" | grep -o '"id":"[^"]*"' | sed 's/"id":"//g' | sed 's/"//g')
         local deleted_count=0
         
         for image_id in $image_ids; do
             local delete_response=$(curl -s --max-time 10 -X DELETE "$API_URL/delete-document/$image_id" 2>/dev/null || echo "{}")
-            if echo "$delete_response" | grep -q "status.*success"; then
+            if echo "$delete_response" | grep -q '"status":"success"'; then
                 ((deleted_count++))
             fi
         done
@@ -550,12 +680,15 @@ fast_integration_test() {
     sleep 2
     response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=1" 2>/dev/null || echo "{}")
     
-    if echo "$response" | grep -q "status.*success"; then
+    if echo "$response" | grep -q '"status":"success"'; then
         echo -e "  ${GREEN}✅ Final empty check: PASS${NC}"
     else
         echo -e "  ${RED}❌ Final empty check: FAIL${NC}"
         all_tests_passed=false
     fi
+    
+    # Cleanup test environment
+    cleanup_test_environment
     
     # Final results
     echo -e "\n${BLUE}📊 Fast Integration Test Results${NC}"
@@ -715,58 +848,41 @@ echo -e "  ${YELLOW}ℹ️ Access at: http://localhost:8020${NC}"
 cleanup_test_documents() {
     echo -e "  🗄️ Cleaning up test documents from vector database..."
     
-    # Get list of documents from API
-    local response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=100" 2>/dev/null || echo "{}")
+    # Clean up all documents from test collections
+    local collections_to_clean=("documents" "images")
     
-    if echo "$response" | grep -q "status.*success"; then
-        # Use jq if available for proper JSON parsing, otherwise use a more robust grep approach
-        if command -v jq &> /dev/null; then
-            # Use jq to extract ONLY test_integration documents based on filename in metadata
-            # Be very specific to only match test_integration.pdf or similar patterns
-            local test_doc_ids=$(echo "$response" | jq -r '.documents[] | select(.metadata.filename | test("^test_integration.*\\.pdf$|^test.*integration.*\\.pdf$")) | .id' 2>/dev/null)
-        else
-            # Fallback: Use a more precise grep approach to find ONLY test_integration documents
-            local test_doc_ids=""
-            # Extract each document block and check if it contains test_integration patterns
-            while IFS= read -r line; do
-                if echo "$line" | grep -q '"id":'; then
-                    local doc_id=$(echo "$line" | grep -o '"id":"[^"]*"' | sed 's/"id":"//g' | sed 's/"//g')
-                    if [ -n "$doc_id" ]; then
-                        # Check if this document block contains test_integration patterns in filename
-                        # Be very specific to only match test_integration.pdf
-                        if echo "$response" | grep -A 50 -B 5 "\"id\":\"$doc_id\"" | grep -q '"filename".*"test_integration.*\.pdf"'; then
-                            test_doc_ids="$test_doc_ids $doc_id"
-                        fi
-                    fi
-                fi
-            done < <(echo "$response" | grep -A 1 -B 1 '"id":')
-        fi
+    for collection_type in "${collections_to_clean[@]}"; do
+        echo -e "    🧹 Cleaning up $collection_type collection..."
         
-        if [ -n "$test_doc_ids" ]; then
+        # Get list of documents from API
+        local response=$(curl -s --max-time 10 "$API_URL/list-documents?content_type=$collection_type&limit=100" 2>/dev/null || echo "{}")
+        
+        if echo "$response" | grep -q '"status":"success"'; then
+            # Extract document IDs and delete them
+            local doc_ids=$(echo "$response" | grep -o '"id":"[^"]*"' | sed 's/"id":"//g' | sed 's/"//g')
             local deleted_count=0
-            for doc_id in $test_doc_ids; do
-                echo -e "    🗑️ Deleting test document: $doc_id"
+            
+            for doc_id in $doc_ids; do
+                echo -e "      🗑️ Deleting $collection_type: $doc_id"
                 local delete_response=$(curl -s --max-time 10 -X DELETE "$API_URL/delete-document/$doc_id" 2>/dev/null || echo "{}")
                 
-                if echo "$delete_response" | grep -q "status.*success"; then
-                    echo -e "      ✅ Successfully deleted document: $doc_id"
+                if echo "$delete_response" | grep -q '"status":"success"'; then
+                    echo -e "        ✅ Successfully deleted $collection_type: $doc_id"
                     ((deleted_count++))
                 else
-                    echo -e "      ⚠️ Failed to delete document: $doc_id"
+                    echo -e "        ⚠️ Failed to delete $collection_type: $doc_id"
                 fi
             done
             
             if [ $deleted_count -gt 0 ]; then
-                echo -e "    ✅ Cleaned up $deleted_count test documents from vector database"
+                echo -e "    ✅ Cleaned up $deleted_count $collection_type from test collection"
             else
-                echo -e "    ℹ️ No test documents found to clean up"
+                echo -e "    ℹ️ No $collection_type found to clean up"
             fi
         else
-            echo -e "    ℹ️ No test documents found to clean up"
+            echo -e "    ⚠️ Could not retrieve $collection_type for cleanup"
         fi
-    else
-        echo -e "    ⚠️ Could not retrieve documents for cleanup"
-    fi
+    done
 }
 
 # Cleanup function
@@ -801,8 +917,8 @@ cleanup() {
     echo -e "  ✅ Cleanup completed"
 }
 
-# Set up trap for cleanup
-trap cleanup EXIT
+# Set up trap for cleanup - ensure cleanup runs on exit, error, or interrupt
+trap 'cleanup; cleanup_test_environment' EXIT INT TERM
 
 # Run main function
 main "$@" 

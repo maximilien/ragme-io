@@ -816,7 +816,16 @@ async def upload_images(files: list[UploadFile] = File(...)):
         from ..utils.image_processor import image_processor
 
         processed_count = 0
-        supported_formats = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+        supported_formats = {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".bmp",
+            ".heic",
+            ".heif",
+        }
 
         # Get image collection name from config
         image_collection_name = config.get_image_collection_name()
@@ -854,30 +863,29 @@ async def upload_images(files: list[UploadFile] = File(...)):
                     temp_file_path = temp_file.name
 
                 try:
-                    # Process image metadata and classification
+                    # Process image with full pipeline including OCR
                     # For uploaded files, we need to use the temp file path instead of URL
                     file_path = f"file://{temp_file_path}"
-                    image_metadata = image_processor.get_image_metadata(file_path)
-
-                    # Use PyTorch for image classification
-                    image_classification = image_processor.classify_image_with_pytorch(
-                        file_path
-                    )
+                    processed_image = image_processor.process_image(file_path)
 
                     # Combine metadata
                     combined_metadata = {
-                        **image_metadata,
-                        "classification": image_classification,
+                        **processed_image,
                         "filename": file.filename,
                         "file_size": len(content),
                         "date_added": datetime.now().isoformat(),
                         "processing_timestamp": datetime.now().isoformat(),
                     }
 
-                    # Encode image to base64 for storage
-                    import base64
+                    # Encode image to base64 for storage (converts HEIC to JPEG for web compatibility)
+                    base64_data = image_processor.encode_image_to_base64(file_path)
 
-                    base64_data = base64.b64encode(content).decode("utf-8")
+                    # Update metadata to reflect the actual format being stored
+                    if file_ext.lower() in [".heic", ".heif"]:
+                        combined_metadata["original_format"] = file_ext.lower()
+                        combined_metadata["format"] = "image/jpeg"
+                        combined_metadata["mime_type"] = "image/jpeg"
+                        combined_metadata["content_type"] = "image/jpeg"
 
                     # Check if the vector database supports images
                     if image_vdb.supports_images():
@@ -893,14 +901,25 @@ async def upload_images(files: list[UploadFile] = File(...)):
                         )
                     else:
                         # Fallback: store as text document with image metadata
-                        top_pred = image_classification.get("top_prediction", {})
+                        top_pred = processed_image.get("classification", {}).get(
+                            "top_prediction", {}
+                        )
                         label = top_pred.get("label", "unknown")
 
-                        text_representation = (
-                            f"Image: {file.filename}\n"
-                            f"Classification: {label}\n"
-                            f"Metadata: {str(combined_metadata)}"
+                        # Include OCR content if available
+                        ocr_content = processed_image.get("ocr_content", {})
+                        ocr_text = (
+                            ocr_content.get("extracted_text", "") if ocr_content else ""
                         )
+
+                        text_representation = (
+                            f"Image: {file.filename}\nClassification: {label}\n"
+                        )
+
+                        if ocr_text:
+                            text_representation += f"OCR Content: {ocr_text}\n"
+
+                        text_representation += f"Metadata: {str(combined_metadata)}"
                         image_vdb.write_documents(
                             [
                                 {
@@ -931,6 +950,75 @@ async def upload_images(files: list[UploadFile] = File(...)):
     except Exception as e:
         print(f"Error in upload_images: {str(e)}")
         print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/test-ocr")
+async def test_ocr(file: UploadFile = File(...)):
+    """
+    Test OCR functionality on a single image file.
+
+    Args:
+        file: Image file to test OCR on
+
+    Returns:
+        dict: OCR results and extracted text
+    """
+    try:
+        from ..utils.image_processor import image_processor
+
+        # Validate file type
+        supported_formats = {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".bmp",
+            ".heic",
+            ".heif",
+        }
+        filename = file.filename.lower()
+        file_ext = "." + filename.split(".")[-1] if "." in filename else ""
+
+        if file_ext not in supported_formats:
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported file format: {filename}"
+            )
+
+        # Read file content
+        content = await file.read()
+
+        # Save to temporary file for processing
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        try:
+            # Test OCR directly
+            file_path = f"file://{temp_file_path}"
+            ocr_result = image_processor.extract_text_with_ocr(file_path)
+
+            # Also test full image processing
+            processed_image = image_processor.process_image(file_path)
+
+            return {
+                "status": "success",
+                "filename": file.filename,
+                "ocr_result": ocr_result,
+                "full_processing": {
+                    "classification": processed_image.get("classification", {}),
+                    "ocr_content": processed_image.get("ocr_content", {}),
+                    "metadata": processed_image.get("exif", {}),
+                },
+            }
+
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

@@ -38,6 +38,7 @@ dependencies = [
     # Essential image processing dependencies
     "exif>=1.6.1",
     "pillow>=9.0.0",
+    "pillow-heif>=1.1.0",
 ]
 
 [project.optional-dependencies]
