@@ -217,32 +217,41 @@ class RagMeTools:
             "metadata": doc.get("metadata", {}),
         }
 
-    def list_ragme_collection(
-        self, limit: int = 10, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    def list_ragme_collection(self, limit: int = 10, offset: int = 0) -> str:
         """
         List the contents of the RagMeDocs collection with essential information only.
-        Returns a summary of documents without full text content for fast listing.
+        Returns a formatted string with document summaries for fast listing.
         """
         documents = self.ragme.list_documents(limit=limit, offset=offset)
 
-        # Return only essential information for fast listing
-        summary_docs = []
-        for _i, doc in enumerate(documents):
-            summary_doc = {
-                "url": doc.get("url", "Unknown"),
-                "type": doc.get("metadata", {}).get("type", "Unknown"),
-                "date_added": doc.get("metadata", {}).get("date_added", "Unknown"),
-                "content_length": len(doc.get("text", "")),
-                "content_preview": (
-                    doc.get("text", "")[:100] + "..."
-                    if len(doc.get("text", "")) > 100
-                    else doc.get("text", "")
-                ),
-            }
-            summary_docs.append(summary_doc)
+        if not documents:
+            return "No documents found in the collection."
 
-        return summary_docs
+        result = f"Found {len(documents)} documents in the collection:\n\n"
+
+        for i, doc in enumerate(documents, offset + 1):
+            metadata = doc.get("metadata", {})
+
+            result += f"{i}. Document ID: {doc.get('id', 'unknown')}\n"
+            result += f"   URL: {doc.get('url', 'unknown')}\n"
+            result += f"   Type: {metadata.get('type', 'unknown')}\n"
+
+            if metadata.get("date_added"):
+                result += f"   Added: {metadata.get('date_added')}\n"
+
+            result += f"   Content Length: {len(doc.get('text', ''))} characters\n"
+
+            # Add a preview of the content
+            content_preview = (
+                doc.get("text", "")[:100] + "..."
+                if len(doc.get("text", "")) > 100
+                else doc.get("text", "")
+            )
+            result += f"   Preview: {content_preview}\n"
+
+            result += "\n"
+
+        return result
 
     def write_to_ragme_collection(self, urls=None) -> str:
         """
@@ -462,19 +471,11 @@ class RagMeTools:
             offset: Number of images to skip (default: 0)
 
         Returns:
-            str: Formatted list of images with metadata
+            str: Formatted list of images with metadata and image previews
         """
         try:
-            import os
-
-            from ..vdbs.vector_db_factory import create_vector_database
-
-            # Create image vector database using the configured database type
-            db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
-            image_vdb = create_vector_database(db_type)
-
-            # List images
-            images = image_vdb.list_documents(limit=limit, offset=offset)
+            # Use the existing vector database from RagMe instance
+            images = self.ragme.vector_db.list_images(limit=limit, offset=offset)
 
             if not images:
                 return "No images found in the collection."
@@ -494,7 +495,11 @@ class RagMeTools:
                 classification = metadata.get("classification", {})
                 top_prediction = classification.get("top_prediction", {})
 
-                result += f"{i}. Image ID: {img.get('id', 'unknown')}\n"
+                # Get image ID and filename for preview
+                img_id = img.get("id", "unknown")
+                filename = metadata.get("filename", img.get("url", "unknown"))
+
+                result += f"{i}. Image ID: {img_id}\n"
                 result += (
                     f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
                 )
@@ -509,6 +514,8 @@ class RagMeTools:
                 if metadata.get("date_added"):
                     result += f"   Added: {metadata.get('date_added')}\n"
 
+                # Add image preview using the special format that frontend can detect
+                result += f"\n[IMAGE:{img_id}:{filename}]\n"
                 result += "\n"
 
             return result

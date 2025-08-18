@@ -103,8 +103,8 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                                 ),
                                 Property(
                                     name="image",
-                                    data_type=DataType.BLOB,
-                                    description="the base64 encoded image",
+                                    data_type=DataType.TEXT,
+                                    description="the image reference (truncated base64 or URL)",
                                 ),
                                 Property(
                                     name="metadata",
@@ -132,7 +132,7 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                                 Property(
                                     name="image",
                                     data_type=DataType.TEXT,
-                                    description="the base64 encoded image",
+                                    description="the image reference (truncated base64 or URL)",
                                 ),
                                 Property(
                                     name="metadata",
@@ -204,6 +204,10 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                 if "image_data" in metadata:
                     del metadata["image_data"]
 
+                # Store image data in metadata for API access, but not in the main image field
+                # This avoids Weaviate cloud UI display issues with large BLOB data
+                metadata["base64_data"] = image_data
+
                 metadata_text = json.dumps(metadata, ensure_ascii=False)
 
                 print(f"Writing image with data length: {len(image_data)}")
@@ -215,7 +219,7 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                 batch.add_object(
                     properties={
                         "url": img.get("url", ""),
-                        "image": image_data,
+                        "image": f"data:image/jpeg;base64,{image_data[:100]}...",  # Store truncated reference
                         "metadata": metadata_text,
                     }
                 )
@@ -297,11 +301,53 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
     def search_image_collection(
         self, query: str, limit: int = 5
     ) -> list[dict[str, Any]]:
-        """Search only the image collection using metadata."""
+        """Search only the image collection using metadata.
+
+        Strategy:
+        - First try to search in filenames (most reliable for image content)
+        - Then try hybrid search to leverage both dense and sparse signals
+        - Fallback to BM25 (sparse, robust for plain keywords in metadata)
+        - Final fallback to near_text if others are unavailable
+        """
         if not self.has_image_collection():
             return []
 
         collection = self.client.collections.get(self.image_collection.name)
+
+        # First, try to search in filenames using BM25 with specific field targeting
+        try:
+            # Use BM25 to search specifically in the filename field
+            response = collection.query.bm25(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                properties=["metadata.filename"],
+            )
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception:
+            pass
+
+        # Try hybrid search
+        try:
+            response = collection.query.hybrid(
+                query=query, limit=limit, include_vector=False
+            )
+            return self._convert_weaviate_response(response)
+        except Exception:
+            pass
+
+        # Fallback to BM25 (general search)
+        try:
+            response = collection.query.bm25(
+                query=query, limit=limit, include_vector=False
+            )
+            return self._convert_weaviate_response(response)
+        except Exception:
+            pass
+
+        # Last resort: near_text
         response = collection.query.near_text(
             query=query, limit=limit, include_vector=False
         )
@@ -415,7 +461,16 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
 
             # Add image data if this is an image (check if 'image' field exists)
             if "image" in obj.properties:
-                result["image_data"] = obj.properties["image"]
+                # Store the truncated reference for Weaviate cloud display
+                image_value = obj.properties["image"]
+                if image_value:  # Only add if not empty/null
+                    result["image"] = image_value
+                # For images, the actual data is stored in metadata.base64_data
+                # The image field contains a truncated reference
+                if "metadata" in result and "base64_data" in result["metadata"]:
+                    result["image_data"] = result["metadata"]["base64_data"]
+                else:
+                    result["image_data"] = image_value
 
             # Add score if available
             if hasattr(obj, "score") and obj.score is not None:

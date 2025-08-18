@@ -54,6 +54,20 @@ class QueryAgent:
             "query.top_k", 5
         )  # Default to 5 most relevant documents
 
+        # Get relevance thresholds
+        query_config = config.get("query", {})
+        relevance_thresholds = query_config.get("relevance_thresholds", {})
+        self.text_relevance_threshold = relevance_thresholds.get("text", 0.8)
+        self.image_relevance_threshold = relevance_thresholds.get("image", 0.8)
+        self.image_rerank_with_llm: bool = query_config.get(
+            "image_rerank_with_llm", False
+        )
+        self.image_rerank_top_k: int = query_config.get("image_rerank_top_k", 10)
+        self.text_rerank_with_llm: bool = query_config.get(
+            "text_rerank_with_llm", False
+        )
+        self.text_rerank_top_k: int = query_config.get("text_rerank_top_k", 10)
+
         self.llm = OpenAI(model=llm_model, temperature=temperature)
 
     async def run(self, query: str):
@@ -69,6 +83,56 @@ class QueryAgent:
         logger.info(f"QueryAgent received query: '{query}'")
 
         try:
+            # Check if this is a "list images" query and handle it specially
+            query_lower = query.lower().strip()
+            if "list" in query_lower and (
+                "images" in query_lower or "image" in query_lower
+            ):
+                logger.info("QueryAgent detected list images query, handling specially")
+                # Get all images from the image collection
+                images = self.vector_db.list_images(limit=100, offset=0)
+
+                if not images:
+                    return "No images found in the collection."
+
+                result = f"Found {len(images)} images in the collection:\n\n"
+
+                for i, img in enumerate(images, 1):
+                    metadata = img.get("metadata", {})
+                    if isinstance(metadata, str):
+                        import json
+
+                        try:
+                            metadata = json.loads(metadata)
+                        except json.JSONDecodeError:
+                            metadata = {}
+
+                    classification = metadata.get("classification", {})
+                    top_prediction = classification.get("top_prediction", {})
+
+                    # Get image ID and filename for preview
+                    img_id = img.get("id", "unknown")
+                    filename = metadata.get("filename", img.get("url", "unknown"))
+
+                    result += f"{i}. Image ID: {img_id}\n"
+                    result += (
+                        f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
+                    )
+
+                    if top_prediction:
+                        label = top_prediction.get("label", "unknown")
+                        confidence = top_prediction.get("confidence", 0)
+                        result += f"   Classification: {label} ({confidence:.2%} confidence)\n"
+
+                    if metadata.get("date_added"):
+                        result += f"   Added: {metadata.get('date_added')}\n"
+
+                    # Add image preview using the special format that frontend can detect
+                    result += f"\n[IMAGE:{img_id}:{filename}]\n"
+                    result += "\n"
+
+                return result
+
             logger.info(
                 f"QueryAgent searching vector database with query: '{query}' (top_k={self.top_k})"
             )
@@ -88,13 +152,47 @@ class QueryAgent:
                 text_results = self.vector_db.search_text_collection(
                     query, limit=self.top_k
                 )
-                logger.info(f"QueryAgent found {len(text_results)} text documents")
+                # Apply LLM reranking to text results for better relevance scoring
+                if self.text_rerank_with_llm and text_results:
+                    text_results = self._rerank_text_with_llm(
+                        query, text_results, self.text_rerank_top_k
+                    )
+                # Filter text results by relevance threshold
+                text_results = [
+                    result
+                    for result in text_results
+                    if result.get("score", 0) >= self.text_relevance_threshold
+                ]
+                logger.info(
+                    f"QueryAgent found {len(text_results)} relevant text documents (threshold: {self.text_relevance_threshold})"
+                )
 
             if has_image:
                 image_results = self.vector_db.search_image_collection(
-                    query, limit=self.top_k
+                    query,
+                    limit=max(
+                        self.top_k,
+                        (
+                            self.image_rerank_top_k
+                            if self.image_rerank_with_llm
+                            else self.top_k
+                        ),
+                    ),
                 )
-                logger.info(f"QueryAgent found {len(image_results)} image documents")
+                # Optional: LLM-based reranking of image results
+                if self.image_rerank_with_llm and image_results:
+                    image_results = self._rerank_images_with_llm(
+                        query, image_results, self.image_rerank_top_k
+                    )
+                # Filter image results by relevance threshold (on reranked/normalized scores)
+                image_results = [
+                    result
+                    for result in image_results
+                    if result.get("score", 0) >= self.image_relevance_threshold
+                ][: self.top_k]
+                logger.info(
+                    f"QueryAgent found {len(image_results)} relevant image documents (threshold: {self.image_relevance_threshold}, rerank={self.image_rerank_with_llm})"
+                )
 
             # Combine and sort results
             all_results = text_results + image_results
@@ -136,7 +234,29 @@ class QueryAgent:
                         f"**Text Documents:** Found {len(text_results)} relevant text documents"
                     )
 
-                if image_results:
+                # Only include images if they're actually relevant to the query
+                print(
+                    f"DEBUG: About to check image relevance for query: '{query}' with {len(image_results)} images"
+                )
+                logger.info(
+                    f"Checking if {len(image_results)} images are relevant to query: '{query}'"
+                )
+                print("DEBUG: Calling _are_images_relevant_to_query...")
+                try:
+                    images_relevant = self._are_images_relevant_to_query(
+                        query, image_results
+                    )
+                    logger.info(f"Images relevant: {images_relevant}")
+                    print(f"DEBUG: Images relevant result: {images_relevant}")
+                    print(
+                        f"DEBUG: image_results: {len(image_results)}, images_relevant: {images_relevant}"
+                    )
+                except Exception as e:
+                    print(f"DEBUG: Exception in _are_images_relevant_to_query: {e}")
+                    logger.error(f"Exception in _are_images_relevant_to_query: {e}")
+                    images_relevant = False
+
+                if image_results and images_relevant:
                     result_parts.append(
                         f"**Images:** Found {len(image_results)} relevant images"
                     )
@@ -158,6 +278,212 @@ class QueryAgent:
             logger.error(f"QueryAgent error: {str(e)}")
             return f"Error searching documents: {str(e)}"
 
+    def _are_images_relevant_to_query(
+        self, query: str, image_results: list[dict]
+    ) -> bool:
+        """
+        Check if the found images are actually relevant to the query.
+
+        Args:
+            query (str): The user's query
+            image_results (list): List of image results
+
+        Returns:
+            bool: True if images are relevant, False otherwise
+        """
+        print(
+            f"DEBUG: _are_images_relevant_to_query called with query: '{query}' and {len(image_results)} images"
+        )
+        query_lower = query.lower()
+
+        # Check if query is asking for images specifically
+        image_keywords = ["image", "picture", "photo", "show me", "display", "see"]
+        if any(keyword in query_lower for keyword in image_keywords):
+            logger.info(
+                f"Images considered relevant due to image keywords in query: '{query}'"
+            )
+            return True
+
+        # Check if query is asking to list images specifically
+        if "list" in query_lower and (
+            "images" in query_lower or "image" in query_lower
+        ):
+            logger.info(
+                f"Images considered relevant due to list images query: '{query}'"
+            )
+            return True
+
+        # Check if any image has a high relevance score and relevant filename
+        for image in image_results:
+            score = image.get("score", 0)
+            metadata = image.get("metadata", {})
+            filename = metadata.get("filename", "").lower()
+
+            # If score is very high (>0.95), consider it relevant
+            if score > 0.95:
+                logger.info(
+                    f"Image considered relevant due to high score ({score}): {filename}"
+                )
+                return True
+
+            # Check if filename contains words from the query (more strict matching)
+            query_words = query_lower.split()
+            for word in query_words:
+                if len(word) > 2 and word in filename:
+                    # Additional check: make sure it's not a false positive
+                    # For "who is max", we don't want to match "max" in "maximilien"
+                    if word == "max" and "maximilien" in filename:
+                        continue  # Skip this match as it's not relevant
+                    logger.info(
+                        f"Image considered relevant due to filename match: {filename} contains word '{word}' from '{query}'"
+                    )
+                    return True
+
+        logger.info(f"Images not considered relevant for query: '{query}'")
+        print(
+            f"DEBUG: Images not considered relevant for query: '{query}'"
+        )  # Temporary debug
+        return False
+
+    def _rerank_images_with_llm(
+        self, query: str, image_results: list[dict], top_k: int
+    ) -> list[dict]:
+        """Use the LLM to rerank image results by textual relevance of their metadata to the query.
+
+        We pass filenames and available metadata to the LLM and ask for 0-1 relevance scores.
+        We then normalize and attach these scores back on each result as `score`.
+        """
+        try:
+            # Build a compact list of candidates
+            lines: list[str] = []
+            for idx, img in enumerate(image_results[:top_k]):
+                metadata = img.get("metadata", {}) or {}
+                filename = metadata.get("filename", "Unknown")
+                label = (
+                    (metadata.get("classification", {}) or {})
+                    .get("top_prediction", {})
+                    .get("label", "")
+                )
+                # Keep each candidate on one line for easier parsing
+                lines.append(f"{idx}\t{filename}\t{label}")
+
+            listing = "\n".join(lines)
+            prompt = (
+                "You will receive a user query and a list of image candidates (index, filename, predicted label).\n"
+                "For each candidate, output a JSON array of objects with: index (int) and score (float between 0 and 1) named 'relevance'.\n"
+                "Only return the JSON array, no extra text.\n\n"
+                f"Query: {query}\n\nCandidates (index\tfilename\tpredicted_label):\n{listing}\n"
+            )
+
+            response = self.llm.complete(prompt)
+            text = response.text.strip()
+
+            import json
+
+            reranked: list[dict] | dict = json.loads(text)
+            # Normalize to list
+            if isinstance(reranked, dict) and "results" in reranked:
+                reranked = reranked["results"]
+            if not isinstance(reranked, list):
+                return image_results
+
+            # Apply scores back to results
+            for item in reranked:
+                idx = int(item.get("index", -1))
+                # Accept multiple key names from LLMs
+                raw_score = (
+                    item.get("relevance")
+                    or item.get("score")
+                    or item.get("similarity")
+                    or 0.0
+                )
+                try:
+                    score = float(raw_score)
+                except Exception:
+                    score = 0.0
+                # Clamp to [0,1]
+                if score < 0.0:
+                    score = 0.0
+                if score > 1.0:
+                    score = 1.0
+                if 0 <= idx < len(image_results):
+                    image_results[idx]["score"] = score
+
+            # Sort by new scores desc
+            image_results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+            return image_results
+        except Exception:
+            # If anything fails, just return original order
+            return image_results
+
+    def _rerank_text_with_llm(
+        self, query: str, text_results: list[dict], top_k: int
+    ) -> list[dict]:
+        """Use the LLM to rerank text results by relevance to the query.
+
+        We pass document content and metadata to the LLM and ask for 0-1 relevance scores.
+        We then normalize and attach these scores back on each result as `score`.
+        """
+        try:
+            # Build a compact list of candidates
+            lines: list[str] = []
+            for idx, doc in enumerate(text_results[:top_k]):
+                content = doc.get("text", "")[:500]  # Truncate content for prompt
+                url = doc.get("url", "Unknown")
+                metadata = doc.get("metadata", {}) or {}
+                filename = metadata.get("filename", "Unknown")
+                # Keep each candidate on one line for easier parsing
+                lines.append(f"{idx}\t{filename}\t{url}\t{content[:100]}...")
+
+            listing = "\n".join(lines)
+            prompt = (
+                "You will receive a user query and a list of text document candidates (index, filename, url, content_preview).\n"
+                "For each candidate, output a JSON array of objects with: index (int) and score (float between 0 and 1) named 'relevance'.\n"
+                "Only return the JSON array, no extra text.\n\n"
+                f"Query: {query}\n\nCandidates (index\tfilename\turl\tcontent_preview):\n{listing}\n"
+            )
+
+            response = self.llm.complete(prompt)
+            text = response.text.strip()
+
+            import json
+
+            reranked: list[dict] | dict = json.loads(text)
+            # Normalize to list
+            if isinstance(reranked, dict) and "results" in reranked:
+                reranked = reranked["results"]
+            if not isinstance(reranked, list):
+                return text_results
+
+            # Apply scores back to results
+            for item in reranked:
+                idx = int(item.get("index", -1))
+                # Accept multiple key names from LLMs
+                raw_score = (
+                    item.get("relevance")
+                    or item.get("score")
+                    or item.get("similarity")
+                    or 0.0
+                )
+                try:
+                    score = float(raw_score)
+                except Exception:
+                    score = 0.0
+                # Clamp to [0,1]
+                if score < 0.0:
+                    score = 0.0
+                if score > 1.0:
+                    score = 1.0
+                if 0 <= idx < len(text_results):
+                    text_results[idx]["score"] = score
+
+            # Sort by new scores desc
+            text_results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+            return text_results
+        except Exception:
+            # If anything fails, just return original order
+            return text_results
+
     def _answer_query_with_results(
         self, query: str, text_results: list[dict], image_results: list[dict]
     ) -> str:
@@ -170,7 +496,7 @@ class QueryAgent:
             image_results (list): List of relevant image documents
 
         Returns:
-            str: LLM-generated summary
+            str: LLM-generated summary with image data
         """
         try:
             # Prepare context from the most relevant documents
@@ -183,42 +509,89 @@ class QueryAgent:
                     content = doc.get("text", "")
                     metadata = doc.get("metadata", {})
                     filename = metadata.get("filename", "Unknown")
+                    url = doc.get("url", metadata.get("source", "Unknown"))
 
-                    # Truncate content if too long (keep more for summarization)
-                    if len(content) > 2000:
-                        content = content[:2000] + "..."
+                    # Truncate content if too long but keep more for better answers
+                    if len(content) > 3000:
+                        content = content[:3000] + "..."
 
-                    context_parts.append(f"Document {i + 1} ({filename}):\n{content}\n")
+                    context_parts.append(
+                        f"Document {i + 1} ({filename}):\n"
+                        f"Source: {url}\n"
+                        f"Content: {content}\n"
+                    )
 
-            # Add image documents context
-            if image_results:
+            # Add image documents context (only if relevant)
+            if image_results and self._are_images_relevant_to_query(
+                query, image_results
+            ):
                 context_parts.append("**Image Documents:**")
                 for i, img in enumerate(image_results[:3]):  # Use top 3 image documents
                     metadata = img.get("metadata", {})
                     filename = metadata.get("filename", "Unknown")
-                    description = metadata.get(
-                        "description", "No description available"
+                    classification = metadata.get("classification", {})
+                    top_prediction = classification.get("top_prediction", {})
+                    label = top_prediction.get("label", "Unknown")
+                    confidence = top_prediction.get("confidence", 0)
+                    confidence_percent = (
+                        f"{confidence * 100:.1f}%" if confidence > 0 else "Unknown"
                     )
 
+                    # Include AI classification information
                     context_parts.append(
-                        f"Image {i + 1} ({filename}):\nDescription: {description}\n"
+                        f"Image {i + 1} ({filename}):\n"
+                        f"AI Classification: {label} ({confidence_percent} confidence)\n"
+                        f"File size: {metadata.get('file_size', 'Unknown')} bytes\n"
+                        f"Format: {metadata.get('format', 'Unknown')}\n"
                     )
 
             context = "\n".join(context_parts)
 
-            # Create prompt for LLM summarization
-            prompt = f"""Based on the following documents and images, please provide a comprehensive answer to the user's question.
+            # Create prompt for LLM to answer the specific query
+            prompt = f"""You are a helpful assistant that answers questions based on the provided documents and images.
 
 User Question: {query}
 
 Relevant Content:
 {context}
 
-Please provide a clear, accurate answer based on the information above. If the content includes both text documents and images, mention both types of sources in your response."""
+Please provide a direct answer to the user's question using the information from the documents and images above.
+
+Instructions:
+- Answer the specific question asked, don't just summarize the content
+- If the question asks about images, describe what you see in the images
+- If the question asks about specific information, find and present that information
+- Be concise but thorough
+- If you cannot answer the question with the provided content, say so clearly
+- If the content includes images, mention them in your response
+- IMPORTANT: When listing images, use the format [IMAGE:imageId:filename] for each image instead of markdown image syntax"""
 
             # Generate response using LLM
             response = self.llm.complete(prompt)
-            return response.text
+            response_text = response.text
+
+            # If we have image results and they're relevant, append image data to the response
+            if image_results and self._are_images_relevant_to_query(
+                query, image_results
+            ):
+                response_text += "\n\n**Images Found:**\n"
+                for _, img in enumerate(image_results[:3]):  # Use top 3 images
+                    img_id = img.get("id")
+                    metadata = img.get("metadata", {})
+                    filename = metadata.get("filename", "Unknown")
+                    classification = metadata.get("classification", {})
+                    top_prediction = classification.get("top_prediction", {})
+                    label = top_prediction.get("label", "Unknown")
+                    confidence = top_prediction.get("confidence", 0)
+                    confidence_percent = (
+                        f"{confidence * 100:.1f}%" if confidence > 0 else "Unknown"
+                    )
+
+                    # Add special image reference that frontend can detect and handle
+                    response_text += f"\n[IMAGE:{img_id}:{filename}]\n"
+                    response_text += f"*{filename} - AI Classification: {label} ({confidence_percent} confidence)*\n"
+
+            return response_text
 
         except Exception as e:
             logger.error(f"Error generating LLM response: {str(e)}")

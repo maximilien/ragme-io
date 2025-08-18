@@ -141,6 +141,10 @@ Focus only on functional operations that modify or query the collection structur
             if self._is_add_url_query(query):
                 return self._handle_add_url_directly(query)
 
+            # Check if this is a "list" operation and handle it directly
+            if self._is_list_query(query):
+                return self._handle_list_directly(query)
+
             # Pre-process the query to extract URLs for add operations
             processed_query = self._preprocess_query(query)
             logger.info(
@@ -174,6 +178,33 @@ Focus only on functional operations that modify or query the collection structur
 
         # Call the tool directly
         return self.tools.write_to_ragme_collection([url_part])
+
+    def _is_list_query(self, query: str) -> bool:
+        """Check if the query is asking to list something."""
+        query_lower = query.lower().strip()
+        return query_lower.startswith("list ")
+
+    def _handle_list_directly(self, query: str) -> str:
+        """Handle list operations directly without going through the LLM."""
+        query_lower = query.lower().strip()
+
+        # Extract what to list
+        if "images" in query_lower or "image" in query_lower:
+            logger.info("FunctionalAgent handling list images directly")
+            return self.tools.list_image_collection(limit=10, offset=0)
+        elif (
+            "documents" in query_lower
+            or "docs" in query_lower
+            or "document" in query_lower
+        ):
+            logger.info("FunctionalAgent handling list documents directly")
+            return self.tools.list_ragme_collection(limit=10, offset=0)
+        else:
+            # Default to listing documents if no specific type mentioned
+            logger.info(
+                "FunctionalAgent handling list (defaulting to documents) directly"
+            )
+            return self.tools.list_ragme_collection(limit=10, offset=0)
 
     def _preprocess_query(self, query: str) -> str:
         """

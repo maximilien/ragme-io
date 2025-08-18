@@ -1407,6 +1407,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const parsedContent = simpleMarkdownParser(message.content);
         const sanitizedContent = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(parsedContent) : parsedContent;
         contentDiv.innerHTML = sanitizedContent;
+        
+        // Load any images in AI messages
+        if (message.type === 'ai') {
+            this.loadAgentImages(contentDiv);
+        }
 
         // Add copy button for AI messages
         if (message.type === 'ai') {
@@ -2977,44 +2982,27 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             </div>
         `;
         
-        // Try to fetch the document from backend to get image data
-        fetch(`/api/document/${docId}`)
+        // Try to fetch the image from backend using the dedicated image endpoint
+        fetch(`/image/${docId}`)
             .then(response => response.json())
             .then(result => {
-                if (result.success && result.document) {
-                    const doc = result.document;
-                    const imageData = doc.image_data || 
-                                    doc.metadata?.image_data || 
-                                    doc.metadata?.base64_data ||
-                                    doc.metadata?.image ||
-                                    doc.image;
+                if (result.image_data) {
+                    const mimeType = result.metadata?.format || 
+                                    result.metadata?.mime_type || 
+                                    result.metadata?.content_type || 
+                                    'image/jpeg';
                     
-                    if (imageData) {
-                        const mimeType = doc.metadata?.format || 
-                                        doc.metadata?.mime_type || 
-                                        doc.metadata?.content_type || 
-                                        'image/jpeg';
-                        
-                        contentPreview.innerHTML = `
-                            <div class="image-preview">
-                                <img src="data:${mimeType};base64,${imageData}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
-                            </div>
-                        `;
-                    } else {
-                        contentPreview.innerHTML = `
-                            <div class="no-content">
-                                <i class="fas fa-image" style="font-size: 2rem; color: #6b7280; margin-bottom: 1rem;"></i>
-                                <p>Image preview not available</p>
-                                <p style="font-size: 0.9rem; color: #6b7280;">No image data found in backend</p>
-                            </div>
-                        `;
-                    }
+                    contentPreview.innerHTML = `
+                        <div class="image-preview">
+                            <img src="data:${mimeType};base64,${result.image_data}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                        </div>
+                    `;
                 } else {
                     contentPreview.innerHTML = `
                         <div class="no-content">
                             <i class="fas fa-image" style="font-size: 2rem; color: #6b7280; margin-bottom: 1rem;"></i>
                             <p>Image preview not available</p>
-                            <p style="font-size: 0.9rem; color: #6b7280;">Failed to fetch from backend</p>
+                            <p style="font-size: 0.9rem; color: #6b7280;">No image data found in backend</p>
                         </div>
                     `;
                 }
@@ -3026,6 +3014,67 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <i class="fas fa-image" style="font-size: 2rem; color: #6b7280; margin-bottom: 1rem;"></i>
                         <p>Image preview not available</p>
                         <p style="font-size: 0.9rem; color: #6b7280;">Error: ${error.message}</p>
+                    </div>
+                `;
+            });
+    }
+
+    loadAgentImages(container) {
+        const imageContainers = container.querySelectorAll('.agent-image-container');
+        imageContainers.forEach(container => {
+            const imageId = container.getAttribute('data-image-id');
+            const filename = container.getAttribute('data-filename');
+            
+            if (imageId) {
+                this.loadAgentImage(container, imageId, filename);
+            }
+        });
+    }
+
+    loadAgentImage(container, imageId, filename) {
+        // Show loading state
+        container.innerHTML = `
+            <div class="image-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading ${filename}...</p>
+            </div>
+        `;
+        
+        // Fetch image from backend
+        fetch(`/image/${imageId}`)
+            .then(response => response.json())
+            .then(result => {
+                if (result.image_data) {
+                    const mimeType = result.metadata?.format || 
+                                    result.metadata?.mime_type || 
+                                    result.metadata?.content_type || 
+                                    'image/jpeg';
+                    
+                    container.innerHTML = `
+                        <div class="agent-image-preview">
+                            <img src="data:${mimeType};base64,${result.image_data}" 
+                                 alt="${filename}" 
+                                 style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                            <div class="image-caption">${filename}</div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="image-error">
+                            <i class="fas fa-image" style="font-size: 2rem; color: #6b7280; margin-bottom: 1rem;"></i>
+                            <p>Image not available</p>
+                            <p style="font-size: 0.9rem; color: #6b7280;">${filename}</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading agent image:', error);
+                container.innerHTML = `
+                    <div class="image-error">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #dc2626; margin-bottom: 1rem;"></i>
+                        <p>Error loading image</p>
+                        <p style="font-size: 0.9rem; color: #6b7280;">${filename}</p>
                     </div>
                 `;
             });
@@ -4329,11 +4378,29 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
 // Simple markdown parser fallback if marked is not available
 function simpleMarkdownParser(text) {
     if (typeof marked !== 'undefined') {
+        // First handle our custom image format
+        text = text.replace(/\[IMAGE:([^:]+):([^\]]+)\]/g, function(match, imageId, filename) {
+            return `<div class="agent-image-container" data-image-id="${imageId}" data-filename="${filename}">
+                <div class="image-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading image...</p>
+                </div>
+            </div>`;
+        });
+        
         return marked.parse(text);
     }
     
     // Fallback simple markdown parser
     return text
+        .replace(/\[IMAGE:([^:]+):([^\]]+)\]/g, function(match, imageId, filename) {
+            return `<div class="agent-image-container" data-image-id="${imageId}" data-filename="${filename}">
+                <div class="image-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading image...</p>
+                </div>
+            </div>`;
+        })
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`(.*?)`/g, '<code>$1</code>')

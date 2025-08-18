@@ -238,7 +238,7 @@ class TestRagMeAgent:
 
         # Verify the ReActAgent system prompt contains expected content
         system_prompt = agent.agent.system_prompt
-        assert "helpful assistant" in system_prompt
+        assert "dispatcher agent" in system_prompt
         assert "functional_operations" in system_prompt
         assert "content_questions" in system_prompt
         assert "memory" in system_prompt
