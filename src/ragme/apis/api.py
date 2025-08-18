@@ -1449,12 +1449,23 @@ async def get_image(image_id: str):
         images = ragme.vector_db.list_images(limit=1000, offset=0)
 
         # Find the specific image
+        image_document = None
         for img in images:
             img_id = str(img.get("id")) if img.get("id") else None
             if img_id == image_id:
-                return img
+                image_document = img
+                break
 
-        raise HTTPException(status_code=404, detail=f"Image {image_id} not found")
+        if not image_document:
+            raise HTTPException(status_code=404, detail=f"Image {image_id} not found")
+
+        # Return the image data
+        return {
+            "id": image_document.get("id"),
+            "url": image_document.get("url"),
+            "image_data": image_document.get("image_data"),
+            "metadata": image_document.get("metadata", {}),
+        }
     except HTTPException:
         raise
     except Exception as e:

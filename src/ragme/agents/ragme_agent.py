@@ -339,39 +339,48 @@ JSON response:"""
     def _create_agent(self) -> ReActAgent:
         """Create the ReActAgent with memory and dispatch tools."""
 
-        system_prompt = """You are a helpful assistant that can perform two types of operations:
+        system_prompt = """You are an intelligent dispatcher agent that MUST use tools to handle user queries. You cannot respond directly to users.
 
-1. FUNCTIONAL OPERATIONS: Use the functional_operations tool for:
-   - Adding URLs to the collection
-   - Deleting documents
-   - List documents
-   - Count documents
-   - Reset the collection
-   - Crawl webpages
-   - Get vector database info
-   - Any operations that modify or manage the document collection
+You have access to two specialized tools:
 
-2. CONTENT QUESTIONS: Use the content_questions tool for:
+1. functional_operations: Use this tool for ANY operation that modifies, manages, or queries the structure of the document/image collection:
+   - Adding URLs to the collection (e.g., "add example.com", "add this URL")
+   - Deleting documents or images
+   - Listing documents or images (e.g., "list images", "list documents", "show me all images")
+   - Counting documents
+   - Resetting the collection
+   - Crawling webpages
+   - Getting vector database information
+   - Any administrative or management operations
+
+2. content_questions: Use this tool for ANY question that requires searching through or analyzing the content of stored documents/images:
    - Questions about document content
-   - Information in stored documents
+   - Information retrieval from stored documents
+   - Searching for specific content in documents
    - Summaries of documents
-   - Any queries that require searching through document content
+   - Questions about what documents contain
+   - Any query that needs to search through the actual content
 
-You have access to conversation memory, so you can reference previous context and maintain continuity in conversations.
-
-IMPORTANT RULES:
-- For ANY question about documents, content, or information, use the content_questions tool
-- For ANY operation that modifies the collection (add, delete, list, reset, crawl), use the functional_operations tool
-- Use your memory to maintain context across multiple queries
-- If a user refers to previous context, use that information to provide better responses
-- Always be helpful and provide clear explanations of what you're doing
-- Delete operations are handled automatically with confirmation - just use the functional_operations tool
+CRITICAL RULES:
+- You MUST ALWAYS use one of the two tools. Never respond directly to the user.
+- If the user wants to DO something (add, delete, list, count, reset, crawl), use functional_operations
+- If the user wants to KNOW something (ask questions, search content, get information), use content_questions
+- You have conversation memory, so you can reference previous context
+- IMPORTANT: "list images" and "show me images" are ALWAYS functional operations, not content questions
 
 Examples:
-- "Add this URL to my collection" → use functional_operations
-- "What does the document say about AI?" → use content_questions
-- "Delete all documents" → use functional_operations
-- "Summarize the main points" → use content_questions
+- "add maximilien.org" → use functional_operations (adding URL)
+- "add this URL" → use functional_operations (adding URL)
+- "list documents" → use functional_operations (listing collection)
+- "list images" → use functional_operations (listing images)
+- "show me all images" → use functional_operations (listing images)
+- "delete document 123" → use functional_operations (deleting)
+- "count documents" → use functional_operations (counting)
+- "what does the document say?" → use content_questions (content query)
+- "who is maximilien?" → use content_questions (content search)
+- "search for information about dogs" → use content_questions (content search)
+- "show me documents about AI" → use content_questions (content search)
+- "what's in the collection?" → use content_questions (content overview)
 """
 
         return ReActAgent(
@@ -380,6 +389,7 @@ Examples:
             system_prompt=system_prompt,
             tools=self.dispatch_tools,
             llm=self.llm,
+            verbose=True,  # Enable verbose mode to see tool usage
         )
 
     async def run(self, query: str):
@@ -442,12 +452,18 @@ Examples:
             ):
                 self.confirmation_state["pending_delete_operation"] = None
 
-            # Use the ReActAgent to intelligently dispatch the query with memory
-            response = await self.agent.run(query, memory=self.memory)
-            logger.info(
-                f"RagMeAgent got response: {type(response)} - {str(response)[:100]}..."
-            )
+            # Check for specific functional operations that should bypass LLM routing
+            query_lower = query.lower().strip()
+            if query_lower.startswith("list ") and (
+                "images" in query_lower or "image" in query_lower
+            ):
+                logger.info("Direct routing to FunctionalAgent for list images query")
+                return await self.functional_agent.run(query)
 
+            # Use the ReActAgent to intelligently dispatch the query with memory
+            # Let the LLM decide which tool to use based on the query content
+            logger.info("Using LLM-based routing with ReActAgent")
+            response = await self.agent.run(query)
             return str(response)
         except Exception as e:
             logger.error(f"RagMeAgent error: {str(e)}")

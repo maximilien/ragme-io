@@ -167,6 +167,59 @@ app.use(express.json());
 
 app.use(express.static(path.join(process.cwd(), 'public')));
 
+// Proxy image requests to the backend
+app.get('/image/:imageId', async (req, res) => {
+  try {
+    const imageId = req.params.imageId;
+    const response = await fetch(`${RAGME_API_URL}/image/${imageId}`);
+
+    if (response.ok) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      res.status(response.status).json({
+        status: 'error',
+        message: 'Image not found',
+      });
+    }
+  } catch (error) {
+    logger.error('Error proxying image request:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch image',
+    });
+  }
+});
+
+// Proxy query requests to the backend
+app.post('/query', async (req, res) => {
+  try {
+    const response = await fetch(`${RAGME_API_URL}/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(req.body),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      res.status(response.status).json({
+        status: 'error',
+        message: 'Query failed',
+      });
+    }
+  } catch (error) {
+    logger.error('Error proxying query request:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to process query',
+    });
+  }
+});
+
 // Serve the main HTML file
 app.get('/', (req, res) => {
   res.sendFile(path.join(process.cwd(), 'public/index.html'));
