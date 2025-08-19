@@ -223,8 +223,20 @@ def filter_items_by_date_range(
 
         try:
             # Parse the date_added string
-            date_added = datetime.fromisoformat(date_added_str.replace("Z", "+00:00"))
-            if start_date <= date_added <= end_date:
+            if date_added_str.endswith("Z"):
+                # Handle UTC time (with Z suffix)
+                date_added = datetime.fromisoformat(
+                    date_added_str.replace("Z", "+00:00")
+                )
+                # Convert to local time for consistent comparison with start_date and end_date
+                date_added_local = date_added.astimezone()
+            else:
+                # Handle local time (no timezone suffix)
+                date_added_local = datetime.fromisoformat(date_added_str)
+
+            # Make date_added_local naive for comparison with start_date and end_date (which are also naive)
+            date_added_naive = date_added_local.replace(tzinfo=None)
+            if start_date <= date_added_naive <= end_date:
                 filtered_items.append(item)
         except (ValueError, TypeError):
             # Skip items with invalid dates
