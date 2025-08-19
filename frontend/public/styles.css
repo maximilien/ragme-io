@@ -1951,6 +1951,89 @@ body {
     max-height: 500px;
 }
 
+/* Base64 content handling */
+.base64-preview {
+    color: #666;
+    font-style: italic;
+    margin-right: 0.5rem;
+}
+
+.expand-btn, .collapse-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.expand-btn:hover, .collapse-btn:hover {
+    background: #5a67d8;
+}
+
+.base64-content {
+    margin-top: 0.5rem;
+}
+
+.base64-content pre {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-bottom: 0.5rem;
+}
+
+.collapse-btn {
+    background: #6c757d;
+}
+
+.collapse-btn:hover {
+    background: #5a6268;
+}
+
+/* OCR text content styling */
+.ocr-text-content {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    background: #f8f9fa !important;
+    border: 1px solid #e9ecef !important;
+    border-radius: 4px !important;
+    padding: 0.75rem !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 0.8rem !important;
+    line-height: 1.4 !important;
+}
+
+.ocr-text-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ocr-text-content::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.ocr-text-content::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.ocr-text-content::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
 /* Content preview */
 .content-preview {
     background: rgba(255, 255, 255, 0.8);

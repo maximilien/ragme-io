@@ -1952,7 +1952,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             'jpg': 'fa-file-image',
             'jpeg': 'fa-file-image',
             'png': 'fa-file-image',
-            'gif': 'fa-file-image'
+            'gif': 'fa-file-image',
+            'heic': 'fa-file-image',
+            'heif': 'fa-file-image'
         };
         return iconMap[ext] || 'fa-file';
     }
@@ -2825,14 +2827,106 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             `);
         }
         
-        // Raw Metadata Section (for any other fields)
+        // OCR Content Section
+        if (metadata.ocr_content && typeof metadata.ocr_content === 'object') {
+            const ocrContent = metadata.ocr_content;
+            const ocrTags = [];
+            
+            // Show useful OCR metadata first
+            if (ocrContent.ocr_processing !== undefined) {
+                ocrTags.push(`
+                    <div class="metadata-tag">
+                        <span class="tag-key">OCR Processing</span>
+                        <span class="tag-value">${ocrContent.ocr_processing ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                `);
+            }
+            if (ocrContent.text_length !== undefined) {
+                ocrTags.push(`
+                    <div class="metadata-tag">
+                        <span class="tag-key">Text Length</span>
+                        <span class="tag-value">${ocrContent.text_length} characters</span>
+                    </div>
+                `);
+            }
+            if (ocrContent.block_count !== undefined) {
+                ocrTags.push(`
+                    <div class="metadata-tag">
+                        <span class="tag-key">Text Blocks</span>
+                        <span class="tag-value">${ocrContent.block_count} blocks</span>
+                    </div>
+                `);
+            }
+            if (ocrContent.extracted_text) {
+                ocrTags.push(`
+                    <div class="metadata-tag">
+                        <span class="tag-key">Extracted Text</span>
+                        <span class="tag-value ocr-text-content">${this.escapeHtml(ocrContent.extracted_text)}</span>
+                    </div>
+                `);
+            }
+            
+            // Show text_blocks in a collapsible section if available
+            if (ocrContent.text_blocks && ocrContent.text_blocks.length > 0) {
+                const textBlocksContent = ocrContent.text_blocks.map((block, index) => {
+                    const confidence = block.confidence ? ` (${(block.confidence * 100).toFixed(1)}%)` : '';
+                    return `
+                        <div class="metadata-tag">
+                            <span class="tag-key">Block ${index + 1}${confidence}</span>
+                            <span class="tag-value">${this.escapeHtml(block.text || 'No text')}</span>
+                        </div>
+                    `;
+                }).join('');
+                
+                ocrTags.push(`
+                    <div class="metadata-collapsible">
+                        <button class="collapsible-btn" data-action="toggle-collapse">
+                            <i class="fas fa-chevron-down"></i> Show ${ocrContent.text_blocks.length} text blocks
+                        </button>
+                        <div class="collapsible-content">
+                            ${textBlocksContent}
+                        </div>
+                    </div>
+                `);
+            }
+            
+            if (ocrTags.length > 0) {
+                sections.push(`
+                    <div class="metadata-section">
+                        <h5 class="section-title">OCR Content</h5>
+                        ${ocrTags.join('')}
+                    </div>
+                `);
+            }
+        }
+        
+        // Raw Metadata Section (for any other fields, excluding ocr_content)
         const otherKeys = Object.keys(metadata).filter(key => 
-            !['source', 'collection', 'exif', 'classification', 'processing_timestamp', 'pytorch_processing', 'date_added', 'url', 'filename', 'file_size', 'model', 'dataset', 'top_k', 'format', 'size_bytes', 'daft_processing', 'daft_dataframe_shape', 'schema'].includes(key)
+            !['source', 'collection', 'exif', 'classification', 'processing_timestamp', 'pytorch_processing', 'date_added', 'url', 'filename', 'file_size', 'model', 'dataset', 'top_k', 'format', 'size_bytes', 'daft_processing', 'daft_dataframe_shape', 'schema', 'ocr_content'].includes(key)
         );
         
         if (otherKeys.length > 0) {
             const otherTags = otherKeys.map(key => {
                 let value = metadata[key];
+                
+                // Special handling for base64 data
+                if (key === 'image_data' || key === 'base64_data' || key === 'image') {
+                    if (typeof value === 'string' && value.length > 50) {
+                        const byteEstimate = Math.round(value.length * 0.75); // Base64 is ~75% of original size
+                        return `
+                            <div class="metadata-tag">
+                                <span class="tag-key">${this.escapeHtml(this.formatMetadataKey(key))}</span>
+                                <span class="tag-value">
+                                    <span class="base64-preview">${byteEstimate} bytes</span>
+                                    <button class="expand-btn" data-action="expand-base64" data-key="${key}" data-value="${this.escapeHtml(value)}">
+                                        <i class="fas fa-expand-alt"></i> Show content
+                                    </button>
+                                </span>
+                            </div>
+                        `;
+                    }
+                }
+                
                 if (typeof value === 'object') {
                     value = JSON.stringify(value, null, 2);
                 } else {
@@ -3087,6 +3181,43 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             button.addEventListener('click', function() {
                 const parent = this.parentElement;
                 parent.classList.toggle('expanded');
+            });
+        });
+        
+        // Find all expand buttons for base64 data and add event listeners
+        const expandButtons = document.querySelectorAll('.expand-btn[data-action="expand-base64"]');
+        expandButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const key = button.getAttribute('data-key');
+                const value = button.getAttribute('data-value');
+                const parent = button.closest('.metadata-tag');
+                const tagValue = parent.querySelector('.tag-value');
+                
+                // Replace the preview and button with the full content
+                tagValue.innerHTML = `
+                    <div class="base64-content">
+                        <pre>${this.escapeHtml(value)}</pre>
+                        <button class="collapse-btn" data-action="collapse-base64" data-key="${key}" data-value="${this.escapeHtml(value)}">
+                            <i class="fas fa-compress-alt"></i> Hide content
+                        </button>
+                    </div>
+                `;
+                
+                // Add event listener to the new collapse button
+                const collapseBtn = tagValue.querySelector('.collapse-btn');
+                collapseBtn.addEventListener('click', () => {
+                    const byteEstimate = Math.round(value.length * 0.75);
+                    tagValue.innerHTML = `
+                        <span class="base64-preview">${byteEstimate} bytes</span>
+                        <button class="expand-btn" data-action="expand-base64" data-key="${key}" data-value="${this.escapeHtml(value)}">
+                            <i class="fas fa-expand-alt"></i> Show content
+                        </button>
+                    `;
+                    
+                    // Re-add event listener to the new expand button
+                    const newExpandBtn = tagValue.querySelector('.expand-btn');
+                    newExpandBtn.addEventListener('click', arguments.callee);
+                });
             });
         });
     }
