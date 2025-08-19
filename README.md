@@ -199,25 +199,27 @@ vector_databases:
 RAGme now includes comprehensive image support with AI-powered analysis:
 
 **📤 Image Upload:**
-- Support for JPG, PNG, GIF, WebP, and BMP formats
+- Support for JPG, PNG, GIF, WebP, BMP, HEIC, and HEIF formats
 - Frontend drag-and-drop image upload interface
 - Dedicated `/upload-images` API endpoint
 
 **🤖 AI-Powered Processing:**
 - **PyTorch Classification**: Uses ResNet50 trained on ImageNet to classify image content
+- **OCR Text Extraction**: Automatically extracts text from images containing text (websites, documents, slides, etc.)
 - **EXIF Metadata Extraction**: Extracts camera settings, GPS data, and other technical metadata
-- **Smart Storage**: Images stored as base64 BLOB data in Weaviate with rich metadata
+- **Smart Storage**: Images stored as base64 BLOB data in Weaviate with rich metadata including OCR content
 
 **📦 Dependencies:**
 ```bash
-# For full AI classification features (optional)
+# For full AI classification and OCR features (optional)
 pip install ragme-ai[ml]
 
-# Or install PyTorch separately
+# Or install dependencies separately
 pip install torch>=2.0.0 torchvision>=0.15.0
+pip install easyocr pytesseract opencv-python Pillow
 ```
 
-> **Note**: AI classification requires PyTorch, which is an optional dependency. Images will still be processed and stored without it, but won't include AI-generated labels.
+> **Note**: AI classification requires PyTorch, and OCR requires EasyOCR or pytesseract. These are optional dependencies. Images will still be processed and stored without them, but won't include AI-generated labels or extracted text.
 
 **💬 Agent Tools:**
 - `write_image_to_collection(image_url)` - Add images from URLs to the collection
@@ -229,11 +231,17 @@ pip install torch>=2.0.0 torchvision>=0.15.0
 User: "Add this image to my collection: https://example.com/photo.jpg"
 Agent: Processes image with AI classification (e.g., "Golden Retriever, 94% confidence")
 
+User: "Add this screenshot to my collection: https://example.com/screenshot.png"
+Agent: Processes image with AI classification + OCR text extraction (e.g., "web site, 98% confidence" + extracted text content)
+
 User: "List my images"
-Agent: Shows images with classifications, confidence scores, and metadata
+Agent: Shows images with classifications, confidence scores, metadata, and OCR content
 
 User: "What images do I have of dogs?"
 Agent: Searches image collection for dog-related classifications
+
+User: "Find images containing the text 'RAGme'"
+Agent: Searches image collection using OCR-extracted text content
 ```
 
 The backend automatically routes image operations to the image collection. The frontend shows separate upload tabs for files and images, and the agent intelligently handles both text and image content.

@@ -313,7 +313,16 @@ class RagMeLocalAgent:
                 return False
 
             # Check if it's a supported image format
-            supported_formats = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+            supported_formats = {
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".gif",
+                ".webp",
+                ".bmp",
+                ".heic",
+                ".heif",
+            }
             if file_path.suffix.lower() not in supported_formats:
                 logging.error(f"Unsupported image format: {file_path}")
                 return False
