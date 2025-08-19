@@ -4,7 +4,11 @@
 import warnings
 from typing import Any
 
-from src.ragme.utils.common import crawl_webpage
+from src.ragme.utils.common import (
+    crawl_webpage,
+    filter_items_by_date_range,
+    parse_date_query,
+)
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(
@@ -553,6 +557,151 @@ class RagMeTools:
         except Exception as e:
             return f"Error deleting image: {str(e)}"
 
+    def list_documents_by_datetime(
+        self, date_query: str, limit: int = 10, offset: int = 0
+    ) -> str:
+        """
+        List documents in the collection filtered by a natural language date query.
+
+        Args:
+            date_query: Natural language date query (e.g., "yesterday", "today", "last week", "3 days ago")
+            limit: Maximum number of documents to return (default: 10)
+            offset: Number of documents to skip (default: 0)
+
+        Returns:
+            str: Formatted list of documents within the specified date range
+        """
+        try:
+            # Parse the date query into a date range
+            date_range = parse_date_query(date_query)
+            if not date_range:
+                return f"Could not understand the date query '{date_query}'. Supported formats: today, yesterday, this week, last week, this month, last month, this year, last year, 'X days ago', 'X weeks ago', 'X months ago'"
+
+            start_date, end_date = date_range
+
+            # Get all documents first
+            all_documents = self.ragme.list_documents(limit=1000, offset=0)
+
+            # Filter by date range
+            filtered_documents = filter_items_by_date_range(
+                all_documents, start_date, end_date
+            )
+
+            # Apply pagination
+            total_count = len(filtered_documents)
+            paginated_documents = filtered_documents[offset : offset + limit]
+
+            if not paginated_documents:
+                return f"No documents found for {date_query} (date range: {start_date.strftime('%Y-%m-%d %H:%M')} to {end_date.strftime('%Y-%m-%d %H:%M')})"
+
+            result = f"Found {total_count} documents for {date_query} (showing {len(paginated_documents)}):\n\n"
+
+            for i, doc in enumerate(paginated_documents, offset + 1):
+                metadata = doc.get("metadata", {})
+
+                result += f"{i}. Document ID: {doc.get('id', 'unknown')}\n"
+                result += f"   URL: {doc.get('url', 'unknown')}\n"
+                result += f"   Type: {metadata.get('type', 'unknown')}\n"
+
+                if metadata.get("date_added"):
+                    result += f"   Added: {metadata.get('date_added')}\n"
+
+                result += f"   Content Length: {len(doc.get('text', ''))} characters\n"
+
+                # Add a preview of the content
+                content_preview = (
+                    doc.get("text", "")[:100] + "..."
+                    if len(doc.get("text", "")) > 100
+                    else doc.get("text", "")
+                )
+                result += f"   Preview: {content_preview}\n"
+                result += "\n"
+
+            return result
+
+        except Exception as e:
+            return f"Error listing documents by datetime: {str(e)}"
+
+    def list_images_by_datetime(
+        self, date_query: str, limit: int = 10, offset: int = 0
+    ) -> str:
+        """
+        List images in the collection filtered by a natural language date query.
+
+        Args:
+            date_query: Natural language date query (e.g., "yesterday", "today", "last week", "3 days ago")
+            limit: Maximum number of images to return (default: 10)
+            offset: Number of images to skip (default: 0)
+
+        Returns:
+            str: Formatted list of images within the specified date range
+        """
+        try:
+            # Parse the date query into a date range
+            date_range = parse_date_query(date_query)
+            if not date_range:
+                return f"Could not understand the date query '{date_query}'. Supported formats: today, yesterday, this week, last week, this month, last month, this year, last year, 'X days ago', 'X weeks ago', 'X months ago'"
+
+            start_date, end_date = date_range
+
+            # Get all images first
+            all_images = self.ragme.vector_db.list_images(limit=1000, offset=0)
+
+            # Filter by date range
+            filtered_images = filter_items_by_date_range(
+                all_images, start_date, end_date
+            )
+
+            # Apply pagination
+            total_count = len(filtered_images)
+            paginated_images = filtered_images[offset : offset + limit]
+
+            if not paginated_images:
+                return f"No images found for {date_query} (date range: {start_date.strftime('%Y-%m-%d %H:%M')} to {end_date.strftime('%Y-%m-%d %H:%M')})"
+
+            result = f"Found {total_count} images for {date_query} (showing {len(paginated_images)}):\n\n"
+
+            for i, img in enumerate(paginated_images, offset + 1):
+                metadata = img.get("metadata", {})
+                if isinstance(metadata, str):
+                    import json
+
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+                classification = metadata.get("classification", {})
+                top_prediction = classification.get("top_prediction", {})
+
+                # Get image ID and filename for preview
+                img_id = img.get("id", "unknown")
+                filename = metadata.get("filename", img.get("url", "unknown"))
+
+                result += f"{i}. Image ID: {img_id}\n"
+                result += (
+                    f"   URL: {img.get('url', metadata.get('source', 'unknown'))}\n"
+                )
+
+                if top_prediction:
+                    label = top_prediction.get("label", "unknown")
+                    confidence = top_prediction.get("confidence", 0)
+                    result += (
+                        f"   Classification: {label} ({confidence:.2%} confidence)\n"
+                    )
+
+                if metadata.get("date_added"):
+                    result += f"   Added: {metadata.get('date_added')}\n"
+
+                # Add image preview using the special format that frontend can detect
+                result += f"\n[IMAGE:{img_id}:{filename}]\n"
+                result += "\n"
+
+            return result
+
+        except Exception as e:
+            return f"Error listing images by datetime: {str(e)}"
+
     def get_all_tools(self):
         """
         Get all tools as a list of functions for use with LlamaIndex FunctionAgent.
@@ -567,11 +716,13 @@ class RagMeTools:
             self.delete_all_documents,
             self.delete_documents_by_pattern,
             self.list_ragme_collection,
+            self.list_documents_by_datetime,
             self.find_urls_crawling_webpage,
             self.get_vector_db_info,
             self.count_documents,
             # Image-related tools
             self.write_image_to_collection,
             self.list_image_collection,
+            self.list_images_by_datetime,
             self.delete_image_from_collection,
         ]

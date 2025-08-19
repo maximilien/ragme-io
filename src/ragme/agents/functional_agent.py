@@ -71,6 +71,7 @@ You can perform the following operations:
 TEXT DOCUMENTS:
 - Add URLs to the collection using write_to_ragme_collection(urls) - IMPORTANT: Extract only the URL from user requests
 - List documents in the collection using list_ragme_collection(limit, offset)
+- List documents by date/time using list_documents_by_datetime(date_query, limit, offset) - supports natural language like "yesterday", "today", "last week", "3 days ago"
 - Count documents in the collection using count_documents(date_filter)
 - Delete specific documents using delete_document(doc_id)
 - Delete documents by URL using delete_document_by_url(url)
@@ -82,6 +83,7 @@ TEXT DOCUMENTS:
 IMAGES:
 - Add images from URLs to the image collection using write_image_to_collection(image_url)
 - List images in the image collection using list_image_collection(limit, offset)
+- List images by date/time using list_images_by_datetime(date_query, limit, offset) - supports natural language like "yesterday", "today", "last week", "3 days ago"
 - Delete images from the collection using delete_image_from_collection(image_id)
 
 GENERAL:
@@ -96,6 +98,8 @@ For functional queries like:
 - "delete image with ID abc" → call delete_image_from_collection("abc")
 - "delete document https://example.com" → call delete_document_by_url("https://example.com")
 - "list all documents" or "list all images" → call list_ragme_collection() or list_image_collection()
+- "list yesterday's documents" or "list today's images" → call list_documents_by_datetime("yesterday") or list_images_by_datetime("today")
+- "list documents from last week" or "show me images from 3 days ago" → call list_documents_by_datetime("last week") or list_images_by_datetime("3 days ago")
 - "count documents" or "how many documents are there?" → call count_documents()
 - "count documents from this week/month/year" → call count_documents("current"/"month"/"year")
 - "delete all documents matching pattern test_*" → call delete_documents_by_pattern("test_*")
@@ -117,7 +121,13 @@ When deleting documents:
 For images:
 - When adding images, use write_image_to_collection(image_url) with the image URL
 - When listing images, use list_image_collection(limit, offset)
+- When listing images by date/time, use list_images_by_datetime(date_query, limit, offset) with natural language date queries
 - When deleting images, use delete_image_from_collection(image_id)
+
+For date/time queries:
+- Use list_documents_by_datetime(date_query) for documents with natural language date queries
+- Use list_images_by_datetime(date_query) for images with natural language date queries
+- Supported date queries: "today", "yesterday", "this week", "last week", "this month", "last month", "this year", "last year", "X days ago", "X weeks ago", "X months ago"
 
 DO NOT answer questions about document content or image content - that should be handled by the QueryAgent.
 Focus only on functional operations that modify or query the collection structure.
@@ -182,29 +192,99 @@ Focus only on functional operations that modify or query the collection structur
     def _is_list_query(self, query: str) -> bool:
         """Check if the query is asking to list something."""
         query_lower = query.lower().strip()
-        return query_lower.startswith("list ")
+
+        # Check for explicit "list" commands
+        if query_lower.startswith("list "):
+            return True
+
+        # Check for date-based queries that are implicitly listing operations
+        datetime_keywords = [
+            "today",
+            "yesterday",
+            "this week",
+            "last week",
+            "this month",
+            "last month",
+            "this year",
+            "last year",
+        ]
+        has_datetime = any(keyword in query_lower for keyword in datetime_keywords)
+        has_images_or_docs = any(
+            term in query_lower
+            for term in ["images", "image", "documents", "docs", "document"]
+        )
+
+        return has_datetime and has_images_or_docs
 
     def _handle_list_directly(self, query: str) -> str:
         """Handle list operations directly without going through the LLM."""
         query_lower = query.lower().strip()
 
+        # Check for datetime queries first
+        datetime_keywords = [
+            "today",
+            "yesterday",
+            "this week",
+            "last week",
+            "this month",
+            "last month",
+            "this year",
+            "last year",
+        ]
+        datetime_query = None
+        for keyword in datetime_keywords:
+            if keyword in query_lower:
+                datetime_query = keyword
+                break
+
+        # Also check for "X days ago" pattern
+        import re
+
+        days_ago_match = re.search(r"(\d+)\s+days?\s+ago", query_lower)
+        if days_ago_match:
+            datetime_query = f"{days_ago_match.group(1)} days ago"
+
         # Extract what to list
         if "images" in query_lower or "image" in query_lower:
-            logger.info("FunctionalAgent handling list images directly")
-            return self.tools.list_image_collection(limit=10, offset=0)
+            if datetime_query:
+                logger.info(
+                    f"FunctionalAgent handling list images by datetime: {datetime_query}"
+                )
+                return self.tools.list_images_by_datetime(
+                    datetime_query, limit=10, offset=0
+                )
+            else:
+                logger.info("FunctionalAgent handling list images directly")
+                return self.tools.list_image_collection(limit=10, offset=0)
         elif (
             "documents" in query_lower
             or "docs" in query_lower
             or "document" in query_lower
         ):
-            logger.info("FunctionalAgent handling list documents directly")
-            return self.tools.list_ragme_collection(limit=10, offset=0)
+            if datetime_query:
+                logger.info(
+                    f"FunctionalAgent handling list documents by datetime: {datetime_query}"
+                )
+                return self.tools.list_documents_by_datetime(
+                    datetime_query, limit=10, offset=0
+                )
+            else:
+                logger.info("FunctionalAgent handling list documents directly")
+                return self.tools.list_ragme_collection(limit=10, offset=0)
         else:
             # Default to listing documents if no specific type mentioned
-            logger.info(
-                "FunctionalAgent handling list (defaulting to documents) directly"
-            )
-            return self.tools.list_ragme_collection(limit=10, offset=0)
+            if datetime_query:
+                logger.info(
+                    f"FunctionalAgent handling list documents by datetime: {datetime_query}"
+                )
+                return self.tools.list_documents_by_datetime(
+                    datetime_query, limit=10, offset=0
+                )
+            else:
+                logger.info(
+                    "FunctionalAgent handling list (defaulting to documents) directly"
+                )
+                return self.tools.list_ragme_collection(limit=10, offset=0)
 
     def _preprocess_query(self, query: str) -> str:
         """

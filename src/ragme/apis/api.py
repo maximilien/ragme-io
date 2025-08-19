@@ -311,8 +311,20 @@ def filter_documents_by_date(
 
         try:
             # Parse the date_added string
-            date_added = datetime.fromisoformat(date_added_str.replace("Z", "+00:00"))
-            if date_added >= cutoff_date:
+            if date_added_str.endswith("Z"):
+                # Handle UTC time (with Z suffix)
+                date_added = datetime.fromisoformat(
+                    date_added_str.replace("Z", "+00:00")
+                )
+                # Convert to local time for consistent comparison
+                date_added_local = date_added.astimezone()
+            else:
+                # Handle local time (no timezone suffix)
+                date_added_local = datetime.fromisoformat(date_added_str)
+
+            # Make date_added_local naive for comparison with cutoff_date (which is also naive)
+            date_added_naive = date_added_local.replace(tzinfo=None)
+            if date_added_naive >= cutoff_date:
                 filtered_documents.append(doc)
         except (ValueError, TypeError):
             # If date parsing fails, include the document

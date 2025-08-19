@@ -347,6 +347,7 @@ You have access to two specialized tools:
    - Adding URLs to the collection (e.g., "add example.com", "add this URL")
    - Deleting documents or images
    - Listing documents or images (e.g., "list images", "list documents", "show me all images")
+   - Date-based listing queries (e.g., "yesterday's images", "today's documents", "last week's docs")
    - Counting documents
    - Resetting the collection
    - Crawling webpages
@@ -367,6 +368,7 @@ CRITICAL RULES:
 - If the user wants to KNOW something (ask questions, search content, get information), use content_questions
 - You have conversation memory, so you can reference previous context
 - IMPORTANT: "list images" and "show me images" are ALWAYS functional operations, not content questions
+- IMPORTANT: Date-based queries like "yesterday's images", "today's documents", "last week's docs" are ALWAYS functional operations
 
 Examples:
 - "add maximilien.org" → use functional_operations (adding URL)
@@ -374,6 +376,9 @@ Examples:
 - "list documents" → use functional_operations (listing collection)
 - "list images" → use functional_operations (listing images)
 - "show me all images" → use functional_operations (listing images)
+- "yesterday's images" → use functional_operations (date-based listing)
+- "today's documents" → use functional_operations (date-based listing)
+- "last week's docs" → use functional_operations (date-based listing)
 - "delete document 123" → use functional_operations (deleting)
 - "count documents" → use functional_operations (counting)
 - "what does the document say?" → use content_questions (content query)
@@ -454,10 +459,33 @@ Examples:
 
             # Check for specific functional operations that should bypass LLM routing
             query_lower = query.lower().strip()
+
+            # Direct routing for list operations
             if query_lower.startswith("list ") and (
                 "images" in query_lower or "image" in query_lower
             ):
                 logger.info("Direct routing to FunctionalAgent for list images query")
+                return await self.functional_agent.run(query)
+
+            # Direct routing for date-based queries (these are always functional operations)
+            datetime_keywords = [
+                "today",
+                "yesterday",
+                "this week",
+                "last week",
+                "this month",
+                "last month",
+                "this year",
+                "last year",
+            ]
+            has_datetime = any(keyword in query_lower for keyword in datetime_keywords)
+            has_images_or_docs = any(
+                term in query_lower
+                for term in ["images", "image", "documents", "docs", "document"]
+            )
+
+            if has_datetime and has_images_or_docs:
+                logger.info("Direct routing to FunctionalAgent for date-based query")
                 return await self.functional_agent.run(query)
 
             # Use the ReActAgent to intelligently dispatch the query with memory
