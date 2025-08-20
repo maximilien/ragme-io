@@ -12,7 +12,15 @@ class RAGmeAssistant {
             autoRefresh: true,
             refreshInterval: 30000, // 30 seconds
             maxTokens: 4000,
-            temperature: 0.7
+            temperature: 0.7,
+            showVectorDbInfo: true,
+            maxDocuments: 10,
+            documentOverviewEnabled: true,
+            documentOverviewVisible: true,
+            documentListCollapsed: false,
+            documentListWidth: 35,
+            chatHistoryCollapsed: false,
+            chatHistoryWidth: 10
         };
         this.currentDateFilter = 'current';
         this.currentContentFilter = 'both'; // Default to show both documents and images
@@ -70,6 +78,14 @@ class RAGmeAssistant {
         this.setupResizeDivider();
         this.setupVisualizationResize();
         this.loadSettings();
+        
+        // Apply UI configuration after loading both config and localStorage settings
+        // Use a small delay to ensure DOM elements are ready
+        setTimeout(() => {
+            console.log('Applying UI configuration...');
+            this.applyUIConfiguration();
+        }, 50);
+        
         this.loadChatSessions();
         this.renderChatHistory(); // Render chat history after loading
         this.loadVectorDbInfo();
@@ -114,9 +130,33 @@ class RAGmeAssistant {
                 // Update UI settings
                 if (this.config.frontend && this.config.frontend.ui) {
                     const uiConfig = this.config.frontend.ui;
+                    
+                    // Basic UI settings
                     this.currentDateFilter = uiConfig.default_date_filter || this.currentDateFilter;
                     this.currentVisualizationType = uiConfig.default_visualization || this.currentVisualizationType;
                     this.isVisualizationVisible = uiConfig.visualization_visible !== undefined ? uiConfig.visualization_visible : this.isVisualizationVisible;
+                    
+                    // Vector DB info display
+                    this.settings.showVectorDbInfo = uiConfig.show_vector_db_info !== undefined ? uiConfig.show_vector_db_info : this.settings.showVectorDbInfo;
+                    
+                    // Document list settings
+                    this.settings.maxDocuments = uiConfig.max_documents || 10;
+                    this.settings.documentOverviewEnabled = uiConfig.document_overview_enabled !== undefined ? uiConfig.document_overview_enabled : true;
+                    this.settings.documentOverviewVisible = uiConfig.document_overview_visible !== undefined ? uiConfig.document_overview_visible : true;
+                    this.settings.documentListCollapsed = uiConfig.document_list_collapsed !== undefined ? uiConfig.document_list_collapsed : false;
+                    this.settings.documentListWidth = uiConfig.document_list_width || 35;
+                    
+                    console.log('Loaded UI settings from config:', {
+                        maxDocuments: this.settings.maxDocuments,
+                        documentOverviewEnabled: this.settings.documentOverviewEnabled,
+                        documentOverviewVisible: this.settings.documentOverviewVisible,
+                        documentListCollapsed: this.settings.documentListCollapsed,
+                        chatHistoryCollapsed: this.settings.chatHistoryCollapsed
+                    });
+                    
+                    // Chat History settings
+                    this.settings.chatHistoryCollapsed = uiConfig.chat_history_collapsed !== undefined ? uiConfig.chat_history_collapsed : false;
+                    this.settings.chatHistoryWidth = uiConfig.chat_history_width || 10;
                 }
                 
                 // Update page title and branding
@@ -139,6 +179,168 @@ class RAGmeAssistant {
         } catch (error) {
             console.warn('Failed to load configuration:', error);
         }
+    }
+
+    applyUIConfiguration() {
+        // Apply Vector DB info display setting
+        this.updateVectorDbInfoDisplay();
+        
+        // Apply document list settings
+        this.applyDocumentListSettings();
+        
+        // Apply chat history settings
+        this.applyChatHistorySettings();
+        
+        // Apply document overview settings
+        this.applyDocumentOverviewSettings();
+    }
+
+    applyDocumentListSettings() {
+        const documentsSidebar = document.getElementById('documentsSidebar');
+        if (!documentsSidebar) {
+            console.warn('Documents sidebar element not found');
+            return;
+        }
+        
+        console.log('Applying document list settings:', {
+            width: this.settings.documentListWidth,
+            collapsed: this.settings.documentListCollapsed
+        });
+        
+        // Apply width
+        documentsSidebar.style.width = `${this.settings.documentListWidth}%`;
+        console.log('Set documents sidebar width to:', `${this.settings.documentListWidth}%`);
+        
+        // Apply collapsed state
+        if (this.settings.documentListCollapsed) {
+            documentsSidebar.classList.add('collapsed');
+            console.log('Documents sidebar collapsed');
+            // Show restore button
+            const restoreBtn = document.getElementById('restoreDocumentsBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'block';
+            }
+        } else {
+            documentsSidebar.classList.remove('collapsed');
+            console.log('Documents sidebar expanded');
+            // Hide restore button
+            const restoreBtn = document.getElementById('restoreDocumentsBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'none';
+            }
+        }
+        
+        // Ensure main content area fills the space when documents sidebar is collapsed
+        const chatMainArea = document.querySelector('.chat-main-area');
+        if (chatMainArea) {
+            if (this.settings.documentListCollapsed) {
+                chatMainArea.style.marginRight = '0';
+            } else {
+                chatMainArea.style.marginRight = '';
+            }
+        }
+    }
+
+    applyChatHistorySettings() {
+        const chatHistorySidebar = document.getElementById('chatHistorySidebar');
+        if (!chatHistorySidebar) {
+            console.warn('Chat history sidebar element not found');
+            return;
+        }
+        
+        console.log('Applying chat history settings:', {
+            width: this.settings.chatHistoryWidth,
+            collapsed: this.settings.chatHistoryCollapsed
+        });
+        
+        // Apply width
+        chatHistorySidebar.style.width = `${this.settings.chatHistoryWidth}%`;
+        console.log('Set chat history sidebar width to:', `${this.settings.chatHistoryWidth}%`);
+        
+        // Apply collapsed state
+        if (this.settings.chatHistoryCollapsed) {
+            chatHistorySidebar.classList.add('collapsed');
+            console.log('Chat history sidebar collapsed');
+            // Show restore button
+            const restoreBtn = document.getElementById('restoreSidebarBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'block';
+            }
+        } else {
+            chatHistorySidebar.classList.remove('collapsed');
+            console.log('Chat history sidebar expanded');
+            // Hide restore button
+            const restoreBtn = document.getElementById('restoreSidebarBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'none';
+            }
+        }
+        
+        // Ensure chat main area fills the space when sidebar is collapsed
+        const chatMainArea = document.querySelector('.chat-main-area');
+        if (chatMainArea) {
+            if (this.settings.chatHistoryCollapsed) {
+                chatMainArea.style.marginLeft = '0';
+            } else {
+                chatMainArea.style.marginLeft = '';
+            }
+        }
+    }
+
+    applyDocumentOverviewSettings() {
+        const visualization = document.getElementById('documentsVisualization');
+        if (!visualization) {
+            console.warn('Document visualization element not found');
+            return;
+        }
+        
+        console.log('Applying document overview settings:', {
+            enabled: this.settings.documentOverviewEnabled,
+            visible: this.settings.documentOverviewVisible
+        });
+        
+        // Apply enabled/disabled state
+        if (!this.settings.documentOverviewEnabled) {
+            visualization.style.display = 'none';
+            console.log('Document overview disabled - hiding completely');
+            return;
+        }
+        
+        visualization.style.display = 'block';
+        
+        // Apply visible/hidden state
+        if (!this.settings.documentOverviewVisible) {
+            visualization.classList.add('hidden');
+            console.log('Document overview hidden - adding hidden class');
+            // Update toggle button
+            const toggleBtn = document.getElementById('visualizationToggleBtn');
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-eye';
+                }
+            }
+        } else {
+            visualization.classList.remove('hidden');
+            console.log('Document overview visible - removing hidden class');
+            // Update toggle button
+            const toggleBtn = document.getElementById('visualizationToggleBtn');
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-eye-slash';
+                }
+            }
+        }
+    }
+
+    // Debug method to clear localStorage settings
+    clearLocalStorageSettings() {
+        localStorage.removeItem('ragme-document-overview-visible');
+        localStorage.removeItem('ragme-document-overview-enabled');
+        localStorage.removeItem('ragme-document-list-collapsed');
+        localStorage.removeItem('ragme-chat-history-collapsed');
+        console.log('Cleared localStorage settings');
     }
 
     connectSocket() {
@@ -1566,7 +1768,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const deltaX = startX - e.clientX;
             const newWidth = startWidth + deltaX;
             
-            if (newWidth > 200 && newWidth < window.innerWidth * 0.8) {
+            // Use configuration-based limits
+            const minWidth = 200;
+            const maxWidth = window.innerWidth * (this.settings.documentListWidth / 100);
+            
+            if (newWidth > minWidth && newWidth < maxWidth) {
                 documentsSidebar.style.width = newWidth + 'px';
             }
         });
@@ -1655,8 +1861,20 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     showSettingsModal() {
         this.showModal('settingsModal');
+        
+        // Populate general settings
         document.getElementById('maxDocuments').value = this.settings.maxDocuments;
         document.getElementById('showVectorDbInfo').checked = this.settings.showVectorDbInfo;
+        
+        // Populate document list settings
+        document.getElementById('documentOverviewEnabled').checked = this.settings.documentOverviewEnabled;
+        document.getElementById('documentOverviewVisible').checked = this.settings.documentOverviewVisible;
+        document.getElementById('documentListCollapsed').checked = this.settings.documentListCollapsed;
+        document.getElementById('documentListWidth').value = this.settings.documentListWidth;
+        
+        // Populate chat history settings
+        document.getElementById('chatHistoryCollapsed').checked = this.settings.chatHistoryCollapsed;
+        document.getElementById('chatHistoryWidth').value = this.settings.chatHistoryWidth;
     }
 
     showModal(modalId) {
@@ -1989,24 +2207,54 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     saveSettings() {
         const maxDocuments = parseInt(document.getElementById('maxDocuments').value);
         const showVectorDbInfo = document.getElementById('showVectorDbInfo').checked;
+        const documentOverviewEnabled = document.getElementById('documentOverviewEnabled').checked;
+        const documentOverviewVisible = document.getElementById('documentOverviewVisible').checked;
+        const documentListCollapsed = document.getElementById('documentListCollapsed').checked;
+        const documentListWidth = parseInt(document.getElementById('documentListWidth').value);
+        const chatHistoryCollapsed = document.getElementById('chatHistoryCollapsed').checked;
+        const chatHistoryWidth = parseInt(document.getElementById('chatHistoryWidth').value);
         
         if (maxDocuments < 1 || maxDocuments > 100) {
             this.showNotification('error', 'Max documents must be between 1 and 100');
             return;
         }
+        
+        if (documentListWidth < 10 || documentListWidth > 50) {
+            this.showNotification('error', 'Document list width must be between 10% and 50%');
+            return;
+        }
+        
+        if (chatHistoryWidth < 10 || chatHistoryWidth > 40) {
+            this.showNotification('error', 'Chat history width must be between 10% and 40%');
+            return;
+        }
 
+        // Update settings
         this.settings.maxDocuments = maxDocuments;
         this.settings.showVectorDbInfo = showVectorDbInfo;
-        localStorage.setItem('ragme-settings', JSON.stringify(this.settings));
+        this.settings.documentOverviewEnabled = documentOverviewEnabled;
+        this.settings.documentOverviewVisible = documentOverviewVisible;
+        this.settings.documentListCollapsed = documentListCollapsed;
+        this.settings.documentListWidth = documentListWidth;
+        this.settings.chatHistoryCollapsed = chatHistoryCollapsed;
+        this.settings.chatHistoryWidth = chatHistoryWidth;
         
-        // Save date filter preference
+        // Save to localStorage
+        localStorage.setItem('ragme-settings', JSON.stringify(this.settings));
         localStorage.setItem('ragme-date-filter', this.currentDateFilter);
+        localStorage.setItem('ragme-max-documents', maxDocuments.toString());
+        localStorage.setItem('ragme-document-overview-enabled', documentOverviewEnabled.toString());
+        localStorage.setItem('ragme-document-overview-visible', documentOverviewVisible.toString());
+        localStorage.setItem('ragme-document-list-collapsed', documentListCollapsed.toString());
+        localStorage.setItem('ragme-document-list-width', documentListWidth.toString());
+        localStorage.setItem('ragme-chat-history-collapsed', chatHistoryCollapsed.toString());
+        localStorage.setItem('ragme-chat-history-width', chatHistoryWidth.toString());
         
         this.hideModal('settingsModal');
         this.showNotification('success', 'Settings saved');
         
-        // Update vector DB info display based on new setting
-        this.updateVectorDbInfoDisplay();
+        // Apply UI changes
+        this.applyUIConfiguration();
         
         // Reload documents with new settings
         this.loadDocuments();
@@ -2056,6 +2304,48 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const visualizationTypeSelector = document.getElementById('visualizationTypeSelector');
         if (visualizationTypeSelector) {
             visualizationTypeSelector.value = this.currentVisualizationType;
+        }
+        
+        // Load UI layout preferences
+        const savedDocumentListCollapsed = localStorage.getItem('ragme-document-list-collapsed');
+        if (savedDocumentListCollapsed !== null) {
+            this.settings.documentListCollapsed = savedDocumentListCollapsed === 'true';
+        }
+        
+        const savedChatHistoryCollapsed = localStorage.getItem('ragme-chat-history-collapsed');
+        if (savedChatHistoryCollapsed !== null) {
+            this.settings.chatHistoryCollapsed = savedChatHistoryCollapsed === 'true';
+        }
+        
+        const savedDocumentListWidth = localStorage.getItem('ragme-document-list-width');
+        if (savedDocumentListWidth) {
+            this.settings.documentListWidth = parseInt(savedDocumentListWidth);
+        }
+        
+        const savedChatHistoryWidth = localStorage.getItem('ragme-chat-history-width');
+        if (savedChatHistoryWidth) {
+            this.settings.chatHistoryWidth = parseInt(savedChatHistoryWidth);
+        }
+        
+        const savedDocumentOverviewEnabled = localStorage.getItem('ragme-document-overview-enabled');
+        if (savedDocumentOverviewEnabled !== null) {
+            this.settings.documentOverviewEnabled = savedDocumentOverviewEnabled === 'true';
+        }
+        
+        const savedDocumentOverviewVisible = localStorage.getItem('ragme-document-overview-visible');
+        if (savedDocumentOverviewVisible !== null) {
+            // Only override if not explicitly set by configuration
+            if (this.settings.documentOverviewVisible === undefined) {
+                this.settings.documentOverviewVisible = savedDocumentOverviewVisible === 'true';
+                console.log('Loaded document overview visible from localStorage:', this.settings.documentOverviewVisible);
+            } else {
+                console.log('Keeping document overview visible from configuration:', this.settings.documentOverviewVisible);
+            }
+        }
+        
+        const savedMaxDocuments = localStorage.getItem('ragme-max-documents');
+        if (savedMaxDocuments) {
+            this.settings.maxDocuments = parseInt(savedMaxDocuments);
         }
     }
 

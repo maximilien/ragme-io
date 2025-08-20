@@ -176,6 +176,52 @@ The configuration system allows you to customize:
 
 **🔄 Environment Switching:** Switch between different application environments (e.g., RAGme ↔ YourFancyRAG) by simply changing the `.env` file and restarting with `./stop.sh && ./start.sh`. All configuration changes (APPLICATION_*, VECTOR_DB_TYPE, collection names) take effect immediately.
 
+### 🎨 UI Settings Configuration (NEW!)
+
+RAGme now includes comprehensive UI settings that can be configured both in `config.yaml` and through the Settings menu in the frontend:
+
+#### 📋 Configurable UI Settings
+
+**🔧 General Settings:**
+- **Max Documents**: Maximum number of documents to display (1-100)
+- **Show Vector DB Info**: Display vector database type and collection information in the header
+
+**📄 Document List Settings:**
+- **Document Overview Enabled**: Enable or disable the document overview visualization
+- **Document Overview Visible**: Show or hide the document overview by default
+- **Document List Collapsed**: Start with the document list pane collapsed
+- **Document List Width**: Width of the document list pane as percentage of total width (10-50%, default: 35%)
+
+**💬 Chat History Settings:**
+- **Chat History Collapsed**: Start with the chat history pane collapsed
+- **Chat History Width**: Width of the chat history pane as percentage of total width (10-40%, default: 10%)
+
+#### ⚙️ Configuration Methods
+
+**1. Backend Configuration (`config.yaml`):**
+```yaml
+frontend:
+  ui:
+    show_vector_db_info: true
+    document_overview_enabled: true
+    document_overview_visible: true
+    document_list_collapsed: false
+    document_list_width: 35
+    chat_history_collapsed: false
+    chat_history_width: 10
+```
+
+**2. Frontend Settings Menu:**
+- Access via the hamburger menu → Settings
+- All settings are automatically saved to browser localStorage
+- Settings persist across browser sessions
+- Changes take effect immediately
+
+**3. Default Values:**
+- All settings have sensible defaults that work well for most users
+- Settings can be overridden at any time through the UI or configuration file
+- Backend configuration takes precedence over frontend settings on page load/refresh
+
 ### Multiple Collections Support (Text + Images)
 
 RAGme supports multiple collections per vector database to enable different content types such as text documents and images. Configure in `config.yaml` under each database as a `collections` array:

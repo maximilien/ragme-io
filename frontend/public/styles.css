@@ -254,7 +254,6 @@ body {
 
 /* Sidebar styles */
 .chat-history-sidebar {
-    width: 20%;
     min-width: 250px;
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
@@ -266,10 +265,12 @@ body {
 }
 
 .chat-history-sidebar.collapsed {
-    transform: translateX(-100%);
-    width: 0;
-    min-width: 0;
-    overflow: hidden;
+    display: none;
+}
+
+/* Hidden class for document overview */
+.documents-visualization.hidden {
+    display: none;
 }
 
 .chat-history-list {
@@ -454,7 +455,6 @@ body {
 }
 
 .documents-sidebar {
-    width: 30%;
     min-width: 300px;
     max-width: 500px;
     background: rgba(255, 255, 255, 0.9);
@@ -467,14 +467,7 @@ body {
 }
 
 .documents-sidebar.collapsed {
-    transform: translateX(100%);
-    width: 0;
-    min-width: 0;
-    max-width: 0;
-    overflow: hidden;
-    border-left: none;
-    margin-left: 0;
-    padding-left: 0;
+    display: none;
 }
 
 .sidebar-header {
@@ -2382,7 +2375,8 @@ body {
     background: white;
     border-radius: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    max-width: 90vw;
+    width: 50vw;
+    max-width: 50vw;
     max-height: 90vh;
     overflow: hidden;
     transform: scale(0.9);
@@ -2799,6 +2793,19 @@ body {
 /* Setting item styles */
 .setting-item {
     margin-bottom: 1.5rem;
+}
+
+.modal-body h4 {
+    margin: 1.5rem 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    color: #374151;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.modal-body h4:first-child {
+    margin-top: 0;
 }
 
 .setting-item label {

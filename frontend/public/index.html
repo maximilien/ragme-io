@@ -354,6 +354,7 @@
                 </button>
             </div>
             <div class="modal-body">
+                <h4>General Settings</h4>
                 <div class="setting-item">
                     <label for="maxDocuments">Max Documents:</label>
                     <input type="number" id="maxDocuments" value="20" min="1" max="100">
@@ -366,6 +367,48 @@
                     </label>
                     <small>Display vector database type and collection information in the header</small>
                 </div>
+                
+                <h4>Document List Settings</h4>
+                <div class="setting-item">
+                    <label for="documentOverviewEnabled">
+                        <input type="checkbox" id="documentOverviewEnabled" checked>
+                        Document Overview Enabled
+                    </label>
+                    <small>Enable or disable the document overview visualization</small>
+                </div>
+                <div class="setting-item">
+                    <label for="documentOverviewVisible">
+                        <input type="checkbox" id="documentOverviewVisible" checked>
+                        Document Overview Visible
+                    </label>
+                    <small>Show or hide the document overview by default</small>
+                </div>
+                <div class="setting-item">
+                    <label for="documentListCollapsed">
+                        <input type="checkbox" id="documentListCollapsed">
+                        Document List Collapsed
+                    </label>
+                    <small>Start with the document list pane collapsed</small>
+                </div>
+                <div class="setting-item">
+                    <label for="documentListWidth">Document List Width (%):</label>
+                                            <input type="number" id="documentListWidth" value="35" min="10" max="50">
+                    <small>Width of the document list pane as percentage of total width (10-50%)</small>
+                </div>
+                
+                <h4>Chat History Settings</h4>
+                <div class="setting-item">
+                    <label for="chatHistoryCollapsed">
+                        <input type="checkbox" id="chatHistoryCollapsed">
+                        Chat History Collapsed
+                    </label>
+                    <small>Start with the chat history pane collapsed</small>
+                </div>
+                                    <div class="setting-item">
+                        <label for="chatHistoryWidth">Chat History Width (%):</label>
+                        <input type="number" id="chatHistoryWidth" value="10" min="10" max="40">
+                        <small>Width of the chat history pane as percentage of total width (10-40%)</small>
+                    </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
