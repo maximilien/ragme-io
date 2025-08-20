@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
 - **🖼️ AI-Powered Image Support**: Complete image processing pipeline with PyTorch ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
 - **🎯 Enhanced AI Image Summaries**: Fixed image summary generation to show rich classification data with confidence scores and file information. Images now display meaningful summaries like "Yorkshire terrier with 95.1% confidence" ⭐ **FIXED!**
 - **🧹 Clean PyTorch Codebase**: Removed all TensorFlow dependencies and updated to PyTorch-only implementation with proper dependency management ⭐ **CLEANED!**
@@ -328,6 +329,7 @@ A modern, responsive web interface with three-pane layout:
 
 **Key Features**:
 - **Real-time chat** with markdown support and copy functionality
+- **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API
 - **🔧 MCP Server Tools**: Configure and enable/disable MCP tool servers (Google Drive, Dropbox, Gmail, Twilio, RAGme Test)
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history
 - **Quick New Chat**: "+" button in chat history sidebar for instant new chat creation

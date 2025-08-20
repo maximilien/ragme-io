@@ -6,6 +6,7 @@ A modern, responsive web interface for the RAGme.io Assistant, built with TypeSc
 
 - **Three-pane layout** with resizable and collapsible sidebars
 - **Real-time chat** with markdown support and copy functionality
+- **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API
 - **Document management** with visual D3.js charts
 - **Content addition** via URLs or JSON data
 - **Modern UI** with smooth animations and responsive design

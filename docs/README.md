@@ -140,6 +140,7 @@ See [CI_CD.md](CI_CD.md) for detailed testing information.
 
 ### User Interfaces
 - **New Frontend**: Modern three-pane layout with real-time features ⭐ **DEFAULT**
+  - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API
   - **MCP Server Tools**: Configure and enable/disable MCP tool servers
   - **Recent Prompts & Ideas**: Quick access to sample prompts and chat history
   - **Interactive Visualizations**: D3.js charts with click-to-scroll functionality
