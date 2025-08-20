@@ -195,18 +195,31 @@ mcp_servers:
 frontend:
   # Default user settings
   settings:
-    max_documents: 50
+    max_documents: 10  # Max documents to list before pagination
     auto_refresh: true
     refresh_interval_ms: 30000  # 30 seconds
     max_tokens: 4000
     temperature: 0.7
     
-  # UI behavior
+  # UI behavior and layout settings
   ui:
+    # Vector DB and Collections display
+    show_vector_db_info: true  # Show/hide "Vector DB and Collections" on top pane
+    
+    # Document list settings
+    document_overview_enabled: true  # Document Overview enabled/disabled (default)
+    document_overview_visible: true  # Document Overview show/hide (default)
+    document_list_collapsed: false  # Document List pane collapse or showing (default)
+    document_list_width: 35  # Document List width size (default 35% of total width)
+    
+    # Chat History settings
+    chat_history_collapsed: false  # Chat History collapse or showing (default)
+    chat_history_width: 10  # Chat History width size (default 10% of total width)
+    
+    # Other UI settings
     default_date_filter: "current"  # Options: current, month, year, all
     default_visualization: "graph"  # Options: graph, chart, table
     visualization_visible: true
-    show_vector_db_info: true
     
   # Document limits
   documents:

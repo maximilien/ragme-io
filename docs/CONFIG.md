@@ -108,16 +108,46 @@ mcp_servers:
 ### 🎨 Frontend Configuration
 ```yaml
 frontend:
+  # General settings
   settings:
     max_documents: 50
     auto_refresh: true
     refresh_interval_ms: 30000
     max_tokens: 4000
     temperature: 0.7
+    
+  # UI behavior and layout settings
   ui:
-    default_date_filter: "current"
-    default_visualization: "graph"
+    # Vector DB and Collections display
+    show_vector_db_info: true  # Show/hide "Vector DB and Collections" on top pane
+    
+    # Document list settings
+    max_document_number: 10  # Max document number to list before pagination
+    document_overview_enabled: true  # Document Overview enabled/disabled
+    document_overview_visible: true  # Document Overview show/hide
+    document_list_collapsed: false  # Document List pane collapse or showing
+    document_list_width: 35  # Document List width size (percentage of total width)
+    
+    # Chat History settings
+    chat_history_collapsed: false  # Chat History collapse or showing
+    chat_history_width: 10  # Chat History width size (percentage of total width)
+    
+    # Other UI settings
+    default_date_filter: "current"  # Options: current, month, year, all
+    default_visualization: "graph"  # Options: graph, chart, table
     visualization_visible: true
+    
+  # Document limits
+  documents:
+    max_display: 100
+    default_limit: 50
+    pagination_size: 20
+    
+  # Connection settings
+  connection:
+    retry_attempts: 3
+    retry_delay_ms: 5000
+    timeout_ms: 30000
 ```
 
 ### 🎯 Client Customization
@@ -352,6 +382,112 @@ monitoring:
     - "document_count"
     - "query_count"
     - "response_time"
+```
+
+## 🎨 UI Settings Configuration
+
+### Overview
+
+RAGme's UI settings can be configured through both backend configuration (`config.yaml`) and frontend settings menu. The system provides comprehensive control over the interface layout and behavior.
+
+### Configuration Methods
+
+#### 1. Backend Configuration (`config.yaml`)
+
+UI settings are defined in the `frontend.ui` section of your configuration file:
+
+```yaml
+frontend:
+  ui:
+    # Vector DB and Collections display
+    show_vector_db_info: true
+    
+    # Document list settings
+    document_overview_enabled: true
+    document_overview_visible: true
+    document_list_collapsed: false
+    document_list_width: 35
+    
+    # Chat History settings
+    chat_history_collapsed: false
+    chat_history_width: 10
+    
+    # Other UI settings
+    default_date_filter: "current"
+    default_visualization: "graph"
+    visualization_visible: true
+```
+
+#### 2. Frontend Settings Menu
+
+Users can also configure UI settings through the frontend interface:
+
+1. **Access Settings**: Click the hamburger menu → Settings
+2. **Configure Options**: Modify settings in the organized sections
+3. **Save Changes**: Click "Save" to apply changes immediately
+4. **Persistence**: Settings are automatically saved to browser localStorage
+
+### Available Settings
+
+#### 🔧 General Settings
+- **Max Documents**: Maximum number of documents to display (1-100)
+- **Show Vector DB Info**: Display vector database type and collection information in the header
+
+#### 📄 Document List Settings
+- **Document Overview Enabled**: Enable or disable the document overview visualization
+- **Document Overview Visible**: Show or hide the document overview by default
+- **Document List Collapsed**: Start with the document list pane collapsed
+- **Document List Width**: Width of the document list pane as percentage of total width (10-50%, default: 35%)
+
+#### 💬 Chat History Settings
+- **Chat History Collapsed**: Start with the chat history pane collapsed
+- **Chat History Width**: Width of the chat history pane as percentage of total width (10-40%, default: 10%)
+
+### Configuration Precedence
+
+1. **Backend Configuration**: Settings in `config.yaml` take precedence on page load/refresh
+2. **Frontend Settings**: User changes through the settings menu override backend defaults
+3. **Local Storage**: Frontend settings persist across browser sessions
+4. **Real-time Application**: Changes take effect immediately without page refresh
+
+### Example Configurations
+
+#### Default Configuration
+```yaml
+frontend:
+  ui:
+    show_vector_db_info: true
+    document_overview_enabled: true
+    document_overview_visible: true
+    document_list_collapsed: false
+    document_list_width: 35
+    chat_history_collapsed: false
+    chat_history_width: 10
+```
+
+#### Compact Layout
+```yaml
+frontend:
+  ui:
+    show_vector_db_info: false
+    document_overview_enabled: false
+    document_list_collapsed: true
+    document_list_width: 20
+    chat_history_collapsed: true
+    chat_history_width: 12
+```
+
+#### Wide Document View
+```yaml
+frontend:
+  ui:
+    show_vector_db_info: true
+    document_overview_enabled: true
+    document_overview_visible: true
+    document_list_collapsed: false
+    document_list_width: 40
+    chat_history_collapsed: false
+    chat_history_width: 15
 ```
 
 ## 🔄 Dynamic Configuration
