@@ -69,6 +69,22 @@ The CI pipeline uploads test artifacts:
 
 ## 🛠️ Local Development
 
+### Automated Setup for CI/CD
+
+For CI/CD environments or automated testing, use the non-interactive setup script:
+
+```bash
+# Run the CI setup script (non-interactive)
+./setup-ci.sh
+```
+
+The CI setup script:
+- ✅ Installs Python dependencies using uv
+- ✅ Installs Node.js dependencies using npm ci
+- ✅ Runs TypeScript compilation
+- ✅ Executes unit tests
+- ✅ Provides minimal output for CI environments
+
 ### Running Tests Locally
 
 ```bash
