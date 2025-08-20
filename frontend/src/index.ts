@@ -76,7 +76,7 @@ async function loadConfiguration() {
     } else {
       logger.warn('Could not load configuration from backend, using defaults');
     }
-  } catch (error) {
+  } catch {
     logger.warn('Could not connect to backend for configuration, using defaults');
   }
 }
