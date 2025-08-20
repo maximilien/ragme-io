@@ -74,7 +74,36 @@ Install and/or update the following if needed:
 4. Install [Node.js 18+](https://nodejs.org/) (for new frontend)
 5. Vector Database setup (**Weaviate recommended**, or Milvus Lite)
 
-### Get code, setup dependencies
+### 🛠️ Quick Setup (Recommended)
+
+For the fastest setup experience, use our automated setup script:
+
+```bash
+# Clone the repository
+gh repo clone maximilien/ragme-io
+cd ragme-io
+
+# Run the automated setup script
+./setup.sh
+```
+
+The setup script will:
+- ✅ Install system dependencies (Homebrew, Node.js, Python)
+- ✅ Install Python dependencies using uv
+- ✅ Install Node.js dependencies for the frontend
+- ✅ Create .env file from template
+- ✅ Run initial tests to verify setup
+- ✅ Provide next steps and useful commands
+
+**Options:**
+```bash
+./setup.sh --help              # Show all options
+./setup.sh --skip-python       # Skip Python setup
+./setup.sh --skip-node         # Skip Node.js setup
+./setup.sh --force             # Force reinstall everything
+```
+
+### Manual Setup (Alternative)
 
 ```bash
 gh repo clone maximilien/ragme-io
