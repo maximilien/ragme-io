@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
 - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
 - **🖼️ AI-Powered Image Support**: Complete image processing pipeline with PyTorch ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
 - **🎯 Enhanced AI Image Summaries**: Fixed image summary generation to show rich classification data with confidence scores and file information. Images now display meaningful summaries like "Yorkshire terrier with 95.1% confidence" ⭐ **FIXED!**
@@ -205,25 +206,39 @@ The configuration system allows you to customize:
 
 **🔄 Environment Switching:** Switch between different application environments (e.g., RAGme ↔ YourFancyRAG) by simply changing the `.env` file and restarting with `./stop.sh && ./start.sh`. All configuration changes (APPLICATION_*, VECTOR_DB_TYPE, collection names) take effect immediately.
 
-### 🎨 UI Settings Configuration (NEW!)
+### 🎨 UI Settings Configuration ⭐ **ENHANCED!**
 
-RAGme now includes comprehensive UI settings that can be configured both in `config.yaml` and through the Settings menu in the frontend:
+RAGme now features a completely redesigned Settings interface with organized tabbed layout and comprehensive configuration options from `config.yaml`:
 
-#### 📋 Configurable UI Settings
+#### 📋 Enhanced Settings Interface
+
+**⚙️ Tabbed Organization:**
+- **General Tab**: Application info, auto-refresh settings, display preferences
+- **Interface Tab**: Layout settings, panel visibility, visualization preferences  
+- **Documents Tab**: Document processing, search & filtering options
+- **Chat Tab**: AI model settings, chat history management
 
 **🔧 General Settings:**
+- **Application Information**: View app name, version, and vector database type
+- **Auto-Refresh**: Enable/disable automatic content refresh with configurable intervals
 - **Max Documents**: Maximum number of documents to display (1-100)
 - **Show Vector DB Info**: Display vector database type and collection information in the header
 
-**📄 Document List Settings:**
-- **Document Overview Enabled**: Enable or disable the document overview visualization
-- **Document Overview Visible**: Show or hide the document overview by default
-- **Document List Collapsed**: Start with the document list pane collapsed
-- **Document List Width**: Width of the document list pane as percentage of total width (10-50%, default: 35%)
+**📱 Interface Settings:**
+- **Layout Controls**: Adjustable panel widths with live preview sliders
+- **Panel Visibility**: Configure which panels start collapsed/expanded
+- **Visualization Options**: Default chart types (graph/chart/table) and date filters
+- **Document List Width**: Width of the document list pane (20-60%, default: 35%)
+- **Chat History Width**: Width of the chat history pane (5-30%, default: 10%)
 
-**💬 Chat History Settings:**
-- **Chat History Collapsed**: Start with the chat history pane collapsed
-- **Chat History Width**: Width of the chat history pane as percentage of total width (10-40%, default: 10%)
+**📄 Document Settings:**
+- **Document Overview**: Enable/disable document visualization features
+- **Display Limits**: Configure max documents and pagination size
+- **Content Filtering**: Default content type filters (documents/images/both)
+
+**🤖 Chat Settings:**
+- **AI Model Parameters**: Max tokens (1000-16000) and temperature (0-2) with live sliders
+- **Chat History Management**: History limits and auto-save preferences
 
 #### ⚙️ Configuration Methods
 
@@ -238,18 +253,25 @@ frontend:
     document_list_width: 35
     chat_history_collapsed: false
     chat_history_width: 10
+    default_date_filter: "current"
+    default_visualization: "graph"
 ```
 
-**2. Frontend Settings Menu:**
+**2. Enhanced Frontend Settings Menu:**
 - Access via the hamburger menu → Settings
-- All settings are automatically saved to browser localStorage
+- **Tabbed Interface**: Organized into logical categories for better usability
+- **Live Previews**: Range sliders with real-time value updates
+- **Proper Spacing**: Professional modal design matching other system dialogs
+- **Reset to Defaults**: One-click reset functionality
+- All settings automatically saved to browser localStorage
 - Settings persist across browser sessions
 - Changes take effect immediately
 
-**3. Default Values:**
-- All settings have sensible defaults that work well for most users
-- Settings can be overridden at any time through the UI or configuration file
-- Backend configuration takes precedence over frontend settings on page load/refresh
+**3. Improved User Experience:**
+- **Better Organization**: Settings grouped logically by functionality
+- **Visual Feedback**: Clear labels, help text, and proper form validation
+- **Responsive Design**: Works well on both desktop and mobile devices
+- **Consistent Styling**: Matches the overall application design language
 
 ### Multiple Collections Support (Text + Images)
 
