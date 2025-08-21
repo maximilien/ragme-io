@@ -258,6 +258,19 @@ class VectorDatabase(ABC):
         pass
 
     @abstractmethod
+    def find_image_by_filename(self, filename: str) -> dict[str, Any] | None:
+        """
+        Find an image by its filename in the image collection.
+
+        Args:
+            filename: Filename of the image to find
+
+        Returns:
+            Image dict if found, None if not found
+        """
+        pass
+
+    @abstractmethod
     def supports_images(self) -> bool:
         """
         Check if this vector database implementation supports image storage.

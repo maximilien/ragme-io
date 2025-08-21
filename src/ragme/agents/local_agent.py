@@ -220,7 +220,6 @@ class RagMeLocalAgent:
 
                 if response.status_code == 200:
                     result = response.json()
-                    print(json.dumps(result, indent=2))  # DEBUG
                     if result["success"]:
                         data = result["data"]["data"]
                         logging.info(f"Successfully processed PDF: {file_path}")
@@ -274,7 +273,6 @@ class RagMeLocalAgent:
 
                 if response.status_code == 200:
                     result = response.json()
-                    print(json.dumps(result, indent=2))  # DEBUG
                     if result["success"]:
                         data = result["data"]["data"]
                         logging.info(f"Successfully processed DOCX: {file_path}")
@@ -449,7 +447,6 @@ class RagMeLocalAgent:
 
             if response.status_code == 200:
                 result = response.json()
-                print(json.dumps(result, indent=2))  # DEBUG
                 if result.get("status") == "success":
                     logging.info(
                         f"Successfully added data to RAG ({len(chunks)} chunks)"

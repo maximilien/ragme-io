@@ -85,6 +85,7 @@ class ImageProcessor:
             from ..utils.config_manager import config
 
             ocr_config = config.get("ocr", {})
+
             if not ocr_config.get("enabled", True):
                 return False
 

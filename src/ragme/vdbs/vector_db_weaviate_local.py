@@ -429,6 +429,26 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
         except Exception:
             return None
 
+    def find_image_by_filename(self, filename: str) -> dict[str, Any] | None:
+        """Find an image by its filename in the image collection."""
+        if not self.has_image_collection():
+            return None
+
+        collection = self.client.collections.get(self.image_collection.name)
+        try:
+            # Use fetch_objects with a high limit and filter in Python
+            response = collection.query.fetch_objects(limit=1000, include_vector=False)
+            results = self._convert_weaviate_response(response)
+
+            # Filter by filename in metadata
+            for result in results:
+                metadata = result.get("metadata", {})
+                if metadata.get("filename") == filename:
+                    return result
+            return None
+        except Exception:
+            return None
+
     def cleanup(self):
         """Clean up resources and close connections."""
         if self.client:

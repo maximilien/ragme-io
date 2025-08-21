@@ -1780,6 +1780,19 @@ body {
     transform: scale(1);
 }
 
+/* Make delete button visible in modal header */
+.modal-header-actions .document-delete-btn {
+    opacity: 1;
+    transform: scale(1);
+    color: #6b7280;
+    font-size: 1rem;
+}
+
+.modal-header-actions .document-delete-btn:hover {
+    color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
 .document-title {
     font-weight: 600;
     color: #333;

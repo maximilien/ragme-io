@@ -68,6 +68,11 @@ class QueryAgent:
         )
         self.text_rerank_top_k: int = query_config.get("text_rerank_top_k", 10)
 
+        # Get language settings
+        llm_config = config.get_llm_config()
+        self.force_english = llm_config.get("force_english", True)
+        self.default_language = llm_config.get("language", "en")
+
         self.llm = OpenAI(model=llm_model, temperature=temperature)
 
     async def run(self, query: str):
@@ -235,24 +240,15 @@ class QueryAgent:
                     )
 
                 # Only include images if they're actually relevant to the query
-                print(
-                    f"DEBUG: About to check image relevance for query: '{query}' with {len(image_results)} images"
-                )
                 logger.info(
                     f"Checking if {len(image_results)} images are relevant to query: '{query}'"
                 )
-                print("DEBUG: Calling _are_images_relevant_to_query...")
                 try:
                     images_relevant = self._are_images_relevant_to_query(
                         query, image_results
                     )
                     logger.info(f"Images relevant: {images_relevant}")
-                    print(f"DEBUG: Images relevant result: {images_relevant}")
-                    print(
-                        f"DEBUG: image_results: {len(image_results)}, images_relevant: {images_relevant}"
-                    )
                 except Exception as e:
-                    print(f"DEBUG: Exception in _are_images_relevant_to_query: {e}")
                     logger.error(f"Exception in _are_images_relevant_to_query: {e}")
                     images_relevant = False
 
@@ -291,9 +287,7 @@ class QueryAgent:
         Returns:
             bool: True if images are relevant, False otherwise
         """
-        print(
-            f"DEBUG: _are_images_relevant_to_query called with query: '{query}' and {len(image_results)} images"
-        )
+
         query_lower = query.lower()
 
         # Check if query is asking for images specifically
@@ -339,10 +333,7 @@ class QueryAgent:
                     )
                     return True
 
-        logger.info(f"Images not considered relevant for query: '{query}'")
-        print(
-            f"DEBUG: Images not considered relevant for query: '{query}'"
-        )  # Temporary debug
+                logger.info(f"Images not considered relevant for query: '{query}'")
         return False
 
     def _rerank_images_with_llm(
@@ -436,10 +427,18 @@ class QueryAgent:
                 lines.append(f"{idx}\t{filename}\t{url}\t{content[:100]}...")
 
             listing = "\n".join(lines)
+            # Build language instruction for reranking
+            rerank_language_instruction = ""
+            if self.force_english:
+                rerank_language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query.\n"
+            elif self.default_language != "en":
+                rerank_language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query.\n"
+
             prompt = (
                 "You will receive a user query and a list of text document candidates (index, filename, url, content_preview).\n"
                 "For each candidate, output a JSON array of objects with: index (int) and score (float between 0 and 1) named 'relevance'.\n"
-                "Only return the JSON array, no extra text.\n\n"
+                "Only return the JSON array, no extra text."
+                f"{rerank_language_instruction}\n"
                 f"Query: {query}\n\nCandidates (index\tfilename\turl\tcontent_preview):\n{listing}\n"
             )
 
@@ -547,8 +546,15 @@ class QueryAgent:
 
             context = "\n".join(context_parts)
 
+            # Build language instruction based on configuration
+            language_instruction = ""
+            if self.force_english:
+                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
+            elif self.default_language != "en":
+                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+
             # Create prompt for LLM to answer the specific query
-            prompt = f"""You are a helpful assistant that answers questions based on the provided documents and images.
+            prompt = f"""You are a helpful assistant that answers questions based on the provided documents and images.{language_instruction}
 
 User Question: {query}
 
