@@ -12,6 +12,9 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Process Management](PROCESS_MANAGEMENT.md)** - Service lifecycle management and troubleshooting
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
+### UI/UX Documentation
+- **[Settings UI Improvements](SETTINGS_UI_IMPROVEMENTS.md)** ⭐ **NEW!** - Enhanced Settings interface with tabbed organization and comprehensive configuration options
+
 ### 🆕 Latest Features Documentation
 - **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient bottom sheet interface
