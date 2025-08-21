@@ -120,6 +120,10 @@ llm:
   temperature: 0.7
   max_tokens: 4000
   
+  # Language settings
+  language: "en"  # Default language for agent responses (en, fr, es, de, etc.)
+  force_english: true  # Force agents to always respond in English regardless of user's language
+  
   # Summarization settings
   summarization:
     model: "gpt-4o-mini"
@@ -138,6 +142,8 @@ agents:
     system_prompt: |
       You are a helpful assistant that can write the contents of urls to text document
       collections, as well as answering questions about stored documents.
+      
+      IMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query.
       
       MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
       
@@ -200,6 +206,7 @@ frontend:
     refresh_interval_ms: 30000  # 30 seconds
     max_tokens: 4000
     temperature: 0.7
+    speech_language: "en-US"  # Language for speech recognition (en-US, fr-FR, es-ES, etc.)
     
   # UI behavior and layout settings
   ui:

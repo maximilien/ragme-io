@@ -3,12 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <title>🤖 RAGme.io Assistant</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="all.min.css" rel="stylesheet">
-    <script src="d3.v7.min.js"></script>
-    <script src="marked.min.js" defer></script>
-    <script src="purify.min.js" defer></script>
+    
+    <!-- Immediate redirect if on HTTPS -->
+    <script>
+        if (window.location.protocol === 'https:' && window.location.hostname === 'localhost') {
+            window.location.replace('http://localhost:8020/');
+        }
+    </script>
+    
+    <!-- Load resources dynamically to force HTTP -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create stylesheet links
+            const styles = ['styles.css', 'all.min.css'];
+            styles.forEach(function(href) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'http://localhost:8020/' + href;
+                document.head.appendChild(link);
+            });
+            
+            // Create script tags
+            const scripts = ['d3.v7.min.js', 'marked.min.js', 'purify.min.js'];
+            let loadedScripts = 0;
+            
+            function loadNextScript() {
+                if (loadedScripts < scripts.length) {
+                    const script = document.createElement('script');
+                    script.src = 'http://localhost:8020/' + scripts[loadedScripts];
+                    script.onload = function() {
+                        loadedScripts++;
+                        loadNextScript();
+                    };
+                    script.onerror = function() {
+                        console.error('Failed to load script:', scripts[loadedScripts]);
+                        loadedScripts++;
+                        loadNextScript();
+                    };
+                    document.head.appendChild(script);
+                } else {
+                    // Load socket.io and app.js last
+                    const socketScript = document.createElement('script');
+                    socketScript.src = 'http://localhost:8020/socket.io/socket.io.js';
+                    socketScript.onload = function() {
+                        const appScript = document.createElement('script');
+                        appScript.src = 'http://localhost:8020/app.js';
+                        document.head.appendChild(appScript);
+                    };
+                    document.head.appendChild(socketScript);
+                }
+            }
+            
+            loadNextScript();
+        });
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -277,7 +327,7 @@
                                 <div class="file-upload-placeholder">
                                     <i class="fas fa-images"></i>
                                     <p>Click to select images or drag and drop</p>
-                                    <p class="file-types">Supported: JPG, PNG, GIF, WebP, BMP</p>
+                                    <p class="file-types">Supported: JPG, PNG, GIF, WebP, BMP, HEIC</p>
                                 </div>
                             </div>
                             <div class="file-list" id="imageList">

@@ -479,7 +479,18 @@ class RagMeTools:
         """
         try:
             # Use the existing vector database from RagMe instance
-            images = self.ragme.vector_db.list_images(limit=limit, offset=offset)
+            # Create image vector database for listing images
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List images from image collection
+            images = image_vdb.list_images(limit=limit, offset=offset)
 
             if not images:
                 return "No images found in the collection."
@@ -529,16 +540,17 @@ class RagMeTools:
 
     def delete_image_from_collection(self, image_id: str) -> str:
         """
-        Delete an image from the RagMe image collection by ID.
+        Delete an image from the RagMe image collection by ID or filename.
 
         Args:
-            image_id: The ID of the image to delete
+            image_id: The ID or filename of the image to delete
 
         Returns:
             str: Success or error message
         """
         try:
             import os
+            import re
 
             from ..vdbs.vector_db_factory import create_vector_database
 
@@ -546,13 +558,35 @@ class RagMeTools:
             db_type = os.getenv("VECTOR_DB_TYPE", "weaviate")
             image_vdb = create_vector_database(db_type)
 
-            # Delete the image
-            success = image_vdb.delete_document(image_id)
+            # Check if the input looks like a UUID (typical image ID format)
+            uuid_pattern = re.compile(
+                r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                re.IGNORECASE,
+            )
+
+            actual_image_id = image_id
+
+            # If it doesn't look like a UUID, try to find by filename
+            if not uuid_pattern.match(image_id):
+                # Try to find the image by filename
+                image = image_vdb.find_image_by_filename(image_id)
+                if image:
+                    actual_image_id = image.get("id")
+                    if not actual_image_id:
+                        return f"Image with filename '{image_id}' found but has no ID"
+                else:
+                    return f"Image with filename '{image_id}' not found"
+
+            # Delete the image using the actual ID
+            success = image_vdb.delete_image(actual_image_id)
 
             if success:
-                return f"Successfully deleted image with ID: {image_id}"
+                if actual_image_id != image_id:
+                    return f"Successfully deleted image '{image_id}' (ID: {actual_image_id})"
+                else:
+                    return f"Successfully deleted image with ID: {image_id}"
             else:
-                return f"Image with ID {image_id} not found"
+                return f"Image with ID {actual_image_id} not found"
 
         except Exception as e:
             return f"Error deleting image: {str(e)}"
@@ -645,7 +679,18 @@ class RagMeTools:
             start_date, end_date = date_range
 
             # Get all images first
-            all_images = self.ragme.vector_db.list_images(limit=1000, offset=0)
+            # Create image vector database for listing images
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List all images from image collection
+            all_images = image_vdb.list_images(limit=1000, offset=0)
 
             # Filter by date range
             filtered_images = filter_items_by_date_range(

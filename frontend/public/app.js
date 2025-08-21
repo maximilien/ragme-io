@@ -73,32 +73,68 @@ class RAGmeAssistant {
     }
 
     async init() {
-        // Load configuration first
-        await this.loadConfiguration();
-        
-        this.connectSocket();
-        this.setupEventListeners();
-        this.setupResizeDivider();
-        this.setupVisualizationResize();
-        this.loadSettings();
-        
-        // Apply UI configuration after loading both config and localStorage settings
-        // Use a small delay to ensure DOM elements are ready
-        setTimeout(() => {
-            console.log('Applying UI configuration...');
-            this.applyUIConfiguration();
-        }, 50);
-        
-        this.loadChatSessions();
-        this.renderChatHistory(); // Render chat history after loading
-        this.loadVectorDbInfo();
-        this.startAutoRefresh();
-        
-        // Initialize visualization after settings are loaded
-        // This ensures the visualization type selector reflects the saved preference
-        setTimeout(() => {
-            this.updateVisualization();
-        }, 100);
+        try {
+            console.log('RAGmeAssistant: Starting initialization...');
+            
+            // Load configuration first
+            await this.loadConfiguration();
+            console.log('RAGmeAssistant: Configuration loaded');
+            
+            this.connectSocket();
+            console.log('RAGmeAssistant: Socket connected');
+            
+            this.setupEventListeners();
+            console.log('RAGmeAssistant: Event listeners setup');
+            
+            this.setupResizeDivider();
+            this.setupVisualizationResize();
+            this.loadSettings();
+            console.log('RAGmeAssistant: Settings loaded');
+            
+            // Apply UI configuration after loading both config and localStorage settings
+            // Use a small delay to ensure DOM elements are ready
+            setTimeout(() => {
+                console.log('RAGmeAssistant: Applying UI configuration...');
+                this.applyUIConfiguration();
+            }, 50);
+            
+            this.loadChatSessions();
+            this.renderChatHistory(); // Render chat history after loading
+            console.log('RAGmeAssistant: Chat history rendered');
+            
+            this.loadVectorDbInfo();
+            this.startAutoRefresh();
+            
+            // Initialize visualization after settings are loaded
+            // This ensures the visualization type selector reflects the saved preference
+            setTimeout(() => {
+                this.updateVisualization();
+            }, 100);
+            
+            console.log('RAGmeAssistant: Initialization completed successfully');
+            
+            // Update loading indicator to success
+            const loadingDiv = document.getElementById('ragme-loading');
+            if (loadingDiv) {
+                loadingDiv.style.background = '#10b981';
+                loadingDiv.textContent = 'RAGme: Ready!';
+                setTimeout(() => {
+                    loadingDiv.remove();
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('RAGmeAssistant: Initialization failed:', error);
+            
+            // Update loading indicator to error
+            const loadingDiv = document.getElementById('ragme-loading');
+            if (loadingDiv) {
+                loadingDiv.style.background = '#f44336';
+                loadingDiv.textContent = 'RAGme: Error!';
+            }
+            
+            // Show error notification to user
+            this.showNotification('error', 'Failed to initialize application. Please refresh the page.');
+        }
     }
 
     async loadConfiguration() {
@@ -347,7 +383,32 @@ class RAGmeAssistant {
     }
 
     connectSocket() {
-        this.socket = io();
+        console.log('Connecting to RAGme.io Assistant server...');
+        
+        // Safari-specific debugging
+        console.log('Browser info:', {
+            userAgent: navigator.userAgent,
+            isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+            webkit: 'webkit' in window,
+            io: typeof io !== 'undefined' ? 'available' : 'not available'
+        });
+        
+        try {
+            // Safari-specific socket.io configuration
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const socketOptions = isSafari ? {
+                transports: ['websocket', 'polling'],
+                upgrade: true,
+                rememberUpgrade: true,
+                timeout: 20000
+            } : {};
+            
+            this.socket = io(socketOptions);
+            console.log('Socket.io connection created with options:', socketOptions);
+        } catch (error) {
+            console.error('Failed to create socket connection:', error);
+            this.showNotification('error', 'Failed to connect to server. Please check your connection.');
+        }
         
         this.socket.on('connect', () => {
             console.log('Connected to RAGme.io Assistant server');
@@ -1211,12 +1272,12 @@ class RAGmeAssistant {
         .then(data => {
             console.log('MCP Server configurations updated:', data);
             // Show success notification
-            this.showNotification('success', data.message);
+            this.showNotification(data.message, 'success');
         })
         .catch(error => {
             console.error('Error updating MCP server configurations:', error);
             // Show error notification
-            this.showNotification('error', `Failed to update MCP server configurations: ${error.message}`);
+            this.showNotification(`Failed to update MCP server configurations: ${error.message}`, 'error');
             
             // Revert all changes on error
             changes.forEach(change => {
@@ -1318,7 +1379,7 @@ class RAGmeAssistant {
         this.renderMcpServersList();
         
         // Show success notification
-        this.showNotification('success', `Successfully authenticated with ${this.currentAuthServer}`);
+                    this.showNotification(`Successfully authenticated with ${this.currentAuthServer}`, 'success');
         
         this.currentAuthServer = null;
     }
@@ -1349,7 +1410,7 @@ class RAGmeAssistant {
         })
         .catch(error => {
             console.error('Error updating MCP server authentication:', error);
-            this.showNotification('error', `Failed to update MCP server authentication: ${error.message}`);
+            this.showNotification(`Failed to update MCP server authentication: ${error.message}`, 'error');
         });
     }
 
@@ -1579,7 +1640,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     this.chatSessions[chatIndex].title = newTitle;
                     this.saveChatSessions();
                     this.renderChatHistory();
-                    this.showNotification('success', 'Chat title updated');
+                    this.showNotification('Chat title updated', 'success');
                 }
             }
             titleElement.textContent = newTitle || currentTitle;
@@ -1607,7 +1668,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     deleteChat(chatId) {
         const chat = this.chatSessions.find(c => c.id === chatId);
         if (!chat) {
-            this.showNotification('error', 'Chat not found');
+            this.showNotification('Chat not found', 'error');
             return;
         }
         
@@ -1629,7 +1690,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.saveChatSessions();
         this.renderChatHistory();
         
-        this.showNotification('success', `Deleted chat: ${chat.title}`);
+        this.showNotification(`Deleted chat: ${chat.title}`, 'success');
     }
 
     renderMessage(message) {
@@ -1664,7 +1725,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             copyBtn.title = 'Copy to clipboard';
             copyBtn.addEventListener('click', () => {
                 navigator.clipboard.writeText(message.content);
-                this.showNotification('success', 'Copied to clipboard!');
+                this.showNotification('Copied to clipboard!', 'success');
             });
             contentDiv.appendChild(copyBtn);
 
@@ -1720,7 +1781,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         localStorage.removeItem('ragme-chat-sessions');
         this.renderChatHistory();
         this.createNewChat();
-        this.showNotification('info', 'Chat history cleared');
+        this.showNotification('Chat history cleared', 'info');
     }
 
     clearEverything() {
@@ -1728,7 +1789,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.documents = [];
         this.renderDocuments();
         this.updateVisualization();
-        this.showNotification('info', 'Everything cleared');
+        this.showNotification('Everything cleared', 'info');
     }
 
     toggleSidebar(sidebarId, restoreBtnId) {
@@ -1944,6 +2005,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     hideModal(modalId) {
         const modal = document.getElementById(modalId);
         modal.classList.remove('show');
+        
+        // Reset modal state when closing document details modal
+        if (modalId === 'documentDetailsModal') {
+            this.documentDetailsModal.isOpen = false;
+            this.documentDetailsModal.currentDocId = null;
+            this.documentDetailsModal.summaryGenerated = false;
+            this.documentDetailsModal.summaryInProgress = false;
+        }
     }
 
     toggleSubmenu(submenuId, triggerId) {
@@ -2036,27 +2105,40 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             formData.append('files', files[i]);
         }
 
-        // Show loading notification
-        this.showNotification('info', `Uploading ${files.length} file(s)...`);
+        // Show initial upload notification
+        this.showNotification(`📤 Uploading ${files.length} document(s) to server...`, 'info');
 
         // Send files to backend
         fetch('/upload-files', {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            // Show processing notification when upload completes and processing starts
+            setTimeout(() => {
+                this.showNotification(`📄 Extracting text from ${files.length} document(s)...`, 'info');
+            }, 300);
+            return response.json();
+        })
         .then(data => {
             if (data.status === 'success') {
-                this.showNotification('success', `Successfully uploaded ${files.length} file(s)`);
-                // Refresh documents list
-                this.loadDocuments();
+                // Show AI analysis notification
+                setTimeout(() => {
+                    this.showNotification(`🤖 Analyzing ${files.length} document(s) with AI...`, 'info');
+                }, 600);
+                
+                setTimeout(() => {
+                    this.showNotification(`✅ Successfully processed ${files.length} document(s) - text extraction and AI analysis complete`, 'success');
+                    // Refresh documents list
+                    this.loadDocuments();
+                }, 1200);
             } else {
-                this.showNotification('error', data.message || 'Upload failed');
+                this.showNotification(data.message || 'Upload failed', 'error');
             }
         })
         .catch(error => {
             console.error('Upload error:', error);
-            this.showNotification('error', 'Upload failed. Please try again.');
+            this.showNotification('Upload failed. Please try again.', 'error');
         });
     }
 
@@ -2069,8 +2151,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             formData.append('files', files[i]);
         }
 
-        // Show loading notification
-        this.showNotification('info', `Processing ${files.length} image(s)...`);
+        // Show initial upload notification
+        this.showNotification(`📤 Uploading ${files.length} image(s) to server...`, 'info');
 
         // Send images to backend via API
         console.log('Sending request to /upload-images');
@@ -2078,19 +2160,33 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            // Show processing notification when upload completes and processing starts
+            setTimeout(() => {
+                this.showNotification(`🔍 Analyzing ${files.length} image(s) with AI classification...`, 'info');
+            }, 300);
+            return response.json();
+        })
         .then(data => {
             if (data.status === 'success') {
-                this.showNotification('success', `Successfully processed ${files.length} image(s) with AI classification`);
-                // Refresh documents list to show images
-                this.loadDocuments();
+                // Show OCR processing notification
+                setTimeout(() => {
+                    this.showNotification(`📝 Extracting text from ${files.length} image(s) with OCR...`, 'info');
+                }, 600);
+                
+                // Add a small delay to make the processing notification visible
+                setTimeout(() => {
+                    this.showNotification(`✅ Successfully processed ${files.length} image(s) - AI classification and OCR text extraction complete`, 'success');
+                    // Refresh documents list to show images
+                    this.loadDocuments();
+                }, 1200);
             } else {
-                this.showNotification('error', data.message || 'Image upload failed');
+                this.showNotification(data.message || 'Image upload failed', 'error');
             }
         })
         .catch(error => {
             console.error('Image upload error:', error);
-            this.showNotification('error', 'Image upload failed. Please try again.');
+            this.showNotification('Image upload failed. Please try again.', 'error');
         });
     }
 
@@ -4484,13 +4580,20 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         .then(result => {
             console.log('Delete result:', result);
             if (result.status === 'success') {
-                // Don't remove from local array immediately - let the server refresh handle it
-                console.log('Delete successful, refreshing data from server...');
-                console.log('About to call loadDocuments()...');
+                // Immediately remove from local array and update UI
+                console.log('Delete successful, updating UI immediately...');
                 
-                // Force a refresh of the documents list to ensure everything is in sync
-                this.loadDocuments();
-                console.log('loadDocuments() called');
+                // Remove the document from the local array
+                if (docIndex >= 0 && docIndex < this.documents.length) {
+                    this.documents.splice(docIndex, 1);
+                    console.log('Document removed from local array. New count:', this.documents.length);
+                }
+                
+                // Re-render the documents list immediately
+                this.renderDocuments();
+                
+                // Update visualization to reflect the changes
+                this.updateVisualization();
                 
                 // Show success notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
@@ -4529,16 +4632,65 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (groupedDoc.isGroupedChunks && groupedDoc.totalChunks > 1) {
                 // Delete all chunks of this document
                 this.deleteChunkedDocument(groupedDoc);
+                // Close the modal after chunked deletion
+                this.hideModal('documentDetailsModal');
             } else {
                 // Delete single document - find the actual document index in the original array
                 const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex : 
                                      this.documents.findIndex(doc => doc.id === groupedDoc.id);
-                this.deleteSingleDocument(actualDocIndex, groupedDoc);
+                
+                // Call deleteSingleDocument and close modal after successful deletion
+                this.deleteSingleDocumentFromDetails(actualDocIndex, groupedDoc);
             }
-            
-            // Close the modal
-            this.hideModal('documentDetailsModal');
         }
+    }
+
+    deleteSingleDocumentFromDetails(docIndex, doc) {
+        console.log('deleteSingleDocumentFromDetails called with:', { docIndex, docId: doc.id, docType: doc.content_type });
+        
+        // Determine the appropriate endpoint based on content type
+        const endpoint = doc.content_type === 'image' ? `/delete-image/${doc.id}` : `/delete-document/${doc.id}`;
+        
+        // Call backend API to delete the document/image using the appropriate endpoint
+        fetch(endpoint, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(result => {
+            console.log('Delete result:', result);
+            if (result.status === 'success') {
+                // Immediately remove from local array and update UI
+                console.log('Delete successful, updating UI immediately...');
+                
+                // Remove the document from the local array
+                if (docIndex >= 0 && docIndex < this.documents.length) {
+                    this.documents.splice(docIndex, 1);
+                    console.log('Document removed from local array. New count:', this.documents.length);
+                }
+                
+                // Close the modal first to allow rendering
+                this.hideModal('documentDetailsModal');
+                
+                // Re-render the documents list immediately
+                this.renderDocuments();
+                
+                // Update visualization to reflect the changes
+                this.updateVisualization();
+                
+                // Show success notification
+                const contentType = doc.content_type === 'image' ? 'image' : 'document';
+                this.showNotification('success', `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} deleted successfully`);
+            } else {
+                // Show error notification
+                const contentType = doc.content_type === 'image' ? 'image' : 'document';
+                this.showNotification('error', result.message || `Failed to delete ${contentType}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting document:', error);
+            const contentType = doc.content_type === 'image' ? 'image' : 'document';
+            this.showNotification('error', `Failed to delete ${contentType}. Please try again.`);
+        });
     }
 
     scrollToDocumentInList(documentId) {
@@ -5006,7 +5158,9 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         
         this.speechRecognition.continuous = false;
         this.speechRecognition.interimResults = false;
-        this.speechRecognition.lang = 'en-US';
+        // Get language from config or default to en-US
+        const speechLang = this.config?.frontend?.settings?.speech_language || 'en-US';
+        this.speechRecognition.lang = speechLang;
 
         this.speechRecognition.onstart = () => {
             console.log('Speech recognition started');
@@ -5216,8 +5370,44 @@ function simpleMarkdownParser(text) {
 
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Wait a bit for external scripts to load
+    console.log('DOM Content Loaded - Starting RAGmeAssistant initialization');
+    console.log('RAGme.io Assistant - Application starting...');
+    
+    // Check if required dependencies are available
+    const requiredDeps = {
+        io: typeof io !== 'undefined',
+        DOMPurify: typeof DOMPurify !== 'undefined',
+        marked: typeof marked !== 'undefined',
+        d3: typeof d3 !== 'undefined'
+    };
+    
+    console.log('Dependencies check:', requiredDeps);
+    
+    // Add a visible indicator that the app is loading
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'ragme-loading';
+    loadingDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: #2563eb; color: white; padding: 10px; border-radius: 5px; z-index: 10000; font-size: 12px;';
+    loadingDiv.textContent = 'RAGme: Loading...';
+    document.body.appendChild(loadingDiv);
+    
+    // Wait a bit for external scripts to load, especially for Safari
     setTimeout(() => {
-        new RAGmeAssistant();
-    }, 100);
+        try {
+            console.log('Creating RAGmeAssistant instance...');
+            window.ragmeAssistant = new RAGmeAssistant();
+            console.log('RAGmeAssistant instance created successfully');
+        } catch (error) {
+            console.error('Failed to create RAGmeAssistant instance:', error);
+            // Show error message to user
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #f44336; color: white; padding: 20px; border-radius: 5px; z-index: 10000; text-align: center;';
+            errorDiv.innerHTML = `
+                <h3>Application Error</h3>
+                <p>Failed to initialize the application.</p>
+                <p>Please refresh the page or try a different browser.</p>
+                <p><small>Error: ${error.message}</small></p>
+            `;
+            document.body.appendChild(errorDiv);
+        }
+    }, 200); // Increased delay for Safari
 }); 

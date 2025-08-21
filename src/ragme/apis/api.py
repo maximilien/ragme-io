@@ -453,8 +453,19 @@ async def list_content(
         # Get images if requested
         if content_type in ["image", "both"]:
             try:
-                # Use the existing ragme instance which has the correct VDB with both collections
-                images = ragme.vector_db.list_images(limit=1000, offset=0)
+                from ..utils.config_manager import config
+                from ..vdbs.vector_db_factory import create_vector_database
+
+                # Get image collection name
+                image_collection_name = config.get_image_collection_name()
+
+                # Create image vector database
+                image_vdb = create_vector_database(
+                    collection_name=image_collection_name
+                )
+
+                # List images from image collection
+                images = image_vdb.list_images(limit=1000, offset=0)
                 for img in images:
                     img["content_type"] = "image"
                 all_items.extend(images)
@@ -561,8 +572,17 @@ async def summarize_document(input_data: SummarizeInput):
         # Get images
         images = []  # Initialize images list
         try:
-            # Use the existing ragme instance which has the correct VDB with both collections
-            images = ragme.vector_db.list_images(limit=1000, offset=0)
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List images from image collection
+            images = image_vdb.list_images(limit=1000, offset=0)
             for img in images:
                 img["content_type"] = "image"
             all_items.extend(images)
@@ -1107,8 +1127,17 @@ async def get_document(document_id: str):
 
         # If not found in text collection, try image collection
         try:
-            # Use the existing ragme instance which has the correct VDB with both collections
-            images = ragme.vector_db.list_images(limit=1000, offset=0)
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List images from image collection
+            images = image_vdb.list_images(limit=1000, offset=0)
             image = next((img for img in images if img.get("id") == document_id), None)
 
             if image:
@@ -1245,7 +1274,19 @@ try:
             # Get images
             images = []
             try:
-                images = ragme.vector_db.list_images(limit=1000, offset=0)
+                from ..utils.config_manager import config
+                from ..vdbs.vector_db_factory import create_vector_database
+
+                # Get image collection name
+                image_collection_name = config.get_image_collection_name()
+
+                # Create image vector database
+                image_vdb = create_vector_database(
+                    collection_name=image_collection_name
+                )
+
+                # List images from image collection
+                images = image_vdb.list_images(limit=1000, offset=0)
                 for img in images:
                     img["content_type"] = "image"
                 all_items.extend(images)
@@ -1366,7 +1407,19 @@ try:
             # Get images
             if content_type in ["both", "images"]:
                 try:
-                    images = ragme.vector_db.list_images(limit=1000, offset=0)
+                    from ..utils.config_manager import config
+                    from ..vdbs.vector_db_factory import create_vector_database
+
+                    # Get image collection name
+                    image_collection_name = config.get_image_collection_name()
+
+                    # Create image vector database
+                    image_vdb = create_vector_database(
+                        collection_name=image_collection_name
+                    )
+
+                    # List images from image collection
+                    images = image_vdb.list_images(limit=1000, offset=0)
                     for img in images:
                         img["content_type"] = "image"
                     all_items.extend(images)
@@ -1465,8 +1518,17 @@ async def list_images(limit: int = 10, offset: int = 0):
         dict: List of images with pagination info
     """
     try:
+        from ..utils.config_manager import config
+        from ..vdbs.vector_db_factory import create_vector_database
+
+        # Get image collection name
+        image_collection_name = config.get_image_collection_name()
+
+        # Create image vector database
+        image_vdb = create_vector_database(collection_name=image_collection_name)
+
         # Get images from image collection
-        images = ragme.vector_db.list_images(limit=limit, offset=offset)
+        images = image_vdb.list_images(limit=limit, offset=offset)
 
         return {
             "images": images,
@@ -1545,8 +1607,17 @@ async def get_image(image_id: str):
         dict: Image data
     """
     try:
+        from ..utils.config_manager import config
+        from ..vdbs.vector_db_factory import create_vector_database
+
+        # Get image collection name
+        image_collection_name = config.get_image_collection_name()
+
+        # Create image vector database
+        image_vdb = create_vector_database(collection_name=image_collection_name)
+
         # Get images from image collection
-        images = ragme.vector_db.list_images(limit=1000, offset=0)
+        images = image_vdb.list_images(limit=1000, offset=0)
 
         # Find the specific image
         image_document = None
@@ -1582,8 +1653,17 @@ async def count_images():
         dict: Count of images
     """
     try:
+        from ..utils.config_manager import config
+        from ..vdbs.vector_db_factory import create_vector_database
+
+        # Get image collection name
+        image_collection_name = config.get_image_collection_name()
+
+        # Create image vector database
+        image_vdb = create_vector_database(collection_name=image_collection_name)
+
         # Get all images to count them
-        images = ragme.vector_db.list_images(limit=10000, offset=0)
+        images = image_vdb.list_images(limit=10000, offset=0)
 
         return {"count": len(images), "type": "images"}
     except Exception as e:

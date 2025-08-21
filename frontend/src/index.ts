@@ -7,6 +7,7 @@ import compression from 'compression';
 import path from 'path';
 import multer from 'multer';
 import FormData from 'form-data';
+import axios from 'axios';
 
 const app = express();
 const server = createServer(app);
@@ -152,11 +153,19 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: ["'self'", 'http://localhost:8021', 'ws://localhost:8021'],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: [
+          "'self'",
+          'http://localhost:8021',
+          'ws://localhost:8021',
+          'wss://localhost:8021',
+        ],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        fontSrc: ["'self'", 'https:'],
+        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        workerSrc: ["'self'", 'blob:'],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
       },
     },
   })
@@ -656,7 +665,6 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
 
     // Forward to backend API using proper Node.js FormData
     logger.info('Creating FormData for backend forwarding');
-    const FormData = require('form-data');
     const formData = new FormData();
 
     files.forEach(file => {
@@ -672,7 +680,6 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
     logger.info('Sending request to backend API');
     let result;
     try {
-      const axios = require('axios');
       const response = await axios.post('http://localhost:8021/upload-images', formData, {
         headers: {
           ...formData.getHeaders(),
@@ -938,6 +945,15 @@ io.on('connection', socket => {
   socket.on('disconnect', () => {
     logger.info('User disconnected:', socket.id);
   });
+});
+
+// Add 404 handler to log missing resources
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !res.headersSent) {
+    logger.warn(`404 - Resource not found: ${req.method} ${req.url}`);
+    logger.warn(`User-Agent: ${req.get('User-Agent')}`);
+  }
+  next();
 });
 
 // Add configuration endpoint for frontend

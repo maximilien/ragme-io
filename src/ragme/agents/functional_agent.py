@@ -52,6 +52,10 @@ class FunctionalAgent:
         llm_config = config.get_llm_config()
         temperature = llm_config.get("temperature", 0.7)
 
+        # Get language settings
+        self.force_english = llm_config.get("force_english", True)
+        self.default_language = llm_config.get("language", "en")
+
         self.llm = OpenAI(model=llm_model, temperature=temperature)
         self.agent = self._create_agent()
 
@@ -59,10 +63,17 @@ class FunctionalAgent:
         """
         Create the functional agent with tools for managing the RagMeDocs collection.
         """
+        # Build language instruction based on configuration
+        language_instruction = ""
+        if self.force_english:
+            language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
+        elif self.default_language != "en":
+            language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+
         return FunctionAgent(
             tools=self.tools.get_all_tools(),
             llm=self.llm,
-            system_prompt="""You are a helpful assistant that can perform functional operations on the RagMeDocs collection and RagMeImages collection.
+            system_prompt=f"""You are a helpful assistant that can perform functional operations on the RagMeDocs collection and RagMeImages collection.{language_instruction}
 
 IMPORTANT: When users ask to add URLs, extract ONLY the URL part from their request and pass it to the write_to_ragme_collection function.
 
@@ -84,7 +95,7 @@ IMAGES:
 - Add images from URLs to the image collection using write_image_to_collection(image_url)
 - List images in the image collection using list_image_collection(limit, offset)
 - List images by date/time using list_images_by_datetime(date_query, limit, offset) - supports natural language like "yesterday", "today", "last week", "3 days ago"
-- Delete images from the collection using delete_image_from_collection(image_id)
+- Delete images from the collection using delete_image_from_collection(image_id_or_filename)
 
 GENERAL:
 - Get vector database information using get_vector_db_info()
@@ -96,6 +107,7 @@ For functional queries like:
 - "add this image to the collection" or "add image from URL" → extract the image URL and call write_image_to_collection(image_url)
 - "delete document with ID 123" → call delete_document("123")
 - "delete image with ID abc" → call delete_image_from_collection("abc")
+- "delete image IMG_2050.jpg" → call delete_image_from_collection("IMG_2050.jpg")
 - "delete document https://example.com" → call delete_document_by_url("https://example.com")
 - "list all documents" or "list all images" → call list_ragme_collection() or list_image_collection()
 - "list yesterday's documents" or "list today's images" → call list_documents_by_datetime("yesterday") or list_images_by_datetime("today")
@@ -122,7 +134,7 @@ For images:
 - When adding images, use write_image_to_collection(image_url) with the image URL
 - When listing images, use list_image_collection(limit, offset)
 - When listing images by date/time, use list_images_by_datetime(date_query, limit, offset) with natural language date queries
-- When deleting images, use delete_image_from_collection(image_id)
+- When deleting images, use delete_image_from_collection(image_id_or_filename) - supports both image IDs and filenames
 
 For date/time queries:
 - Use list_documents_by_datetime(date_query) for documents with natural language date queries

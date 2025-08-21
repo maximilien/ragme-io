@@ -420,6 +420,34 @@ class MilvusVectorDatabase(VectorDatabase):
         except Exception:
             return None
 
+    def find_image_by_filename(self, filename: str) -> dict[str, Any] | None:
+        """Find an image by its filename in the image collection."""
+        if not self.has_image_collection():
+            return None
+
+        self._ensure_client()
+        if self.client is None:
+            return None
+
+        try:
+            # Get all images and filter by filename in metadata
+            response = self.client.query(
+                collection_name=self.image_collection.name,
+                filter="",
+                output_fields=["id", "url", "text", "metadata"],
+                limit=1000,
+            )
+            results = self._convert_milvus_response(response)
+
+            # Filter by filename in metadata
+            for result in results:
+                metadata = result.get("metadata", {})
+                if metadata.get("filename") == filename:
+                    return result
+            return None
+        except Exception:
+            return None
+
     def cleanup(self):
         """Clean up resources and close connections."""
         if self.client:

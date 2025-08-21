@@ -98,6 +98,50 @@ Cannot connect to http://localhost:8020
    npm start
    ```
 
+### Safari Browser Compatibility Issues
+
+**Problem**: RAGme interface does not load or function properly in Safari browser.
+
+**Symptoms**:
+- UI appears blank or partially loaded
+- Console shows "Failed to load resource" errors
+- SSL errors for localhost resources
+- "Load failed" errors for all API requests
+- Content Security Policy (CSP) violations
+
+**Root Cause**: Safari has very strict security policies for localhost development:
+- **HTTPS Upgrade**: Safari automatically upgrades `http://localhost` to `https://localhost`
+- **Localhost Restrictions**: Safari blocks many HTTP requests to localhost for security
+- **CSP Enforcement**: Strict Content Security Policy enforcement
+- **Cross-Origin Restrictions**: Aggressive CORS policies for localhost
+
+**Attempted Solutions** (None fully successful):
+1. **Port Changes**: Tried ports 8023, 8024 to avoid cached HTTPS redirects
+2. **IP Address**: Attempted using `127.0.0.1` instead of `localhost`
+3. **XMLHttpRequest**: Switched from `fetch()` to `XMLHttpRequest`
+4. **Dynamic Resource Loading**: Programmatic CSS/JS loading with explicit HTTP URLs
+5. **CSP Modifications**: Updated Content Security Policy headers
+6. **Self-Contained Versions**: Created inline CSS/JS versions
+
+**Current Status**: ❌ **Safari compatibility not achieved**
+
+**Workarounds**:
+1. **Use Alternative Browsers**: Chrome, Firefox, or Edge work perfectly with RAGme
+2. **Safari Settings** (may help in some cases):
+   - Safari → Preferences → Privacy → Uncheck "Prevent cross-site tracking"
+   - Safari → Preferences → Advanced → Check "Show Develop menu"
+   - Safari → Develop → Disable Cross-Origin Restrictions
+   - Try Private Browsing mode
+3. **Development Environment**: Use Chrome/Firefox for development, Safari for testing only
+
+**Technical Details**:
+- Safari's localhost security is fundamentally incompatible with typical development setups
+- The browser enforces strict HTTPS requirements even for local development
+- Network requests to localhost are heavily restricted regardless of method used
+- This is a known Safari limitation, not a RAGme-specific issue
+
+**Recommendation**: Use Chrome, Firefox, or Edge for the best RAGme experience. Safari compatibility may be addressed in future versions with different architectural approaches.
+
 
 
 ### ResourceWarning: unclosed file
