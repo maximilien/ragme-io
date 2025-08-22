@@ -683,3 +683,16 @@ Please provide a clear, accurate answer based on the information above."""
         is_question = any(keyword in query_lower for keyword in question_keywords)
         logger.info(f"QueryAgent.is_query_question('{query}') = {is_question}")
         return is_question
+
+    def cleanup(self):
+        """
+        Clean up resources and close connections to prevent ResourceWarnings.
+        """
+        try:
+            # Clear references
+            self.vector_db = None
+            self.llm = None
+            
+            logger.info("QueryAgent cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during QueryAgent cleanup: {str(e)}")

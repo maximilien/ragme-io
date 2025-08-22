@@ -353,3 +353,18 @@ Focus only on functional operations that modify or query the collection structur
         is_functional = any(keyword in query_lower for keyword in functional_keywords)
         logger.info(f"FunctionalAgent.is_functional_query('{query}') = {is_functional}")
         return is_functional
+
+    def cleanup(self):
+        """
+        Clean up resources and close connections to prevent ResourceWarnings.
+        """
+        try:
+            # Clear references
+            self.ragme = None
+            self.llm = None
+            self.agent = None
+            self.tools = None
+            
+            logger.info("FunctionalAgent cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during FunctionalAgent cleanup: {str(e)}")
