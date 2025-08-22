@@ -418,6 +418,9 @@
                         <button class="settings-tab-btn" data-settings-tab="storageTab">
                             <i class="fas fa-database"></i> Storage
                         </button>
+                        <button class="settings-tab-btn" data-settings-tab="aiAccelerationTab">
+                            <i class="fas fa-rocket"></i> AI Acceleration
+                        </button>
                         <button class="settings-tab-btn" data-settings-tab="chatTab">
                             <i class="fas fa-comments"></i> Chat
                         </button>
@@ -611,6 +614,66 @@
                             <div class="setting-item read-only">
                                 <label>Storage Status:</label>
                                 <span id="storageStatus">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- AI Acceleration Settings Tab -->
+                    <div class="settings-tab-content" id="aiAccelerationTab">
+                        <div class="settings-section">
+                            <h4><i class="fas fa-rocket"></i> AI Acceleration Configuration</h4>
+                            <div class="setting-item">
+                                <label for="aiAccelerationEnabled">
+                                    <input type="checkbox" id="aiAccelerationEnabled">
+                                    Enable AI Acceleration
+                                </label>
+                                <small>Use AI acceleration for faster image classification and OCR processing</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="aiImageClassification">
+                                    <input type="checkbox" id="aiImageClassification" checked>
+                                    Enable Image Classification Acceleration
+                                </label>
+                                <small>Use AI acceleration for image classification tasks</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="aiImageOcr">
+                                    <input type="checkbox" id="aiImageOcr" checked>
+                                    Enable Image OCR Acceleration
+                                </label>
+                                <small>Use AI acceleration for OCR text extraction from images</small>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-cog"></i> FriendliAI Configuration</h4>
+                            <div class="setting-item read-only">
+                                <label>FriendliAI Status:</label>
+                                <span id="friendliStatus">-</span>
+                            </div>
+                            <div class="setting-item read-only">
+                                <label>Acceleration Types:</label>
+                                <span id="friendliAccelerationTypes">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-info-circle"></i> AI Acceleration Information</h4>
+                            <div class="setting-item">
+                                <p><strong>Benefits:</strong></p>
+                                <ul>
+                                    <li>Faster image processing with parallel classification and OCR</li>
+                                    <li>Improved accuracy for complex image analysis</li>
+                                    <li>Reduced local resource usage</li>
+                                    <li>Better handling of various image formats and content types</li>
+                                </ul>
+                                <p><strong>Requirements:</strong></p>
+                                <ul>
+                                    <li>Valid FriendliAI token and team ID</li>
+                                    <li>Configured model endpoint with image processing capabilities</li>
+                                    <li>Internet connection for API access</li>
+                                </ul>
+                                <p><strong>Fallback:</strong> If AI acceleration fails, the system automatically falls back to standard PyTorch classification and EasyOCR processing.</p>
                             </div>
                         </div>
                     </div>

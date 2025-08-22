@@ -1985,6 +1985,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         document.getElementById('defaultVisualization').value = this.currentVisualizationType;
         document.getElementById('defaultDateFilter').value = this.currentDateFilter;
         
+        // Populate AI acceleration settings
+        this.loadAiAccelerationSettings();
+        
         // Populate document settings
         document.getElementById('documentOverviewEnabled').checked = this.settings.documentOverviewEnabled;
         document.getElementById('maxDisplayDocuments').value = this.settings.maxDisplayDocuments || 100;
@@ -4622,6 +4625,49 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             }
         } catch (error) {
             vectorDbElement.textContent = 'Error loading';
+        }
+    }
+
+    async loadAiAccelerationSettings() {
+        try {
+            const response = await fetch('http://localhost:8021/config');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success' && data.config) {
+                    const aiConfig = data.config.ai_acceleration || {};
+                    
+                    // Set checkbox values
+                    document.getElementById('aiAccelerationEnabled').checked = aiConfig.enabled || false;
+                    document.getElementById('aiImageClassification').checked = aiConfig.image_classification !== false;
+                    document.getElementById('aiImageOcr').checked = aiConfig.image_ocr !== false;
+                    
+                    // Set FriendliAI status information
+                    const friendliConfig = aiConfig.friendli_ai || {};
+                    const hasToken = friendliConfig.friendli_token && friendliConfig.friendli_token !== '${FRIENDLI_TOKEN}';
+                    const hasTeamId = friendliConfig.friendli_team_id && friendliConfig.friendli_team_id !== '${FRIENDLI_TEAM_ID}';
+                    const hasEndpoint = friendliConfig.friendli_model && friendliConfig.friendli_model.endpoint_url;
+                    
+                    // Update status display
+                    if (hasToken && hasTeamId && hasEndpoint) {
+                        document.getElementById('friendliStatus').textContent = 'Configured';
+                        document.getElementById('friendliStatus').style.color = '#10b981';
+                    } else {
+                        document.getElementById('friendliStatus').textContent = 'Not Configured';
+                        document.getElementById('friendliStatus').style.color = '#ef4444';
+                    }
+                    
+                    // Update acceleration types
+                    const accelerationTypes = friendliConfig.friendli_model?.acceleration_type || [];
+                    document.getElementById('friendliAccelerationTypes').textContent = accelerationTypes.join(', ') || 'None';
+                }
+            } else {
+                document.getElementById('friendliStatus').textContent = 'Error loading';
+                document.getElementById('friendliStatus').style.color = '#ef4444';
+            }
+        } catch (error) {
+            console.error('Error loading AI acceleration settings:', error);
+            document.getElementById('friendliStatus').textContent = 'Error loading';
+            document.getElementById('friendliStatus').style.color = '#ef4444';
         }
     }
 
