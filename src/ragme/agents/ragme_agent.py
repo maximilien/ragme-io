@@ -578,3 +578,33 @@ Examples:
         except Exception as e:
             logger.error(f"Error getting memory info: {str(e)}")
             return {"memory_type": "ChatMemoryBuffer", "error": str(e)}
+
+    def cleanup(self):
+        """
+        Clean up resources and close connections to prevent ResourceWarnings.
+        """
+        try:
+            # Clear memory
+            if hasattr(self, 'memory') and self.memory:
+                self.memory.reset()
+            
+            # Reset confirmation state
+            self.reset_confirmation_state()
+            
+            # Clean up specialized agents
+            if hasattr(self, 'functional_agent') and self.functional_agent:
+                if hasattr(self.functional_agent, 'cleanup'):
+                    self.functional_agent.cleanup()
+            
+            if hasattr(self, 'query_agent') and self.query_agent:
+                if hasattr(self.query_agent, 'cleanup'):
+                    self.query_agent.cleanup()
+            
+            # Clear references
+            self.ragme = None
+            self.llm = None
+            self.agent = None
+            
+            logger.info("RagMeAgent cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during RagMeAgent cleanup: {str(e)}")

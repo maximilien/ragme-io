@@ -165,7 +165,19 @@ def run_api_tests():
     # Set environment variable for test collection to ensure it overrides config
     original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
     os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
+    from tests.integration.config_manager import get_test_image_collection_name
+    os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = get_test_image_collection_name()
     print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
+    print(f"🔧 Set VECTOR_DB_IMAGE_COLLECTION_NAME={get_test_image_collection_name()}")
+    
+    # Force reload of config module to pick up new environment variables
+    try:
+        from src.ragme import config
+        config.reload()
+        print("🔄 Reloaded RagMe configuration with test environment")
+    except Exception as e:
+        print(f"⚠️ Could not reload config: {e}")
+        # Continue anyway as environment variables should still work
 
     # Restart backend services to pick up the new test configuration
     print("🔄 Restarting backend services with test configuration...")
@@ -266,6 +278,10 @@ def run_api_tests():
             else:
                 os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
                 print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
+                
+        # Remove test image collection name
+        os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
+        print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
         teardown_test_config()
 
 
@@ -283,7 +299,19 @@ async def run_agent_tests():
     # Set environment variable for test collection to ensure it overrides config
     original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
     os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
+    from tests.integration.config_manager import get_test_image_collection_name
+    os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = get_test_image_collection_name()
     print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
+    print(f"🔧 Set VECTOR_DB_IMAGE_COLLECTION_NAME={get_test_image_collection_name()}")
+    
+    # Force reload of config module to pick up new environment variables
+    try:
+        from src.ragme import config
+        config.reload()
+        print("🔄 Reloaded RagMe configuration with test environment")
+    except Exception as e:
+        print(f"⚠️ Could not reload config: {e}")
+        # Continue anyway as environment variables should still work
 
     # Restart backend services to pick up the new test configuration
     print("🔄 Restarting backend services with test configuration...")
@@ -391,6 +419,10 @@ async def run_agent_tests():
             else:
                 os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
                 print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
+                
+        # Remove test image collection name
+        os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
+        print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
         teardown_test_config()
 
 
