@@ -747,6 +747,95 @@ class RagMeTools:
         except Exception as e:
             return f"Error listing images by datetime: {str(e)}"
 
+    def get_images_by_date_range_with_data(self, date_query: str) -> list[dict]:
+        """
+        Get images from a date range with their OCR text and classification data.
+        This tool is designed for use by the QueryAgent to access image data for summarization.
+
+        Args:
+            date_query (str): Natural language date query (e.g., "today", "yesterday", "this week", "last week")
+
+        Returns:
+            list[dict]: List of images with OCR text and classification data
+        """
+        try:
+            # Parse the date query into a date range
+            date_range = parse_date_query(date_query)
+            if not date_range:
+                return []
+
+            start_date, end_date = date_range
+
+            # Create image vector database for listing images
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List all images from image collection
+            all_images = image_vdb.list_images(limit=1000, offset=0)
+
+            # Filter by date range
+            filtered_images = filter_items_by_date_range(
+                all_images, start_date, end_date
+            )
+
+            # Process each image to extract OCR text and classification data
+            processed_images = []
+            for img in filtered_images:
+                metadata = img.get("metadata", {})
+                if isinstance(metadata, str):
+                    import json
+
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+                # Extract OCR text
+                ocr_content = metadata.get("ocr_content", {})
+                ocr_text = ocr_content.get("extracted_text", "") if ocr_content else ""
+
+                # Extract classification data
+                classification = metadata.get("classification", {})
+                top_prediction = classification.get("top_prediction", {})
+                label = top_prediction.get("label", "unknown")
+                confidence = top_prediction.get("confidence", 0)
+
+                # Create processed image data
+                processed_image = {
+                    "id": img.get("id", "unknown"),
+                    "url": img.get("url", "unknown"),
+                    "filename": metadata.get("filename", "unknown"),
+                    "date_added": metadata.get("date_added", "unknown"),
+                    "ocr_text": ocr_text,
+                    "classification": {"label": label, "confidence": confidence},
+                    "has_ocr": bool(ocr_text.strip()),
+                    "metadata": metadata,
+                }
+
+                processed_images.append(processed_image)
+
+            return processed_images
+
+        except Exception:
+            return []
+
+    def get_todays_images_with_data(self) -> list[dict]:
+        """
+        Get today's images with their OCR text and classification data.
+        This tool is designed for use by the QueryAgent to access image data for summarization.
+        (Convenience method that calls get_images_by_date_range_with_data)
+
+        Returns:
+            list[dict]: List of today's images with OCR text and classification data
+        """
+        return self.get_images_by_date_range_with_data("today")
+
     def get_all_tools(self):
         """
         Get all tools as a list of functions for use with LlamaIndex FunctionAgent.
@@ -770,4 +859,6 @@ class RagMeTools:
             self.list_image_collection,
             self.list_images_by_datetime,
             self.delete_image_from_collection,
+            self.get_todays_images_with_data,
+            self.get_images_by_date_range_with_data,
         ]

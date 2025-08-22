@@ -6,6 +6,7 @@ import warnings
 
 from llama_index.llms.openai import OpenAI
 
+from src.ragme.utils.common import filter_items_by_date_range, parse_date_query
 from src.ragme.utils.config_manager import config
 
 # Set up logging
@@ -75,6 +76,290 @@ class QueryAgent:
 
         self.llm = OpenAI(model=llm_model, temperature=temperature)
 
+    def get_images_by_date_range_with_data(self, date_query: str) -> list[dict]:
+        """
+        Get images from a date range with their OCR text and classification data.
+
+        Args:
+            date_query (str): Natural language date query (e.g., "today", "yesterday", "this week", "last week")
+
+        Returns:
+            list[dict]: List of images with OCR text and classification data
+        """
+        try:
+            # Parse the date query into a date range
+            date_range = parse_date_query(date_query)
+            if not date_range:
+                logger.error(f"Could not parse date query: {date_query}")
+                return []
+
+            start_date, end_date = date_range
+
+            # Get all images from the image collection
+            images = self.vector_db.list_images(limit=1000, offset=0)
+
+            # Filter by date range
+            filtered_images = filter_items_by_date_range(images, start_date, end_date)
+
+            # Process each image to extract OCR text and classification data
+            processed_images = []
+            for img in filtered_images:
+                metadata = img.get("metadata", {})
+                if isinstance(metadata, str):
+                    import json
+
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+                # Extract OCR text
+                ocr_content = metadata.get("ocr_content", {})
+                ocr_text = ocr_content.get("extracted_text", "") if ocr_content else ""
+
+                # Extract classification data
+                classification = metadata.get("classification", {})
+                top_prediction = classification.get("top_prediction", {})
+                label = top_prediction.get("label", "unknown")
+                confidence = top_prediction.get("confidence", 0)
+
+                # Create processed image data
+                processed_image = {
+                    "id": img.get("id", "unknown"),
+                    "url": img.get("url", "unknown"),
+                    "filename": metadata.get("filename", "unknown"),
+                    "date_added": metadata.get("date_added", "unknown"),
+                    "ocr_text": ocr_text,
+                    "classification": {"label": label, "confidence": confidence},
+                    "has_ocr": bool(ocr_text.strip()),
+                    "metadata": metadata,
+                }
+
+                processed_images.append(processed_image)
+
+            logger.info(
+                f"Found {len(processed_images)} images for date query '{date_query}'"
+            )
+            return processed_images
+
+        except Exception as e:
+            logger.error(f"Error getting images by date range: {str(e)}")
+            return []
+
+    def get_todays_images_with_data(self) -> list[dict]:
+        """
+        Get today's images with their OCR text and classification data.
+        (Convenience method that calls get_images_by_date_range_with_data)
+
+        Returns:
+            list[dict]: List of today's images with OCR text and classification data
+        """
+        return self.get_images_by_date_range_with_data("today")
+
+    async def _handle_summarize_images_by_date(self, query: str) -> str:
+        """
+        Handle summarize images by date query by providing a list and summary.
+
+        Args:
+            query (str): The original query
+
+        Returns:
+            str: List of images and a summary
+        """
+        try:
+            # Extract date range from query using LLM
+            date_query = await self._extract_date_query_from_summarize_request(query)
+
+            if not date_query:
+                return "I couldn't understand what date range you're asking about. Please specify a date range like 'today', 'yesterday', 'this week', etc."
+
+            # Get images for the date range
+            images = self.get_images_by_date_range_with_data(date_query)
+
+            if not images:
+                return f"No images found for {date_query}."
+
+            # Build the list of images
+            result = f"**Images for {date_query} ({len(images)} found):**\n\n"
+
+            for i, img in enumerate(images, 1):
+                img_id = img.get("id", "unknown")
+                filename = img.get("filename", "unknown")
+                url = img.get("url", "unknown")
+                classification = img.get("classification", {})
+                label = classification.get("label", "unknown")
+                confidence = classification.get("confidence", 0)
+                has_ocr = img.get("has_ocr", False)
+
+                result += f"{i}. **{filename}**\n"
+                result += f"   - URL: {url}\n"
+                result += (
+                    f"   - Classification: {label} ({confidence:.2%} confidence)\n"
+                )
+                result += f"   - OCR Text: {'Available' if has_ocr else 'None'}\n"
+
+                # Add image preview
+                result += f"\n[IMAGE:{img_id}:{filename}]\n\n"
+
+            # Generate summary using LLM
+            summary = await self._generate_images_summary(images, date_query)
+
+            result += f"\n**Summary:**\n{summary}"
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error handling summarize images by date: {str(e)}")
+            return f"Error processing summarize images query: {str(e)}"
+
+    async def _extract_date_query_from_summarize_request(self, query: str) -> str:
+        """
+        Extract the date query from a summarize request using LLM.
+
+        Args:
+            query (str): The original query
+
+        Returns:
+            str: Extracted date query or empty string if not found
+        """
+        try:
+            # Build language instruction based on configuration
+            language_instruction = ""
+            if self.force_english:
+                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
+            elif self.default_language != "en":
+                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+
+            prompt = f"""You are a helpful assistant that extracts date queries from user requests.{language_instruction}
+
+Given a user query about summarizing images, extract the date range they're asking about.
+
+User Query: "{query}"
+
+Supported date formats:
+- "today", "yesterday", "this week", "last week", "this month", "last month", "this year", "last year"
+- "X days ago", "X weeks ago", "X months ago"
+- "Monday", "Tuesday", etc. (for specific days)
+
+If no specific date is mentioned, default to "today".
+
+Please respond with ONLY the date query, nothing else. For example:
+- "summarize today's images" → "today"
+- "summarize yesterday's images" → "yesterday"
+- "summarize this week's images" → "this week"
+- "summarize images from last month" → "last month"
+- "summarize images" → "today"
+
+Date query:"""
+
+            # Generate response using LLM
+            response = self.llm.complete(prompt)
+            date_query = response.text.strip().lower()
+
+            # Validate the date query
+            test_range = parse_date_query(date_query)
+            if not test_range:
+                logger.warning(
+                    f"LLM returned invalid date query: {date_query}, defaulting to 'today'"
+                )
+                return "today"
+
+            return date_query
+
+        except Exception as e:
+            logger.error(f"Error extracting date query: {str(e)}")
+            return "today"  # Default fallback
+
+    async def _handle_summarize_todays_images(self, query: str) -> str:
+        """
+        Handle summarize today's images query (legacy method for backward compatibility).
+
+        Args:
+            query (str): The original query
+
+        Returns:
+            str: List of today's images and a summary
+        """
+        return await self._handle_summarize_images_by_date(query)
+
+    async def _generate_images_summary(
+        self, images: list[dict], date_query: str
+    ) -> str:
+        """
+        Generate a summary of the images using LLM.
+
+        Args:
+            images (list[dict]): List of image data
+            date_query (str): The date range for which the images were retrieved
+
+        Returns:
+            str: Generated summary
+        """
+        try:
+            if not images:
+                return "No images to summarize."
+
+            # Prepare context for LLM
+            context_parts = []
+
+            for i, img in enumerate(images, 1):
+                filename = img.get("filename", "unknown")
+                classification = img.get("classification", {})
+                label = classification.get("label", "unknown")
+                confidence = classification.get("confidence", 0)
+                ocr_text = img.get("ocr_text", "")
+                has_ocr = img.get("has_ocr", False)
+
+                context_parts.append(f"Image {i}: {filename}")
+                context_parts.append(
+                    f"- AI Classification: {label} ({confidence:.2%} confidence)"
+                )
+
+                if has_ocr and ocr_text.strip():
+                    # Truncate OCR text if too long
+                    truncated_ocr = (
+                        ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+                    )
+                    context_parts.append(f"- OCR Text: {truncated_ocr}")
+                else:
+                    context_parts.append("- OCR Text: None available")
+
+                context_parts.append("")
+
+            context = "\n".join(context_parts)
+
+            # Build language instruction based on configuration
+            language_instruction = ""
+            if self.force_english:
+                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
+            elif self.default_language != "en":
+                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+
+            # Create prompt for LLM to generate summary
+            prompt = f"""You are a helpful assistant that summarizes image collections.{language_instruction}
+
+Please provide a comprehensive summary of the following images from {date_query}:
+
+{context}
+
+Instructions for the summary:
+- Analyze the AI classifications to understand the types of images
+- If images have OCR text, incorporate that information into the summary
+- If images don't have OCR text, focus on the classification labels
+- Provide insights about the overall content and themes
+- Be concise but informative
+- Highlight any notable patterns or interesting content
+
+Please provide a clear, well-structured summary:"""
+
+            # Generate response using LLM
+            response = self.llm.complete(prompt)
+            return response.text.strip()
+
+        except Exception as e:
+            logger.error(f"Error generating images summary: {str(e)}")
+            return f"Error generating summary: {str(e)}"
+
     async def run(self, query: str):
         """
         Run a query to answer questions about document content.
@@ -88,8 +373,17 @@ class QueryAgent:
         logger.info(f"QueryAgent received query: '{query}'")
 
         try:
-            # Check if this is a "list images" query and handle it specially
+            # Check if this is a "summarize images" query (generalized to handle any date range)
             query_lower = query.lower().strip()
+            if ("summarize" in query_lower or "summary" in query_lower) and (
+                "images" in query_lower or "image" in query_lower
+            ):
+                logger.info(
+                    "QueryAgent detected summarize images query, handling specially"
+                )
+                return await self._handle_summarize_images_by_date(query)
+
+            # Check if this is a "list images" query and handle it specially
             if "list" in query_lower and (
                 "images" in query_lower or "image" in query_lower
             ):

@@ -96,6 +96,8 @@ IMAGES:
 - List images in the image collection using list_image_collection(limit, offset)
 - List images by date/time using list_images_by_datetime(date_query, limit, offset) - supports natural language like "yesterday", "today", "last week", "3 days ago"
 - Delete images from the collection using delete_image_from_collection(image_id_or_filename)
+- Get today's images with OCR text and classification data using get_todays_images_with_data() - returns structured data for analysis
+- Get images by date range with OCR text and classification data using get_images_by_date_range_with_data(date_query) - supports any natural language date query
 
 GENERAL:
 - Get vector database information using get_vector_db_info()

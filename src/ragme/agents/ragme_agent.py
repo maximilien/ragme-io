@@ -471,6 +471,13 @@ Examples:
             # Check for specific functional operations that should bypass LLM routing
             query_lower = query.lower().strip()
 
+            # Direct routing for summarize images (this should go to QueryAgent for analysis)
+            if ("summarize" in query_lower or "summary" in query_lower) and (
+                "images" in query_lower or "image" in query_lower
+            ):
+                logger.info("Direct routing to QueryAgent for summarize images query")
+                return await self.query_agent.run(query)
+
             # Direct routing for list operations
             if query_lower.startswith("list ") and (
                 "images" in query_lower or "image" in query_lower
