@@ -27,3 +27,7 @@ easyocr>=1.7.0
 
 # HEIC support
 pillow-heif>=0.15.0
+
+# S3/MinIO storage
+boto3>=1.34.0
+minio>=7.2.0

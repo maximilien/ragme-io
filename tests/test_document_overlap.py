@@ -127,7 +127,7 @@ class TestDocumentOverlap:
 
         url_input = JSONInput(data=url_document_data, metadata={"source": "test"})
 
-        with patch("src.ragme.apis.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.get_ragme", return_value=mock_ragme):
             result = await add_json(url_input)
 
         # Verify URL document was added
@@ -160,7 +160,7 @@ class TestDocumentOverlap:
         # Add the PDF document
         pdf_input = JSONInput(data=pdf_document_data, metadata={"source": "test"})
 
-        with patch("src.ragme.apis.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.get_ragme", return_value=mock_ragme):
             result = await add_json(pdf_input)
 
         # Verify PDF document was added
@@ -244,7 +244,7 @@ class TestDocumentOverlap:
 
         pdf_input = JSONInput(data=pdf_documents_data, metadata={"source": "test"})
 
-        with patch("src.ragme.apis.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.get_ragme", return_value=mock_ragme):
             result = await add_json(pdf_input)
 
         # Verify all PDF documents were added
@@ -326,7 +326,7 @@ class TestDocumentOverlap:
 
         url_input = JSONInput(data=url_documents_data, metadata={"source": "test"})
 
-        with patch("src.ragme.apis.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.get_ragme", return_value=mock_ragme):
             result = await add_json(url_input)
 
         # Verify all URL documents were added
@@ -407,7 +407,7 @@ class TestDocumentOverlap:
 
         mixed_input = JSONInput(data=mixed_documents_data, metadata={"source": "test"})
 
-        with patch("src.ragme.apis.api.ragme", mock_ragme):
+        with patch("src.ragme.apis.api.get_ragme", return_value=mock_ragme):
             result = await add_json(mixed_input)
 
         # Verify all documents were added

@@ -207,3 +207,6 @@ config.yaml
 TODOs.md
 .ragme-prompts.txt
 tags.txt
+
+# MinIO data directory
+minio_data/

@@ -23,7 +23,9 @@ class RAGmeAssistant {
             maxDisplayDocuments: 100,
             paginationSize: 20,
             chatHistoryLimit: 50,
-            autoSaveChats: true
+            autoSaveChats: true,
+            copyUploadedDocs: false,
+            copyUploadedImages: false
         };
         this.currentDateFilter = 'current';
         this.currentContentFilter = 'both'; // Default to show both documents and images
@@ -139,7 +141,7 @@ class RAGmeAssistant {
 
     async loadConfiguration() {
         try {
-            const response = await fetch('/api/config');
+            const response = await fetch('http://localhost:8021/config');
             if (response.ok) {
                 this.config = await response.json();
                 console.log('Configuration loaded:', this.config);
@@ -606,8 +608,8 @@ class RAGmeAssistant {
             this.clearEverything();
         });
 
-        document.getElementById('settings').addEventListener('click', () => {
-            this.showSettingsModal();
+        document.getElementById('settings').addEventListener('click', async () => {
+            await this.showSettingsModal();
         });
 
         // New chat button
@@ -793,8 +795,8 @@ class RAGmeAssistant {
         });
 
         // Settings modal
-        document.getElementById('saveSettings').addEventListener('click', () => {
-            this.saveSettings();
+        document.getElementById('saveSettings').addEventListener('click', async () => {
+            await this.saveSettings();
         });
 
         document.getElementById('cancelSettings').addEventListener('click', () => {
@@ -1950,7 +1952,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.switchTab('urlTab');
     }
 
-    showSettingsModal() {
+    async showSettingsModal() {
         this.showModal('settingsModal');
         
         // Populate application information
@@ -1995,6 +1997,24 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         document.getElementById('temperatureValue').textContent = this.settings.temperature;
         document.getElementById('chatHistoryLimit').value = this.settings.chatHistoryLimit || 50;
         document.getElementById('autoSaveChats').checked = this.settings.autoSaveChats !== false;
+        
+        // Populate storage settings from backend config
+        if (this.config && this.config.config && this.config.config.storage) {
+            document.getElementById('copyUploadedDocs').checked = this.config.config.storage.copy_uploaded_docs || false;
+            document.getElementById('copyUploadedImages').checked = this.config.config.storage.copy_uploaded_images || false;
+        } else {
+            // Fallback to local settings
+            document.getElementById('copyUploadedDocs').checked = this.settings.copyUploadedDocs || false;
+            document.getElementById('copyUploadedImages').checked = this.settings.copyUploadedImages || false;
+        }
+        
+        // Ensure configuration is loaded
+        if (!this.config) {
+            await this.loadConfiguration();
+        }
+        
+        // Load storage information
+        await this.loadStorageInfoForSettings();
     }
 
     showModal(modalId) {
@@ -2359,7 +2379,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    saveSettings() {
+    async saveSettings() {
         // General settings
         const maxDocuments = parseInt(document.getElementById('maxDocuments').value);
         const showVectorDbInfo = document.getElementById('showVectorDbInfo').checked;
@@ -2388,6 +2408,33 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const temperature = parseFloat(document.getElementById('temperature').value);
         const chatHistoryLimit = parseInt(document.getElementById('chatHistoryLimit').value);
         const autoSaveChats = document.getElementById('autoSaveChats').checked;
+        
+        // Storage settings
+        const copyUploadedDocs = document.getElementById('copyUploadedDocs').checked;
+        const copyUploadedImages = document.getElementById('copyUploadedImages').checked;
+        
+        // Save storage settings to backend
+        try {
+            const storageResponse = await fetch('http://localhost:8021/update-storage-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    copy_uploaded_docs: copyUploadedDocs,
+                    copy_uploaded_images: copyUploadedImages
+                })
+            });
+            
+            if (storageResponse.ok) {
+                const storageResult = await storageResponse.json();
+                if (storageResult.status === 'success') {
+                    console.log('Storage settings saved to backend');
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to save storage settings to backend:', error);
+        }
         
         // Validation
         if (maxDocuments < 1 || maxDocuments > 100) {
@@ -2432,6 +2479,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.settings.temperature = temperature;
         this.settings.chatHistoryLimit = chatHistoryLimit;
         this.settings.autoSaveChats = autoSaveChats;
+        this.settings.copyUploadedDocs = copyUploadedDocs;
+        this.settings.copyUploadedImages = copyUploadedImages;
         
         // Update global settings
         this.currentVisualizationType = defaultVisualization;
@@ -2450,6 +2499,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         localStorage.setItem('ragme-document-list-width', documentListWidth.toString());
         localStorage.setItem('ragme-chat-history-collapsed', chatHistoryCollapsed.toString());
         localStorage.setItem('ragme-chat-history-width', chatHistoryWidth.toString());
+        localStorage.setItem('ragme-copy-uploaded-docs', copyUploadedDocs.toString());
+        localStorage.setItem('ragme-copy-uploaded-images', copyUploadedImages.toString());
         
         this.hideModal('settingsModal');
         this.showNotification('success', 'Settings saved successfully');
@@ -2550,6 +2601,17 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const savedChatHistoryWidth = localStorage.getItem('ragme-chat-history-width');
         if (savedChatHistoryWidth) {
             this.settings.chatHistoryWidth = parseInt(savedChatHistoryWidth);
+        }
+        
+        // Load storage settings
+        const savedCopyUploadedDocs = localStorage.getItem('ragme-copy-uploaded-docs');
+        if (savedCopyUploadedDocs !== null) {
+            this.settings.copyUploadedDocs = savedCopyUploadedDocs === 'true';
+        }
+        
+        const savedCopyUploadedImages = localStorage.getItem('ragme-copy-uploaded-images');
+        if (savedCopyUploadedImages !== null) {
+            this.settings.copyUploadedImages = savedCopyUploadedImages === 'true';
         }
         
         // Update the visualization type selector to reflect the saved preference
@@ -3002,6 +3064,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             ` : ''}
             
+            <div class="document-details-section" id="storage-section">
+                <h4><i class="fas fa-download"></i> File Download</h4>
+                <div class="storage-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Checking storage availability...</p>
+                </div>
+            </div>
+            
             ${isImage ? `
                 <div class="document-details-section">
                     <h4><i class="fas fa-image"></i> Image Preview</h4>
@@ -3032,6 +3102,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.checkDetailValuesTruncation();
         }, 100);
         
+        // Check storage availability and update the storage section
+        this.checkAndUpdateStorageSection(docId);
+        
         // For images, show the image preview
         if (isImage) {
             console.log('Showing image preview for image document');
@@ -3054,6 +3127,165 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             return date.toLocaleString();
         } catch (e) {
             return dateString;
+        }
+    }
+
+    async checkStorageAvailability(docId) {
+        // Check if a file is available in storage and return download information.
+        // Args: docId - Document ID to check
+        // Returns: Object with storage availability information
+        const maxRetries = 3;
+        const retryDelay = 1000; // 1 second
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(`/download-file/${docId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data;
+                } else if (response.status === 404) {
+                    // Document not found - retry if this is not the last attempt
+                    if (attempt < maxRetries) {
+                        console.log(`Document not found, retrying in ${retryDelay}ms (attempt ${attempt}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        continue;
+                    }
+                    // Document not found - this is expected for some documents
+                    return { status: 'not_found', message: 'Document not found in system' };
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    return { 
+                        status: 'error', 
+                        message: errorData.message || 'Failed to check storage availability' 
+                    };
+                }
+            } catch (error) {
+                console.error(`Error checking storage availability (attempt ${attempt}/${maxRetries}):`, error);
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    continue;
+                }
+                return { status: 'error', message: 'Network error checking storage' };
+            }
+        }
+    }
+
+    formatFileSize(bytes) {
+        // Format file size in human readable format.
+        // Args: bytes - File size in bytes
+        // Returns: Formatted file size string
+        if (!bytes || bytes === 0) return 'Unknown size';
+        
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    async checkAndUpdateStorageSection(docId) {
+        // Check storage availability and update the storage section in the modal
+        const storageSection = document.getElementById('storage-section');
+        if (!storageSection) return;
+
+        try {
+            const storageInfo = await this.checkStorageAvailability(docId);
+            
+            let storageContent = '';
+            
+            if (storageInfo.status === 'success') {
+                // File is available in storage
+                const fileSize = this.formatFileSize(storageInfo.size);
+                const contentType = storageInfo.content_type || 'Unknown type';
+                
+                if (storageInfo.download_url) {
+                    // Show download link
+                    storageContent = `
+                        <div class="storage-available">
+                            <div class="storage-info">
+                                <p><strong>File:</strong> ${storageInfo.filename}</p>
+                                <p><strong>Size:</strong> ${fileSize}</p>
+                                <p><strong>Type:</strong> ${contentType}</p>
+                            </div>
+                            <div class="storage-actions">
+                                <a href="${storageInfo.download_url}" 
+                                   class="btn btn-primary download-btn" 
+                                   download="${storageInfo.filename}"
+                                   target="_blank">
+                                    <i class="fas fa-download"></i> Download File
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // File found but no download URL
+                    storageContent = `
+                        <div class="storage-available">
+                            <div class="storage-info">
+                                <p><strong>File:</strong> ${storageInfo.filename}</p>
+                                <p><strong>Size:</strong> ${fileSize}</p>
+                                <p><strong>Type:</strong> ${contentType}</p>
+                                <p><strong>Status:</strong> <span class="text-warning">${storageInfo.message || 'Download URL not available'}</span></p>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else if (storageInfo.status === 'not_found') {
+                // File not found in storage
+                storageContent = `
+                    <div class="storage-not-available">
+                        <p><i class="fas fa-info-circle"></i> File not available in storage</p>
+                        <p class="text-muted">This document may not have been saved to storage (storage may have been disabled when uploaded) or the file has been removed.</p>
+                    </div>
+                `;
+            } else if (storageInfo.status === 'no_filename') {
+                // No filename in metadata
+                storageContent = `
+                    <div class="storage-not-available">
+                        <p><i class="fas fa-info-circle"></i> No filename available</p>
+                        <p class="text-muted">This document doesn't have a filename in its metadata.</p>
+                    </div>
+                `;
+            } else if (storageInfo.status === 'no_storage') {
+                // File was added before storage service was enabled
+                storageContent = `
+                    <div class="storage-not-available">
+                        <p><i class="fas fa-info-circle"></i> File not available in storage</p>
+                        <p class="text-muted">${storageInfo.message || 'This file was added before the storage service was enabled.'}</p>
+                    </div>
+                `;
+            } else {
+                // Error or other status
+                storageContent = `
+                    <div class="storage-not-available">
+                        <p><i class="fas fa-info-circle"></i> Storage status unavailable</p>
+                        <p class="text-muted">${storageInfo.message || 'Unable to check storage availability'}</p>
+                    </div>
+                `;
+            }
+            
+            // Update the storage section
+            const storageContentDiv = storageSection.querySelector('.storage-loading, .storage-available, .storage-not-available, .storage-error');
+            if (storageContentDiv) {
+                storageContentDiv.outerHTML = storageContent;
+            } else {
+                // Fallback: replace the entire content
+                storageSection.innerHTML = `
+                    <h4><i class="fas fa-download"></i> File Download</h4>
+                    ${storageContent}
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Error updating storage section:', error);
+            const errorContent = `
+                <div class="storage-not-available">
+                    <p><i class="fas fa-info-circle"></i> Storage status unavailable</p>
+                    <p class="text-muted">Unable to check storage availability at this time</p>
+                </div>
+            `;
+            const storageContentDiv = storageSection.querySelector('.storage-loading');
+            if (storageContentDiv) {
+                storageContentDiv.outerHTML = errorContent;
+            }
         }
     }
 
@@ -4390,6 +4622,60 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             }
         } catch (error) {
             vectorDbElement.textContent = 'Error loading';
+        }
+    }
+
+    async loadStorageInfoForSettings() {
+        if (this.config && this.config.config && this.config.config.storage) {
+            const storageType = this.config.config.storage.type || 'Unknown';
+            const bucketName = this.config.config.storage.bucket_name || 'Unknown';
+            const backendConfig = this.config.config.storage.backend_config || {};
+            
+            // Determine bucket name based on storage type
+            let displayBucketName = bucketName;
+            if (storageType === 'local') {
+                displayBucketName = 'documents, images';
+            } else if (storageType === 'minio') {
+                displayBucketName = backendConfig.bucket_name || bucketName;
+            } else if (storageType === 's3') {
+                displayBucketName = backendConfig.bucket_name || bucketName;
+            }
+            
+            // Check if MinIO is available via backend endpoint
+            let minioStatus = 'Unknown';
+            try {
+                const storageStatusResponse = await fetch('http://localhost:8021/storage/status');
+                if (storageStatusResponse.ok) {
+                    const storageStatus = await storageStatusResponse.json();
+                    if (storageStatus.status === 'success' && storageStatus.storage) {
+                        minioStatus = storageStatus.storage.minio_status || 'Unknown';
+                    } else {
+                        minioStatus = 'Not Available';
+                    }
+                } else {
+                    minioStatus = 'Not Available';
+                }
+            } catch (error) {
+                minioStatus = 'Not Available';
+            }
+            
+            // Determine status based on storage type and MinIO availability
+            let status = 'Configured';
+            if (storageType === 'local') {
+                status = `Online (Local Filesystem) - MinIO: ${minioStatus}`;
+            } else if (storageType === 'minio') {
+                status = minioStatus === 'Available' ? 'Online (MinIO)' : 'Offline (MinIO)';
+            } else if (storageType === 's3') {
+                status = 'Online (S3)';
+            }
+            
+            document.getElementById('storageType').textContent = storageType;
+            document.getElementById('storageBucket').textContent = displayBucketName;
+            document.getElementById('storageStatus').textContent = status;
+        } else {
+            document.getElementById('storageType').textContent = 'Not configured';
+            document.getElementById('storageBucket').textContent = 'Not configured';
+            document.getElementById('storageStatus').textContent = 'Not configured';
         }
     }
 

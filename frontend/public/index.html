@@ -415,6 +415,9 @@
                         <button class="settings-tab-btn" data-settings-tab="documentsTab">
                             <i class="fas fa-file-alt"></i> Documents
                         </button>
+                        <button class="settings-tab-btn" data-settings-tab="storageTab">
+                            <i class="fas fa-database"></i> Storage
+                        </button>
                         <button class="settings-tab-btn" data-settings-tab="chatTab">
                             <i class="fas fa-comments"></i> Chat
                         </button>
@@ -575,6 +578,43 @@
                         </div>
                     </div>
                     
+                    <!-- Storage Settings Tab -->
+                    <div class="settings-tab-content" id="storageTab">
+                        <div class="settings-section">
+                            <h4><i class="fas fa-cloud-upload-alt"></i> File Storage Settings</h4>
+                            <div class="setting-item">
+                                <label for="copyUploadedDocs">
+                                    <input type="checkbox" id="copyUploadedDocs">
+                                    Copy Uploaded Documents to Storage
+                                </label>
+                                <small>Automatically copy uploaded documents to the storage service</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="copyUploadedImages">
+                                    <input type="checkbox" id="copyUploadedImages">
+                                    Copy Uploaded Images to Storage
+                                </label>
+                                <small>Automatically copy uploaded images to the storage service</small>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-info-circle"></i> Storage Information</h4>
+                            <div class="setting-item read-only">
+                                <label>Storage Type:</label>
+                                <span id="storageType">-</span>
+                            </div>
+                            <div class="setting-item read-only">
+                                <label>Storage Bucket:</label>
+                                <span id="storageBucket">-</span>
+                            </div>
+                            <div class="setting-item read-only">
+                                <label>Storage Status:</label>
+                                <span id="storageStatus">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Chat Settings Tab -->
                     <div class="settings-tab-content" id="chatTab">
                         <div class="settings-section">
@@ -676,6 +716,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=1.1"></script>
 </body>
 </html> 
