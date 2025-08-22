@@ -340,8 +340,12 @@ class TestRagMeAgent:
         # Create RagMeAgent instance
         agent = RagMeAgent(mock_ragme)
 
-        # Mock LLM responses for different delete operations
-        with patch.object(agent, "llm") as mock_llm:
+        # Mock config to ensure confirmation is required and LLM responses
+        with (
+            patch("src.ragme.agents.ragme_agent.config") as mock_config,
+            patch.object(agent, "llm") as mock_llm,
+        ):
+            mock_config.is_feature_enabled.return_value = False
             # Test single document deletion
             mock_response = Mock()
             mock_response.text = (

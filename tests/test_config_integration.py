@@ -115,10 +115,26 @@ class TestConfigIntegration(unittest.TestCase):
         # Test each database has required fields
         for db in vdb_config["databases"]:
             with self.subTest(db=db.get("name", "unknown")):
-                required_fields = ["name", "type", "collection_name"]
+                required_fields = ["name", "type", "collections"]
                 for field in required_fields:
                     self.assertIn(
                         field, db, f"Database missing required field: {field}"
+                    )
+
+                # Test that collections is a list and has at least one collection
+                collections = db.get("collections", [])
+                self.assertIsInstance(collections, list, "collections should be a list")
+                self.assertGreater(
+                    len(collections), 0, "Database should have at least one collection"
+                )
+
+                # Test each collection has required fields
+                for collection in collections:
+                    self.assertIn(
+                        "name", collection, "Collection missing required field: name"
+                    )
+                    self.assertIn(
+                        "type", collection, "Collection missing required field: type"
                     )
 
     def test_default_database_exists_in_list(self):
