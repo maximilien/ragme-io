@@ -168,8 +168,8 @@ class TestRagMeAgent:
 
         # Verify we have the expected number of tools
         assert (
-            len(tools) == 15
-        )  # write, delete_collection, delete_document, delete_document_by_url, delete_all_documents, delete_documents_by_pattern, list, list_documents_by_datetime, crawl, db info, count, write_image_to_collection, list_image_collection, list_images_by_datetime, delete_image_from_collection
+            len(tools) == 17
+        )  # write, delete_collection, delete_document, delete_document_by_url, delete_all_documents, delete_documents_by_pattern, list, list_documents_by_datetime, crawl, db info, count, write_image_to_collection, list_image_collection, list_images_by_datetime, delete_image_from_collection, get_todays_images_with_data, get_images_by_date_range_with_data
 
         # Test that the tools can access RagMe methods
         assert hasattr(agent.functional_agent.tools, "list_ragme_collection")
@@ -192,6 +192,14 @@ class TestRagMeAgent:
         assert callable(agent.functional_agent.tools.list_documents_by_datetime)
         assert hasattr(agent.functional_agent.tools, "list_images_by_datetime")
         assert callable(agent.functional_agent.tools.list_images_by_datetime)
+
+        # Test that the new image summarization tools are available
+        assert hasattr(agent.functional_agent.tools, "get_todays_images_with_data")
+        assert callable(agent.functional_agent.tools.get_todays_images_with_data)
+        assert hasattr(
+            agent.functional_agent.tools, "get_images_by_date_range_with_data"
+        )
+        assert callable(agent.functional_agent.tools.get_images_by_date_range_with_data)
 
     def test_count_documents_tool(self):
         """Test that the count_documents tool works correctly."""
