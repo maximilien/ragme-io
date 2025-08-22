@@ -14,6 +14,7 @@ from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel
 
 from ..utils.config_manager import config
+from ..utils.storage import StorageService
 
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(
@@ -47,6 +48,17 @@ app = FastAPI(
     description="MCP (Model Context Protocol) Server for document processing",
     version=app_config.get("version", "1.0.0"),
 )
+
+# Storage service will be initialized lazily when needed
+_storage_service = None
+
+
+def get_storage_service():
+    """Get or create storage service instance"""
+    global _storage_service
+    if _storage_service is None:
+        _storage_service = StorageService(config)
+    return _storage_service
 
 
 # Cleanup function
@@ -127,6 +139,28 @@ async def process_pdf(file: UploadFile = File(...)):
                     **pdf_metadata,  # Include PDF metadata but don't let it override filename
                 }
 
+                # Copy file to storage if enabled
+                storage_path = None
+                if config.is_copy_uploaded_docs_enabled():
+                    try:
+                        from datetime import datetime
+
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                        storage_path = f"documents/{timestamp}_{file.filename}"
+                        get_storage_service().upload_data(
+                            data=content,
+                            object_name=storage_path,
+                            content_type="application/pdf",
+                        )
+                        print(f"Copied PDF to storage: {storage_path}")
+                    except Exception as storage_error:
+                        print(f"Failed to copy PDF to storage: {storage_error}")
+                        storage_path = None
+
+                # Add storage path to metadata if file was copied to storage
+                if storage_path:
+                    metadata["storage_path"] = storage_path
+
                 return ToolResponse(
                     success=True,
                     data={
@@ -188,6 +222,28 @@ async def process_docx(file: UploadFile = File(...)):
                 "modified": str(core_props.modified) if core_props.modified else None,
             }
 
+            # Copy file to storage if enabled
+            storage_path = None
+            if config.is_copy_uploaded_docs_enabled():
+                try:
+                    from datetime import datetime
+
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    storage_path = f"documents/{timestamp}_{file.filename}"
+                    get_storage_service().upload_data(
+                        data=content,
+                        object_name=storage_path,
+                        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    )
+                    print(f"Copied DOCX to storage: {storage_path}")
+                except Exception as storage_error:
+                    print(f"Failed to copy DOCX to storage: {storage_error}")
+                    storage_path = None
+
+            # Add storage path to metadata if file was copied to storage
+            if storage_path:
+                metadata["storage_path"] = storage_path
+
             return ToolResponse(
                 success=True,
                 data={
@@ -242,6 +298,28 @@ async def process_pdf_base64(request: Base64FileRequest):
                     "filename": request.filename,  # Always preserve the filename
                     **pdf_metadata,  # Include PDF metadata but don't let it override filename
                 }
+
+                # Copy file to storage if enabled
+                storage_path = None
+                if config.is_copy_uploaded_docs_enabled():
+                    try:
+                        from datetime import datetime
+
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                        storage_path = f"documents/{timestamp}_{request.filename}"
+                        get_storage_service().upload_data(
+                            data=content,
+                            object_name=storage_path,
+                            content_type="application/pdf",
+                        )
+                        print(f"Copied PDF to storage: {storage_path}")
+                    except Exception as storage_error:
+                        print(f"Failed to copy PDF to storage: {storage_error}")
+                        storage_path = None
+
+                # Add storage path to metadata if file was copied to storage
+                if storage_path:
+                    metadata["storage_path"] = storage_path
 
                 return ToolResponse(
                     success=True,
@@ -304,6 +382,28 @@ async def process_docx_base64(request: Base64FileRequest):
                 "created": str(core_props.created) if core_props.created else None,
                 "modified": str(core_props.modified) if core_props.modified else None,
             }
+
+            # Copy file to storage if enabled
+            storage_path = None
+            if config.is_copy_uploaded_docs_enabled():
+                try:
+                    from datetime import datetime
+
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    storage_path = f"documents/{timestamp}_{request.filename}"
+                    get_storage_service().upload_data(
+                        data=content,
+                        object_name=storage_path,
+                        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    )
+                    print(f"Copied DOCX to storage: {storage_path}")
+                except Exception as storage_error:
+                    print(f"Failed to copy DOCX to storage: {storage_error}")
+                    storage_path = None
+
+            # Add storage path to metadata if file was copied to storage
+            if storage_path:
+                metadata["storage_path"] = storage_path
 
             return ToolResponse(
                 success=True,

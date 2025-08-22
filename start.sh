@@ -61,12 +61,38 @@ stop_existing() {
     check_port ${RAGME_MCP_PORT:-8022}  # MCP
 }
 
+# Function to start MinIO service
+start_minio() {
+    echo "Starting MinIO service..."
+    
+    # Check if MinIO is already running
+    if lsof -Pi :9000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "MinIO is already running on port 9000"
+        return 0
+    fi
+    
+    # Create minio_data directory if it doesn't exist
+    mkdir -p minio_data
+    
+    # Start MinIO server
+    echo "Starting MinIO server on port 9000..."
+    minio server minio_data --console-address ":9001" > logs/minio.log 2>&1 &
+    echo $! >> .pid
+    sleep 3
+    
+    echo "✅ MinIO service started successfully!"
+    echo "MinIO Console: http://localhost:9001 (minioadmin/minioadmin)"
+}
+
 # Function to start core services (API, MCP, Agent)
 start_core_services() {
     echo "Starting core RAGme services..."
     
     # Create logs directory if it doesn't exist
     mkdir -p logs
+    
+    # Start MinIO first
+    start_minio
     
     # Start api.py
     echo "Starting api.py..."
@@ -122,9 +148,12 @@ start_service() {
             echo $! >> .pid
             sleep 3
             ;;
+        "minio")
+            start_minio
+            ;;
         *)
             echo "Unknown service: $service"
-            echo "Available services: frontend, api, mcp"
+            echo "Available services: frontend, api, mcp, minio"
             return 1
             ;;
     esac

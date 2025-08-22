@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,11 +16,15 @@ class TestCountDocumentsAPI:
         """Set up test client."""
         self.client = TestClient(app)
 
-    @patch("src.ragme.apis.api.ragme")
-    def test_count_documents_success_all_filter(self, mock_ragme):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_success_all_filter(self, mock_get_ragme):
         """Test successful document count with 'all' date filter using efficient method."""
-        # Setup mocks - mock the efficient count_documents method
-        mock_ragme.vector_db.count_documents = Mock(return_value=3)
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(return_value=3)
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
         response = self.client.get("/count-documents")
@@ -33,13 +37,17 @@ class TestCountDocumentsAPI:
         assert data["date_filter"] == "all"
 
         # Verify efficient method was called
-        mock_ragme.vector_db.count_documents.assert_called_once_with("all")
+        mock_ragme_instance.vector_db.count_documents.assert_called_once_with("all")
 
-    @patch("src.ragme.apis.api.ragme")
-    def test_count_documents_success_current_filter(self, mock_ragme):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_success_current_filter(self, mock_get_ragme):
         """Test successful document count with 'current' date filter using efficient method."""
-        # Setup mocks - mock the efficient count_documents method
-        mock_ragme.vector_db.count_documents = Mock(return_value=1)
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(return_value=1)
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
         response = self.client.get("/count-documents?date_filter=current")
@@ -52,13 +60,17 @@ class TestCountDocumentsAPI:
         assert data["date_filter"] == "current"
 
         # Verify efficient method was called
-        mock_ragme.vector_db.count_documents.assert_called_once_with("current")
+        mock_ragme_instance.vector_db.count_documents.assert_called_once_with("current")
 
-    @patch("src.ragme.apis.api.ragme")
-    def test_count_documents_empty_collection(self, mock_ragme):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_empty_collection(self, mock_get_ragme):
         """Test document count when collection is empty."""
-        # Setup mocks - mock the efficient count_documents method returning 0
-        mock_ragme.vector_db.count_documents = Mock(return_value=0)
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(return_value=0)
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
         response = self.client.get("/count-documents")
@@ -70,13 +82,17 @@ class TestCountDocumentsAPI:
         assert data["count"] == 0
         assert data["date_filter"] == "all"
 
-    @patch("src.ragme.apis.api.ragme")
-    def test_count_documents_error_handling(self, mock_ragme):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_error_handling(self, mock_get_ragme):
         """Test error handling when count_documents raises exception."""
-        # Setup mock to raise exception
-        mock_ragme.vector_db.count_documents = Mock(
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(
             side_effect=Exception("Database connection failed")
         )
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
         response = self.client.get("/count-documents")
@@ -94,11 +110,15 @@ class TestCountDocumentsAPI:
         # The filter function will handle the invalid filter
         assert response.status_code in [200, 422]  # Depending on validation
 
-    @patch("src.ragme.apis.api.ragme")
-    def test_count_documents_month_filter(self, mock_ragme):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_month_filter(self, mock_get_ragme):
         """Test document count with 'month' date filter."""
-        # Setup mocks - mock the efficient count_documents method
-        mock_ragme.vector_db.count_documents = Mock(return_value=5)
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(return_value=5)
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
         response = self.client.get("/count-documents?date_filter=month")
@@ -111,13 +131,17 @@ class TestCountDocumentsAPI:
         assert data["date_filter"] == "month"
 
         # Verify efficient method was called
-        mock_ragme.vector_db.count_documents.assert_called_once_with("month")
+        mock_ragme_instance.vector_db.count_documents.assert_called_once_with("month")
 
-    @patch("src.ragme.apis.api.ragme")
-    def test_count_documents_year_filter(self, mock_ragme):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_year_filter(self, mock_get_ragme):
         """Test document count with 'year' date filter."""
-        # Setup mocks - mock the efficient count_documents method
-        mock_ragme.vector_db.count_documents = Mock(return_value=75)
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(return_value=75)
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
         response = self.client.get("/count-documents?date_filter=year")
@@ -130,7 +154,7 @@ class TestCountDocumentsAPI:
         assert data["date_filter"] == "year"
 
         # Verify efficient method was called
-        mock_ragme.vector_db.count_documents.assert_called_once_with("year")
+        mock_ragme_instance.vector_db.count_documents.assert_called_once_with("year")
 
 
 if __name__ == "__main__":

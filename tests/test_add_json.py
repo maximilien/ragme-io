@@ -39,12 +39,16 @@ def client():
 @pytest.fixture
 def mock_ragme():
     """Mock the RagMe instance."""
-    with patch("src.ragme.apis.api.ragme") as mock:
-        # Setup mock methods
-        mock.write_json_to_weaviate = MagicMock()
-        mock.run = MagicMock()
-        mock.cleanup = MagicMock()
-        yield mock
+    with patch("src.ragme.apis.api.get_ragme") as mock_get_ragme:
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.write_json_to_weaviate = MagicMock()
+        mock_ragme_instance.run = MagicMock()
+        mock_ragme_instance.cleanup = MagicMock()
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
+        yield mock_ragme_instance
 
 
 def test_add_json_success(client, mock_ragme):

@@ -279,6 +279,69 @@ class ConfigManager:
 
         return db_config.get("image_embedding_model", "text-embedding-3-large")
 
+    def get_storage_config(self) -> dict[str, Any]:
+        """
+        Get storage service configuration.
+
+        Returns:
+            Storage configuration dictionary
+        """
+        return self.get("storage", {})
+
+    def get_storage_type(self) -> str:
+        """
+        Get the storage service type.
+
+        Returns:
+            Storage type (minio, s3, local), defaults to "minio"
+        """
+        return self.get("storage.type", "minio")
+
+    def get_storage_backend_config(
+        self, backend_type: str | None = None
+    ) -> dict[str, Any]:
+        """
+        Get configuration for a specific storage backend.
+
+        Args:
+            backend_type: Storage backend type (minio, s3, local). If None, uses current storage type.
+
+        Returns:
+            Backend configuration dictionary
+        """
+        if backend_type is None:
+            backend_type = self.get_storage_type()
+
+        return self.get(f"storage.{backend_type}", {})
+
+    def get_storage_bucket_name(self) -> str:
+        """
+        Get the storage bucket name for the current storage type.
+
+        Returns:
+            Bucket name, defaults to "ragme-storage"
+        """
+        backend_config = self.get_storage_backend_config()
+        return backend_config.get("bucket_name", "ragme-storage")
+
+    def is_copy_uploaded_docs_enabled(self) -> bool:
+        """
+        Check if copying uploaded documents to storage is enabled.
+
+        Returns:
+            True if copying documents is enabled, False otherwise
+        """
+        return self.get("storage.copy_uploaded_docs", False)
+
+    def is_copy_uploaded_images_enabled(self) -> bool:
+        """
+        Check if copying uploaded images to storage is enabled.
+
+        Returns:
+            True if copying images is enabled, False otherwise
+        """
+        return self.get("storage.copy_uploaded_images", False)
+
     def get_agent_config(self, agent_name: str) -> dict[str, Any] | None:
         """
         Get agent configuration by name.

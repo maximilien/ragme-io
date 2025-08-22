@@ -158,7 +158,7 @@ agents:
   - name: "local-agent"
     type: "local"
     llm_model: "gpt-4o-mini"
-    watch_directory: "watch_directory"
+    watch_directory: "${WATCH_DIRECTORY}"
     chunk_size: 1000
     mcp_servers:
       - name: "local"
@@ -348,6 +348,31 @@ monitoring:
     grafana:
       enabled: false
       port: 3000
+
+# Storage Configuration
+storage:
+  type: "minio"  # Options: minio, s3, local
+  
+  # File copy settings
+  copy_uploaded_docs: false      # Copy uploaded documents to storage service
+  copy_uploaded_images: false    # Copy uploaded images to storage service
+  
+  minio:
+    endpoint: "localhost:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    secure: false  # Set to true for HTTPS
+    bucket_name: "ragme-storage"
+    region: "us-east-1"
+  s3:
+    endpoint: "${S3_ENDPOINT}"
+    access_key: "${S3_ACCESS_KEY}"
+    secret_key: "${S3_SECRET_KEY}"
+    bucket_name: "${S3_BUCKET_NAME}"
+    region: "${S3_REGION:-us-east-1}"
+    secure: true
+  local:
+    path: "${MINIO_LOCAL_PATH}"
 
 # Backup Configuration
 backup:

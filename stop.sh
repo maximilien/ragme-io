@@ -47,13 +47,17 @@ stop_processes() {
     kill_port_process 8020 "New Frontend"
     kill_port_process 8021 "FastAPI"
     kill_port_process 8022 "MCP"
+    kill_port_process 9000 "MinIO"
+    kill_port_process 9001 "MinIO Console"
 
     # Check if any processes are still running
     echo "Checking for any remaining processes..."
     if lsof -Pi :8020 -sTCP:LISTEN -t >/dev/null 2>&1 || \
        lsof -Pi :8021 -sTCP:LISTEN -t >/dev/null 2>&1 || \
-       lsof -Pi :8022 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "Warning: Some processes may still be running on ports 8020, 8021, or 8022"
+       lsof -Pi :8022 -sTCP:LISTEN -t >/dev/null 2>&1 || \
+       lsof -Pi :9000 -sTCP:LISTEN -t >/dev/null 2>&1 || \
+       lsof -Pi :9001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "Warning: Some processes may still be running on ports 8020, 8021, 8022, 9000, or 9001"
         return 1
     else
         echo "All RAGme processes stopped successfully."
@@ -82,9 +86,13 @@ stop_service() {
         "mcp")
             kill_port_process 8022 "MCP"
             ;;
+        "minio")
+            kill_port_process 9000 "MinIO"
+            kill_port_process 9001 "MinIO Console"
+            ;;
         *)
             echo "Unknown service: $service"
-            echo "Available services: frontend, api, mcp"
+            echo "Available services: frontend, api, mcp, minio"
             return 1
             ;;
     esac
@@ -93,8 +101,11 @@ stop_service() {
 }
 
 # Function to identify service from PID
+# This function analyzes the command line of a process to determine which RAGme service it is
 identify_service() {
     local pid=$1
+    
+    # Check if process is still running
     if ! kill -0 $pid 2>/dev/null; then
         echo "stale"
         return
@@ -102,14 +113,38 @@ identify_service() {
     
     # Get the command line for the PID
     local cmd=$(ps -p $pid -o command= 2>/dev/null)
-    if [[ $cmd == *"src.ragme.api"* ]]; then
+    
+    # Handle empty or null command
+    if [[ -z "$cmd" ]]; then
+        echo "Unknown"
+        return
+    fi
+    
+    # Identify services based on command patterns
+    # API service patterns
+    if [[ $cmd == *"src.ragme.apis.api"* ]] || [[ $cmd == *"uvicorn"* ]] && [[ $cmd == *"ragme.apis.api"* ]]; then
         echo "API"
-    elif [[ $cmd == *"src.ragme.mcp"* ]]; then
+    # MCP service patterns
+    elif [[ $cmd == *"src.ragme.apis.mcp"* ]] || [[ $cmd == *"uvicorn"* ]] && [[ $cmd == *"ragme.apis.mcp"* ]]; then
         echo "MCP"
-    elif [[ $cmd == *"src.ragme.local_agent"* ]]; then
+    # Agent service patterns
+    elif [[ $cmd == *"src.ragme.agents.local_agent"* ]] || [[ $cmd == *"python -m src.ragme.agents.local_agent"* ]]; then
         echo "Agent"
+    # Frontend service patterns
     elif [[ $cmd == *"npm start"* ]]; then
         echo "Frontend"
+    # MinIO service patterns
+    elif [[ $cmd == *"minio server"* ]]; then
+        echo "MinIO"
+    # Fallback patterns for uvicorn processes that might not match exact patterns
+    elif [[ $cmd == *"uvicorn"* ]] && [[ $cmd == *"ragme"* ]]; then
+        if [[ $cmd == *"api"* ]]; then
+            echo "API"
+        elif [[ $cmd == *"mcp"* ]]; then
+            echo "MCP"
+        else
+            echo "Unknown RAGme Service"
+        fi
     else
         echo "Unknown"
     fi
@@ -173,7 +208,7 @@ show_status() {
     echo "🌐 Port Status:"
     
     # Check each port
-    local ports=("8020:New Frontend" "8021:FastAPI" "8022:MCP")
+    local ports=("8020:New Frontend" "8021:FastAPI" "8022:MCP" "9000:MinIO" "9001:MinIO Console")
     local all_running=true
     
     for port_info in "${ports[@]}"; do
@@ -193,6 +228,8 @@ show_status() {
         echo "   • New Frontend: http://localhost:8020"
         echo "   • API: http://localhost:8021"
         echo "   • MCP: http://localhost:8022"
+        echo "   • MinIO: http://localhost:9000"
+        echo "   • MinIO Console: http://localhost:9001"
     else
         echo "⚠️  Some RAGme services are not running."
         echo "   Use './stop.sh restart' to restart all services."
@@ -234,11 +271,11 @@ case "${1:-stop}" in
     "status")
         show_status
         ;;
-    "frontend"|"api"|"mcp")
+    "frontend"|"api"|"mcp"|"minio")
         stop_service "$1"
         ;;
     *)
-        echo "Usage: $0 [stop|restart|status|frontend|api|mcp]"
+        echo "Usage: $0 [stop|restart|status|frontend|api|mcp|minio]"
         echo ""
         echo "Commands:"
         echo "  stop       - Stop all RAGme processes (default)"

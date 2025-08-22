@@ -3070,4 +3070,118 @@ body {
     .setting-item select {
         width: 150px;
     }
+}
+
+/* Storage Section Styles */
+.storage-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.storage-loading i {
+    color: #6b7280;
+    font-size: 1rem;
+}
+
+.storage-loading p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.storage-available {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.storage-info {
+    margin-bottom: 1rem;
+}
+
+.storage-info p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+.storage-info p strong {
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.storage-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.download-btn {
+    background: #2563eb;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+    background: #1d4ed8;
+    color: white;
+    text-decoration: none;
+}
+
+.storage-not-available {
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.storage-not-available p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+    color: #92400e;
+}
+
+.storage-not-available p.text-muted {
+    color: #a16207;
+    font-size: 0.8rem;
+}
+
+.storage-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.storage-error p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+    color: #dc2626;
+}
+
+.storage-error p.text-muted {
+    color: #b91c1c;
+    font-size: 0.8rem;
+}
+
+.text-warning {
+    color: #f59e0b;
+}
+
+.text-muted {
+    color: #6b7280;
 } 

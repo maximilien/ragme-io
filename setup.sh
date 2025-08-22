@@ -196,6 +196,32 @@ install_node_deps() {
     print_status "Node.js dependencies installed successfully!"
 }
 
+# Function to install MinIO
+install_minio() {
+    print_header "Installing MinIO..."
+    
+    # Check if MinIO is already installed
+    if command_exists minio; then
+        print_status "✅ MinIO is already installed"
+        return 0
+    fi
+    
+    # Install MinIO using Homebrew
+    print_status "Installing MinIO via Homebrew..."
+    if brew install minio/stable/minio; then
+        print_status "✅ MinIO installed successfully"
+    else
+        print_error "❌ Failed to install MinIO"
+        print_warning "You can install MinIO manually from https://min.io/download"
+        return 1
+    fi
+    
+    # Create minio_data directory
+    print_status "Creating MinIO data directory..."
+    mkdir -p minio_data
+    print_status "✅ MinIO data directory created"
+}
+
 # Function to run initial tests
 run_initial_tests() {
     print_header "Running initial tests..."
@@ -295,6 +321,9 @@ main() {
     else
         print_status "Skipping Node.js dependency installation"
     fi
+    
+    # Install MinIO
+    install_minio
     
     # Run initial tests
     run_initial_tests

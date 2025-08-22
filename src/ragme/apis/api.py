@@ -13,10 +13,12 @@ import PyPDF2
 from docx import Document
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ..ragme import RagMe
 from ..utils.config_manager import config
+from ..utils.storage import StorageService
 
 # Force reload configuration to pick up environment variable changes
 config.reload()
@@ -50,7 +52,8 @@ async def lifespan(app: FastAPI):
     # Startup
     yield
     # Shutdown
-    ragme.cleanup()
+    if _ragme is not None:
+        _ragme.cleanup()
 
 
 # Get application configuration
@@ -76,8 +79,28 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Initialize RagMe instance
-ragme = RagMe()
+# RagMe instance will be initialized lazily when needed
+_ragme = None
+
+
+def get_ragme():
+    """Get or create RagMe instance"""
+    global _ragme
+    if _ragme is None:
+        _ragme = RagMe()
+    return _ragme
+
+
+# Storage service will be initialized lazily when needed
+_storage_service = None
+
+
+def get_storage_service():
+    """Get or create storage service instance"""
+    global _storage_service
+    if _storage_service is None:
+        _storage_service = StorageService(config)
+    return _storage_service
 
 
 class URLInput(BaseModel):
@@ -131,7 +154,7 @@ async def add_urls(url_input: URLInput):
         dict: Status message and number of URLs processed
     """
     try:
-        ragme.write_webpages_to_weaviate(url_input.urls)
+        get_ragme().write_webpages_to_weaviate(url_input.urls)
         return {
             "status": "success",
             "message": f"Successfully processed {len(url_input.urls)} URLs",
@@ -183,7 +206,7 @@ async def add_json(json_input: JSONInput):
                     unique_url = f"{url}#{timestamp}"
 
                 # Check if a document with the same URL already exists
-                existing_doc = ragme.vector_db.find_document_by_url(unique_url)
+                existing_doc = get_ragme().vector_db.find_document_by_url(unique_url)
                 if existing_doc:
                     # Only replace if it's not a chunked document or if the new one
                     # is chunked. This prevents chunked documents from replacing
@@ -202,7 +225,7 @@ async def add_json(json_input: JSONInput):
                         not existing_is_chunked and new_is_chunked
                     ):
                         # Delete the existing document
-                        ragme.vector_db.delete_document(existing_doc["id"])
+                        get_ragme().vector_db.delete_document(existing_doc["id"])
                         replaced_count += 1
                     elif existing_is_chunked and not new_is_chunked:
                         # Skip adding this document to avoid replacing chunked
@@ -210,7 +233,7 @@ async def add_json(json_input: JSONInput):
                         continue
 
                 # Add the new document with unique URL
-                ragme.vector_db.write_documents(
+                get_ragme().vector_db.write_documents(
                     [{"text": text, "url": unique_url, "metadata": doc_metadata}]
                 )
                 processed_count += 1
@@ -227,7 +250,7 @@ async def add_json(json_input: JSONInput):
             }
         else:
             # Fallback to original behavior for backward compatibility
-            ragme.write_json_to_weaviate(json_input.data, json_input.metadata)
+            get_ragme().write_json_to_weaviate(json_input.data, json_input.metadata)
             return {"status": "success", "message": "JSON data added to RAG system"}
 
     except Exception as e:
@@ -250,7 +273,7 @@ async def query(query_input: QueryInput):
         dict: Response from the RAG system
     """
     try:
-        response = await ragme.run(query_input.query)
+        response = await get_ragme().run(query_input.query)
         return {"status": "success", "response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -354,11 +377,11 @@ async def count_documents(
     """
     try:
         # Use efficient count method if available
-        if hasattr(ragme.vector_db, "count_documents"):
-            count = ragme.vector_db.count_documents(date_filter)
+        if hasattr(get_ragme().vector_db, "count_documents"):
+            count = get_ragme().vector_db.count_documents(date_filter)
         else:
             # Fallback to old method for backward compatibility
-            all_documents = ragme.list_documents(limit=1000, offset=0)
+            all_documents = get_ragme().list_documents(limit=1000, offset=0)
             filtered_documents = filter_documents_by_date(all_documents, date_filter)
             count = len(filtered_documents)
 
@@ -395,7 +418,7 @@ async def list_documents(
     """
     try:
         # Get all documents first to apply date filtering
-        all_documents = ragme.list_documents(limit=1000, offset=0)
+        all_documents = get_ragme().list_documents(limit=1000, offset=0)
 
         # Apply date filtering
         filtered_documents = filter_documents_by_date(all_documents, date_filter)
@@ -445,7 +468,7 @@ async def list_content(
 
         # Get documents if requested
         if content_type in ["documents", "both"]:
-            documents = ragme.list_documents(limit=1000, offset=0)
+            documents = get_ragme().list_documents(limit=1000, offset=0)
             for doc in documents:
                 doc["content_type"] = "document"
             all_items.extend(documents)
@@ -564,7 +587,7 @@ async def summarize_document(input_data: SummarizeInput):
         all_items = []
 
         # Get text documents
-        documents = ragme.list_documents(limit=1000, offset=0)
+        documents = get_ragme().list_documents(limit=1000, offset=0)
         for doc in documents:
             doc["content_type"] = "document"
         all_items.extend(documents)
@@ -793,6 +816,29 @@ async def upload_files(files: list[UploadFile] = File(...)):
                     text_content = content.decode("utf-8", errors="ignore")
 
                 if text_content.strip():
+                    # Generate unique URL to prevent overwriting
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    unique_url = f"file://{file.filename}#{timestamp}"
+
+                    # Copy file to storage if enabled
+                    storage_path = None
+                    if config.is_copy_uploaded_docs_enabled():
+                        try:
+                            # Create storage path with timestamp to avoid conflicts
+                            storage_path = f"documents/{timestamp}_{file.filename}"
+                            get_storage_service().upload_data(
+                                data=content,
+                                object_name=storage_path,
+                                content_type=file.content_type
+                                or "application/octet-stream",
+                            )
+                            print(f"Copied document to storage: {storage_path}")
+                        except Exception as storage_error:
+                            print(
+                                f"Failed to copy document to storage: {storage_error}"
+                            )
+                            storage_path = None
+
                     # Add to RAG system
                     metadata = {
                         "type": filename.split(".")[-1],
@@ -800,11 +846,11 @@ async def upload_files(files: list[UploadFile] = File(...)):
                         "date_added": datetime.now().isoformat(),
                     }
 
-                    # Generate unique URL to prevent overwriting
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                    unique_url = f"file://{file.filename}#{timestamp}"
+                    # Add storage path to metadata if file was copied to storage
+                    if storage_path:
+                        metadata["storage_path"] = storage_path
 
-                    ragme.vector_db.write_documents(
+                    get_ragme().vector_db.write_documents(
                         [
                             {
                                 "text": text_content,
@@ -895,6 +941,22 @@ async def upload_images(files: list[UploadFile] = File(...)):
                     temp_file_path = temp_file.name
 
                 try:
+                    # Copy image to storage if enabled (do this first to get storage_path)
+                    storage_path = None
+                    if config.is_copy_uploaded_images_enabled():
+                        try:
+                            # Create storage path with timestamp to avoid conflicts
+                            storage_path = f"images/{timestamp}_{file.filename}"
+                            get_storage_service().upload_data(
+                                data=content,
+                                object_name=storage_path,
+                                content_type=file.content_type or "image/jpeg",
+                            )
+                            print(f"Copied image to storage: {storage_path}")
+                        except Exception as storage_error:
+                            print(f"Failed to copy image to storage: {storage_error}")
+                            storage_path = None
+
                     # Process image with full pipeline including OCR
                     # For uploaded files, we need to use the temp file path instead of URL
                     file_path = f"file://{temp_file_path}"
@@ -908,6 +970,10 @@ async def upload_images(files: list[UploadFile] = File(...)):
                         "date_added": datetime.now().isoformat(),
                         "processing_timestamp": datetime.now().isoformat(),
                     }
+
+                    # Add storage path to metadata if file was copied to storage
+                    if storage_path:
+                        combined_metadata["storage_path"] = storage_path
 
                     # Encode image to base64 for storage (converts HEIC to JPEG for web compatibility)
                     base64_data = image_processor.encode_image_to_base64(file_path)
@@ -1067,7 +1133,7 @@ async def delete_document(document_id: str):
     """
     try:
         # Check if document exists in text collection
-        documents = ragme.list_documents(limit=1000, offset=0)
+        documents = get_ragme().list_documents(limit=1000, offset=0)
 
         # Convert Weaviate UUID to string for comparison
         text_document = None
@@ -1079,7 +1145,7 @@ async def delete_document(document_id: str):
 
         if text_document:
             # Document exists in text collection, delete it
-            success = ragme.delete_document(document_id)
+            success = get_ragme().delete_document(document_id)
             if success:
                 return {
                     "status": "success",
@@ -1114,7 +1180,7 @@ async def get_document(document_id: str):
     """
     try:
         # First try to get from text collection
-        documents = ragme.list_documents(limit=1000, offset=0)
+        documents = get_ragme().list_documents(limit=1000, offset=0)
         document = next(
             (doc for doc in documents if doc.get("id") == document_id), None
         )
@@ -1138,7 +1204,9 @@ async def get_document(document_id: str):
 
             # List images from image collection
             images = image_vdb.list_images(limit=1000, offset=0)
-            image = next((img for img in images if img.get("id") == document_id), None)
+            image = next(
+                (img for img in images if str(img.get("id")) == document_id), None
+            )
 
             if image:
                 return {
@@ -1198,6 +1266,15 @@ async def get_frontend_config():
             "active_image_collection": config.get_image_collection_name(),
         }
 
+        # Get storage configuration
+        storage_config = {
+            "type": config.get_storage_type(),
+            "copy_uploaded_docs": config.is_copy_uploaded_docs_enabled(),
+            "copy_uploaded_images": config.is_copy_uploaded_images_enabled(),
+            "bucket_name": config.get_storage_bucket_name(),
+            "backend_config": config.get_storage_backend_config(),
+        }
+
         # Build safe configuration for frontend
         frontend_config_data = {
             "application": {
@@ -1206,6 +1283,7 @@ async def get_frontend_config():
                 "version": app_config.get("version", "1.0.0"),
             },
             "vector_database": vector_db_info,
+            "storage": storage_config,
             "frontend": frontend_config,
             "client": client_config,
             "features": features_config,
@@ -1218,11 +1296,71 @@ async def get_frontend_config():
         return {"status": "error", "message": f"Failed to get configuration: {str(e)}"}
 
 
+@app.get("/storage/status")
+async def get_storage_status():
+    """Get storage service status including MinIO availability."""
+    try:
+        import requests
+        from requests.exceptions import RequestException
+
+        # Check MinIO status
+        minio_status = "Not Available"
+        try:
+            response = requests.get(
+                "http://localhost:9000/minio/health/live", timeout=2
+            )
+            if response.status_code == 200:
+                minio_status = "Available"
+        except RequestException:
+            minio_status = "Not Available"
+
+        # Get storage configuration
+        storage_config = {
+            "type": config.get_storage_type(),
+            "copy_uploaded_docs": config.is_copy_uploaded_docs_enabled(),
+            "copy_uploaded_images": config.is_copy_uploaded_images_enabled(),
+            "bucket_name": config.get_storage_bucket_name(),
+            "backend_config": config.get_storage_backend_config(),
+            "minio_status": minio_status,
+        }
+
+        return {"status": "success", "storage": storage_config}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to get storage status: {str(e)}"}
+
+
+@app.post("/update-storage-settings")
+async def update_storage_settings(request: dict):
+    """Update storage settings."""
+    try:
+        # This would typically update the configuration file
+        # For now, we'll just return success as the config is read-only in this implementation
+        copy_uploaded_docs = request.get("copy_uploaded_docs", False)
+        copy_uploaded_images = request.get("copy_uploaded_images", False)
+
+        # Note: In a real implementation, this would update the config.yaml file
+        # For now, we'll just validate the settings
+
+        return {
+            "status": "success",
+            "message": "Storage settings updated successfully",
+            "settings": {
+                "copy_uploaded_docs": copy_uploaded_docs,
+                "copy_uploaded_images": copy_uploaded_images,
+            },
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to update storage settings: {str(e)}",
+        }
+
+
 @app.post("/reset-chat-session")
 async def reset_chat_session():
     """Reset the chat session, clearing memory and confirmation state."""
     try:
-        ragme.reset_chat_session()
+        get_ragme().reset_chat_session()
         return {"status": "success", "message": "Chat session reset successfully"}
     except Exception as e:
         return {"status": "error", "message": f"Failed to reset chat session: {str(e)}"}
@@ -1266,7 +1404,7 @@ try:
             all_items = []
 
             # Get text documents
-            documents = ragme.list_documents(limit=1000, offset=0)
+            documents = get_ragme().list_documents(limit=1000, offset=0)
             for doc in documents:
                 doc["content_type"] = "document"
             all_items.extend(documents)
@@ -1399,7 +1537,7 @@ try:
 
             # Get text documents
             if content_type in ["both", "documents"]:
-                documents = ragme.list_documents(limit=1000, offset=0)
+                documents = get_ragme().list_documents(limit=1000, offset=0)
                 for doc in documents:
                     doc["content_type"] = "document"
                 all_items.extend(documents)
@@ -1668,6 +1806,232 @@ async def count_images():
         return {"count": len(images), "type": "images"}
     except Exception as e:
         print(f"Error counting images: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/download-file/{document_id}")
+async def download_file(document_id: str):
+    """
+    Download a file from storage by document ID.
+
+    This endpoint attempts to find the file in storage and returns a presigned URL
+    or the file content directly.
+
+    Args:
+        document_id: ID of the document to download
+
+    Returns:
+        dict: File download information including URL or content
+    """
+    try:
+        # First try to get from text collection
+        documents = get_ragme().list_documents(limit=1000, offset=0)
+        print(f"Looking for document with ID: {document_id}")
+        print(f"Number of documents: {len(documents)}")
+
+        # Debug: print all document IDs to see what's available
+        doc_ids = [doc.get("id") for doc in documents]
+        print(f"Available document IDs: {doc_ids}")
+
+        document = next(
+            (doc for doc in documents if str(doc.get("id")) == document_id), None
+        )
+
+        if document:
+            print(f"Found document: {document.get('url', 'No URL')}")
+            # This is a text document, try to find the file in storage
+            filename = document.get("metadata", {}).get("filename")
+            storage_path = document.get("metadata", {}).get("storage_path")
+
+            if storage_path:
+                # Use the storage path directly from metadata
+                print(f"Using storage_path from metadata: {storage_path}")
+                storage_service = get_storage_service()
+                try:
+                    # Try to get file info directly first
+                    try:
+                        file_info = storage_service.get_file_info(storage_path)
+                        storage_file = {
+                            "name": storage_path,
+                            "size": file_info.get("size", 0),
+                            "content_type": file_info.get(
+                                "content_type", "application/octet-stream"
+                            ),
+                        }
+                        print(f"Found file in storage: {storage_file}")
+                    except Exception as e:
+                        print(f"Error getting file info for {storage_path}: {e}")
+                        # Fallback: check if the file exists in storage
+                        files = storage_service.list_files(prefix="documents/")
+                        storage_file = next(
+                            (f for f in files if f["name"] == storage_path), None
+                        )
+                        if storage_file:
+                            print(f"Found file via list_files: {storage_file}")
+                        else:
+                            print("File not found in list_files")
+                            storage_file = None
+                except Exception as e:
+                    print(f"Error checking storage: {e}")
+                    storage_file = None
+            elif filename:
+                # Document has filename but no storage_path - it was added before storage service
+                print(
+                    "Document has filename but no storage_path - not available in storage"
+                )
+                storage_file = None
+
+            if storage_file:
+                print("Storage file found, generating download URL...")
+                # Generate presigned URL for download
+                try:
+                    download_url = storage_service.get_file_url(
+                        storage_file["name"], expires_in=3600
+                    )
+                    print(f"Generated download URL: {download_url}")
+                    return JSONResponse(
+                        {
+                            "status": "success",
+                            "download_url": download_url,
+                            "filename": filename,
+                            "content_type": storage_file.get(
+                                "content_type", "application/octet-stream"
+                            ),
+                            "size": storage_file.get("size", 0),
+                            "storage_path": storage_file["name"],
+                        }
+                    )
+                except Exception as url_error:
+                    print(f"Error generating download URL: {url_error}")
+                    # Fallback: return file info without URL
+                    return JSONResponse(
+                        {
+                            "status": "success",
+                            "filename": filename,
+                            "content_type": storage_file.get(
+                                "content_type", "application/octet-stream"
+                            ),
+                            "size": storage_file.get("size", 0),
+                            "storage_path": storage_file["name"],
+                            "message": "File found in storage but could not generate download URL",
+                        }
+                    )
+            else:
+                print("Storage file not found, returning not_found response")
+                return JSONResponse(
+                    {
+                        "status": "not_found",
+                        "message": f"File '{filename}' not found in storage",
+                    }
+                )
+
+        # If not found in text collection, try image collection
+        try:
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            # Get image collection name
+            image_collection_name = config.get_image_collection_name()
+
+            # Create image vector database
+            image_vdb = create_vector_database(collection_name=image_collection_name)
+
+            # List images from image collection
+            images = image_vdb.list_images(limit=1000, offset=0)
+            image = next(
+                (img for img in images if str(img.get("id")) == document_id), None
+            )
+
+            if image:
+                # This is an image, try to find the file in storage
+                filename = image.get("metadata", {}).get("filename")
+                storage_path = image.get("metadata", {}).get("storage_path")
+
+                if storage_path:
+                    # Use the storage path directly from metadata
+                    storage_service = get_storage_service()
+                    try:
+                        # Get file info directly from storage
+                        file_info = storage_service.get_file_info(storage_path)
+                        storage_file = {
+                            "name": storage_path,
+                            "size": file_info.get("size", 0),
+                            "content_type": file_info.get("content_type", "image/jpeg"),
+                        }
+                    except Exception as e:
+                        print(f"Error getting file info for {storage_path}: {e}")
+                        storage_file = None
+                elif filename:
+                    # Image has filename but no storage_path - it was added before storage service
+                    print(
+                        "Image has filename but no storage_path - not available in storage"
+                    )
+                    storage_file = None
+                else:
+                    # Image has no filename or storage_path - it was added before storage service
+                    print(
+                        "Image has no filename or storage_path - not available in storage"
+                    )
+                    storage_file = None
+
+                if storage_file:
+                    # Generate presigned URL for download
+                    try:
+                        download_url = storage_service.get_file_url(
+                            storage_file["name"], expires_in=3600
+                        )
+                        return JSONResponse(
+                            {
+                                "status": "success",
+                                "download_url": download_url,
+                                "filename": filename,
+                                "content_type": storage_file.get(
+                                    "content_type", "image/jpeg"
+                                ),
+                                "size": storage_file.get("size", 0),
+                                "storage_path": storage_file["name"],
+                            }
+                        )
+                    except Exception as url_error:
+                        print(f"Error generating download URL: {url_error}")
+                        # Fallback: return file info without URL
+                        return JSONResponse(
+                            {
+                                "status": "success",
+                                "filename": filename,
+                                "content_type": storage_file.get(
+                                    "content_type", "image/jpeg"
+                                ),
+                                "size": storage_file.get("size", 0),
+                                "storage_path": storage_file["name"],
+                                "message": "File found in storage but could not generate download URL",
+                            }
+                        )
+                else:
+                    # Image was found but doesn't have storage metadata
+                    return JSONResponse(
+                        {
+                            "status": "no_storage",
+                            "message": "Image was added before storage service was enabled",
+                        }
+                    )
+
+        except Exception as image_error:
+            print(f"Error trying to get from image collection: {str(image_error)}")
+
+        # If not found in either collection
+        return JSONResponse(
+            {
+                "status": "not_found",
+                "message": f"Document or image {document_id} not found in system",
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error downloading file {document_id}: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

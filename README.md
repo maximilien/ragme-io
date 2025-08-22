@@ -28,6 +28,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
 - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
 - **🖼️ AI-Powered Image Support**: Complete image processing pipeline with PyTorch ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
+- **💾 S3-Compatible File Storage**: MinIO-based storage service for document and image persistence with support for multiple storage backends (MinIO, S3, Local). Automatic bucket management, presigned URLs, and comprehensive file operations! ⭐ **NEW!**
 - **🎯 Enhanced AI Image Summaries**: Fixed image summary generation to show rich classification data with confidence scores and file information. Images now display meaningful summaries like "Yorkshire terrier with 95.1% confidence" ⭐ **FIXED!**
 - **🧹 Clean PyTorch Codebase**: Removed all TensorFlow dependencies and updated to PyTorch-only implementation with proper dependency management ⭐ **CLEANED!**
 - **🔧 Enhanced VDB Management**: Improved `vdb.sh` tool to show source information, AI classifications, and better metadata for image documents ⭐ **ENHANCED!**
@@ -59,6 +60,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **[📋 Project Overview](docs/PRESENTATION.md)** - Complete project overview with examples
 - **[🎛️ Configuration Guide](docs/CONFIG.md)** - Comprehensive configuration system for client customization ⭐ **NEW!**
 - **[🤖 Agent Architecture](docs/AGENT_REFACTOR.md)** - Three-agent architecture design and implementation ⭐ **NEW!**
+- **[💾 Storage Service](docs/STORAGE_SERVICE.md)** - S3-compatible file storage service with MinIO ⭐ **NEW!**
 - **[🔧 Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture  
 - **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
 - **[📖 Documentation Index](docs/README.md)** - Full documentation structure
@@ -116,6 +118,47 @@ source .venv/bin/activate
 
 # Install dependencies
 uv sync --extra dev
+```
+
+### Storage Service Setup
+
+RAGme.io now includes a comprehensive S3-compatible file storage service using MinIO for local development and production-ready S3 support.
+
+#### MinIO Local Development (Recommended)
+
+MinIO is automatically installed and configured during setup:
+
+```bash
+# MinIO is automatically started with ./start.sh
+./start.sh
+
+# Access MinIO Console: http://localhost:9001
+# Default credentials: minioadmin / minioadmin
+# Default bucket: ragme-storage
+```
+
+**Features:**
+- **Local Development**: MinIO runs on port 9000 with console on port 9001
+- **Automatic Setup**: Installed via Homebrew during `./setup.sh`
+- **Bucket Management**: Automatic bucket creation and management
+- **File Operations**: Upload, download, list, delete, and presigned URLs
+- **Multiple Backends**: Support for MinIO, S3, and local filesystem storage
+- **Service Architecture**: MinIO runs as an independent service - RAGme never modifies MinIO source code
+
+#### S3 Production Configuration
+
+For production deployments, configure S3 storage in `config.yaml`:
+
+```yaml
+storage:
+  type: "s3"
+  s3:
+    endpoint: "${S3_ENDPOINT}"
+    access_key: "${S3_ACCESS_KEY}"
+    secret_key: "${S3_SECRET_KEY}"
+    bucket_name: "${S3_BUCKET_NAME}"
+    region: "${S3_REGION:-us-east-1}"
+    secure: true
 ```
 
 ### Vector Database Setup
@@ -370,6 +413,12 @@ This will start all services and you can access the **new frontend** at `http://
 
 # Check service status
 ./stop.sh status
+
+# Stop specific services
+./stop.sh frontend    # Stop frontend only
+./stop.sh api         # Stop API only
+./stop.sh mcp         # Stop MCP only
+./stop.sh minio       # Stop MinIO only
 ```
 
 ### Frontend Development
@@ -400,6 +449,7 @@ This will start all services and you can access the **new frontend** at `http://
 ./tools/tail-logs.sh api        # API logs (port 8021)
 ./tools/tail-logs.sh mcp        # MCP logs (port 8022)
 ./tools/tail-logs.sh frontend   # Frontend logs (port 8020)
+./tools/tail-logs.sh minio      # MinIO logs (port 9000)
 ```
 
 For detailed process management, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).
@@ -505,11 +555,17 @@ new-ui[New Frontend<br/>Port 8020] --> ragme-agent[RagMeAgent<br/>Dispatcher]
     end
     mcp --> api
     api --> ragme[RAGme Core]
-    ragme --> vector-db[(Vector DB)]    
+    ragme --> vector-db[(Vector DB)]
+    ragme --> storage-service[Storage Service<br/>MinIO/S3]
     subgraph "Vector Database Layer"
         vector-db --> weaviate-local[(Local Weaviate<br/>Podman)]
         vector-db --> weaviate-cloud[(Weaviate Cloud)]
         vector-db --> milvus[(Milvus Lite)]
+    end
+    subgraph "Storage Layer"
+        storage-service --> minio[(MinIO<br/>Port 9000)]
+        storage-service --> s3[(AWS S3)]
+        storage-service --> local-fs[(Local Filesystem)]
     end
 ```
 

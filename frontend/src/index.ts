@@ -200,6 +200,30 @@ app.get('/image/:imageId', async (req, res) => {
   }
 });
 
+// Proxy download-file requests to the backend
+app.get('/download-file/:documentId', async (req, res) => {
+  try {
+    const documentId = req.params.documentId;
+    const response = await fetch(`${RAGME_API_URL}/download-file/${documentId}`);
+
+    if (response.ok) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      res.status(response.status).json({
+        status: 'error',
+        message: 'File not found',
+      });
+    }
+  } catch (error) {
+    logger.error('Error proxying download-file request:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch file',
+    });
+  }
+});
+
 // Proxy query requests to the backend
 app.post('/query', async (req, res) => {
   try {
