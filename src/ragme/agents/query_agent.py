@@ -692,7 +692,7 @@ Please provide a clear, accurate answer based on the information above."""
             # Clear references
             self.vector_db = None
             self.llm = None
-            
+
             logger.info("QueryAgent cleanup completed")
         except Exception as e:
             logger.error(f"Error during QueryAgent cleanup: {str(e)}")

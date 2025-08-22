@@ -96,7 +96,7 @@ class TestAgentsIntegration:
         if hasattr(self, "agent") and self.agent:
             try:
                 # Close any open connections in the agent
-                if hasattr(self.agent, 'cleanup'):
+                if hasattr(self.agent, "cleanup"):
                     self.agent.cleanup()
             except Exception as e:
                 print(f"Warning: Failed to cleanup agent: {e}")
@@ -177,9 +177,16 @@ class TestAgentsIntegration:
             response_lower = response.lower()
             has_general_knowledge = any(
                 phrase in response_lower
-                for phrase in ["robespierre", "french revolution", "general", "typically", "usually", "commonly"]
+                for phrase in [
+                    "robespierre",
+                    "french revolution",
+                    "general",
+                    "typically",
+                    "usually",
+                    "commonly",
+                ]
             )
-            
+
             if not (evaluation_passed or has_general_knowledge):
                 raise AssertionError(
                     f"Query '{query_name}' should indicate no specific information found or provide general knowledge, got: {response}"
@@ -207,7 +214,13 @@ class TestAgentsIntegration:
         response_lower = url_response.lower()
         url_already_exists = any(
             phrase in response_lower
-            for phrase in ["already present", "already exists", "ya está presente", "already in", "duplicate"]
+            for phrase in [
+                "already present",
+                "already exists",
+                "ya está presente",
+                "already in",
+                "duplicate",
+            ]
         )
 
         if not (success_evaluation or confirmation_evaluation or url_already_exists):
@@ -240,7 +253,14 @@ class TestAgentsIntegration:
         response_lower = maximilien_response.lower()
         has_key_phrases = any(
             phrase in response_lower
-            for phrase in ["maximilien", "photography", "haiti", "travel", "website", "site"]
+            for phrase in [
+                "maximilien",
+                "photography",
+                "haiti",
+                "travel",
+                "website",
+                "site",
+            ]
         )
 
         if not (has_info_evaluation or confirmation_evaluation or has_key_phrases):
@@ -347,7 +367,7 @@ class TestAgentsIntegration:
 
         # Get list of documents
         documents = self.ragme.list_documents()
-        
+
         # Skip this test if no documents are present (which can happen if document addition failed)
         if len(documents) == 0:
             print("⚠️ No documents found in collection, skipping removal test")
@@ -399,10 +419,19 @@ class TestAgentsIntegration:
             response_lower = maximilien_response.lower()
             has_general_knowledge = any(
                 phrase in response_lower
-                for phrase in ["robespierre", "french revolution", "general", "typically", "usually", "commonly"]
+                for phrase in [
+                    "robespierre",
+                    "french revolution",
+                    "general",
+                    "typically",
+                    "usually",
+                    "commonly",
+                ]
             )
 
-            if not (empty_evaluation or confirmation_evaluation or has_general_knowledge):
+            if not (
+                empty_evaluation or confirmation_evaluation or has_general_knowledge
+            ):
                 raise AssertionError(
                     f"Query should indicate no information, ask for confirmation, or provide general knowledge after removing URL document, got: {maximilien_response}"
                 )
@@ -446,10 +475,19 @@ class TestAgentsIntegration:
             response_lower = ragme_response.lower()
             has_no_info_response = any(
                 phrase in response_lower
-                for phrase in ["don't have", "no information", "not available", "cannot find", "no details", "no specific"]
+                for phrase in [
+                    "don't have",
+                    "no information",
+                    "not available",
+                    "cannot find",
+                    "no details",
+                    "no specific",
+                ]
             )
 
-            if not (empty_evaluation or confirmation_evaluation or has_no_info_response):
+            if not (
+                empty_evaluation or confirmation_evaluation or has_no_info_response
+            ):
                 raise AssertionError(
                     f"Query should indicate no information, ask for confirmation, or state no details available after removing PDF document, got: {ragme_response}"
                 )
@@ -514,12 +552,12 @@ class TestAgentsIntegration:
 
             Answer with exactly "YES" if the response indicates no specific information, provides general knowledge, or asks for clarification.
             Answer with exactly "NO" if the response claims to have specific detailed information from documents.
-            
+
             Examples of "YES" responses (general knowledge or no specific info):
             - "Maximilien refers to Maximilien Robespierre, a key figure in the French Revolution"
             - "I don't have specific information about this topic"
             - "Please provide more details"
-            
+
             Examples of "NO" responses (specific document information):
             - "Based on the stored documents, here's what I found"
             - "According to the website content"
@@ -532,12 +570,12 @@ class TestAgentsIntegration:
 
             Answer with exactly "YES" if the response contains specific, detailed information about the topic (including personal details, specific events, descriptions, or factual information).
             Answer with exactly "NO" if the response indicates no information found, provides only general knowledge, or asks for clarification.
-            
+
             Examples of "YES" responses:
             - "Maximilien appears to be an individual passionate about photography and travel"
             - "The site features photographs and reflections on travels"
             - "They attended a concert by the band RAM during a family wedding"
-            
+
             Examples of "NO" responses:
             - "I don't have information about this topic"
             - "The documents do not contain specific information"

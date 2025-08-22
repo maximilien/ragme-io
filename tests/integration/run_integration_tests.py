@@ -166,13 +166,15 @@ def run_api_tests():
     original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
     os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
     from tests.integration.config_manager import get_test_image_collection_name
+
     os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = get_test_image_collection_name()
     print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
     print(f"🔧 Set VECTOR_DB_IMAGE_COLLECTION_NAME={get_test_image_collection_name()}")
-    
+
     # Force reload of config module to pick up new environment variables
     try:
         from src.ragme import config
+
         config.reload()
         print("🔄 Reloaded RagMe configuration with test environment")
     except Exception as e:
@@ -278,7 +280,7 @@ def run_api_tests():
             else:
                 os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
                 print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
-                
+
         # Remove test image collection name
         os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
         print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
@@ -300,13 +302,15 @@ async def run_agent_tests():
     original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
     os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
     from tests.integration.config_manager import get_test_image_collection_name
+
     os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = get_test_image_collection_name()
     print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
     print(f"🔧 Set VECTOR_DB_IMAGE_COLLECTION_NAME={get_test_image_collection_name()}")
-    
+
     # Force reload of config module to pick up new environment variables
     try:
         from src.ragme import config
+
         config.reload()
         print("🔄 Reloaded RagMe configuration with test environment")
     except Exception as e:
@@ -419,7 +423,7 @@ async def run_agent_tests():
             else:
                 os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
                 print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
-                
+
         # Remove test image collection name
         os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
         print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
@@ -535,20 +539,32 @@ def main():
     # Run tests based on arguments
     success = True
 
-    if args.pytest:
-        # Use pytest framework
-        if args.api or args.all:
-            success &= run_pytest_tests("api")
+    try:
+        if args.pytest:
+            # Use pytest framework
+            if args.api or args.all:
+                success &= run_pytest_tests("api")
 
-        if args.agents or args.all:
-            success &= run_pytest_tests("agents")
-    else:
-        # Use custom test runner
-        if args.api or args.all:
-            success &= run_api_tests()
+            if args.agents or args.all:
+                success &= run_pytest_tests("agents")
+        else:
+            # Use custom test runner
+            if args.api or args.all:
+                success &= run_api_tests()
 
-        if args.agents or args.all:
-            success &= asyncio.run(run_agent_tests())
+            if args.agents or args.all:
+                success &= asyncio.run(run_agent_tests())
+
+    except Exception as e:
+        print(f"\n❌ Integration tests failed with exception: {e}")
+        success = False
+    finally:
+        # Always ensure teardown happens, even if tests fail
+        print("\n🧹 Ensuring test configuration cleanup...")
+        try:
+            teardown_test_config()
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to cleanup test configuration: {e}")
 
     # Clean up resources to prevent ResourceWarnings
     cleanup_resources()

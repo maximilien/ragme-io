@@ -364,7 +364,7 @@ Focus only on functional operations that modify or query the collection structur
             self.llm = None
             self.agent = None
             self.tools = None
-            
+
             logger.info("FunctionalAgent cleanup completed")
         except Exception as e:
             logger.error(f"Error during FunctionalAgent cleanup: {str(e)}")
