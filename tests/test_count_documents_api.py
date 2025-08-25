@@ -50,17 +50,17 @@ class TestCountDocumentsAPI:
         mock_get_ragme.return_value = mock_ragme_instance
 
         # Make request
-        response = self.client.get("/count-documents?date_filter=current")
+        response = self.client.get("/count-documents?date_filter=today")
 
         # Verify response
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
         assert data["count"] == 1
-        assert data["date_filter"] == "current"
+        assert data["date_filter"] == "today"
 
         # Verify efficient method was called
-        mock_ragme_instance.vector_db.count_documents.assert_called_once_with("current")
+        mock_ragme_instance.vector_db.count_documents.assert_called_once_with("today")
 
     @patch("src.ragme.apis.api.get_ragme")
     def test_count_documents_empty_collection(self, mock_get_ragme):

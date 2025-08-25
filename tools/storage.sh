@@ -93,7 +93,7 @@ if [[ "$1" == "help" ]] || [[ $# -eq 0 ]]; then
     echo "  ./tools/storage.sh delete-all --all            # deletes all files from all buckets"
     echo
     print_status $YELLOW "EXAMPLES:"
-    echo "  ./tools/storage.sh health                      # Check storage service health and connectivity"
+    echo "  ./tools/storage.sh health                      # Check storage service health and connectivity (shows bucket sizes and file counts)"
     echo "  ./tools/storage.sh buckets                     # List all available buckets"
     echo "  ./tools/storage.sh info                        # Check storage configuration and status"
     echo "  ./tools/storage.sh list --details              # List all files with size and date info"

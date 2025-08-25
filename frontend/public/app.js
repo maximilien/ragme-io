@@ -8,7 +8,7 @@ class RAGmeAssistant {
         this.currentChatId = null;
         // Default settings - will be overridden by configuration
         this.settings = {
-            maxDocuments: 50,
+            maxDocuments: 10, // Changed from 50 to 10 (max: 25)
             autoRefresh: true,
             refreshInterval: 30000, // 30 seconds
             maxTokens: 4000,
@@ -20,14 +20,23 @@ class RAGmeAssistant {
             documentListWidth: 35,
             chatHistoryCollapsed: false,
             chatHistoryWidth: 10,
-            maxDisplayDocuments: 100,
-            paginationSize: 20,
+            maxDisplayDocuments: 10, // Changed from 100 to 10 (max: 25)
+            paginationSize: 10, // Changed from 20 to 10 (max: 25)
             chatHistoryLimit: 50,
             autoSaveChats: true,
             copyUploadedDocs: false,
             copyUploadedImages: false
         };
-        this.currentDateFilter = 'current';
+        
+        // Pagination state
+        this.pagination = {
+            currentPage: 1,
+            totalPages: 1,
+            totalDocuments: 0,
+            documentsPerPage: 10,
+            allDocuments: [] // Store all documents for pagination
+        };
+        this.currentDateFilter = 'today';
         this.currentContentFilter = 'both'; // Default to show both documents and images
         this.currentVisualizationType = 'graph'; // Default to Network Graph
         this.isVisualizationVisible = true; // Default to visible
@@ -505,10 +514,32 @@ class RAGmeAssistant {
             console.log('Current filters - date:', this.currentDateFilter, 'content:', this.currentContentFilter);
             if (result.success) {
                 console.log('Previous documents count:', this.documents.length);
-                this.documents = result.items;
-                console.log('New documents count:', this.documents.length);
-                console.log('Documents after update:', this.documents.map(d => ({ id: d.id, url: d.url, content_type: d.content_type })));
-                this.renderDocuments();
+                
+                // Store all documents for client-side pagination
+                if (result.pagination?.offset > 0) {
+                    // Append new documents when loading more
+                    this.pagination.allDocuments = this.pagination.allDocuments.concat(result.items);
+                } else {
+                    // Replace all documents when loading fresh
+                    this.pagination.allDocuments = result.items;
+                }
+                this.pagination.totalDocuments = result.pagination?.count || result.items.length;
+                this.pagination.documentsPerPage = this.settings.maxDocuments;
+                this.pagination.totalPages = Math.ceil(this.pagination.totalDocuments / this.pagination.documentsPerPage);
+                
+                // Display first page
+                this.displayCurrentPage();
+                
+                console.log('Total documents loaded:', this.pagination.allDocuments.length);
+                console.log('Total documents available:', this.pagination.totalDocuments);
+                console.log('Total pages:', this.pagination.totalPages);
+                console.log('Current page:', this.pagination.currentPage);
+                console.log('Documents on current page:', this.documents.map(d => ({ id: d.id, url: d.url, content_type: d.content_type })));
+                
+                // Hide loading indicator
+                this.showPaginationLoading(false);
+                
+                this.updatePagination();
                 this.updateVisualization();
                 
                 // Update connection status on success
@@ -519,6 +550,9 @@ class RAGmeAssistant {
                 this.updateVectorDbInfoDisplay();
             } else {
                 console.error('Failed to list content:', result.message);
+                
+                // Hide loading indicator on error
+                this.showPaginationLoading(false);
                 
                 // Update connection status on failure
                 this.connectionStatus.isConnected = false;
@@ -640,19 +674,55 @@ class RAGmeAssistant {
             this.refreshDocuments();
         });
 
-        // Content filter selector
+        // Document search input
+        const documentSearchInput = document.getElementById('documentSearchInput');
+        documentSearchInput.addEventListener('input', (e) => {
+            this.filterDocuments(e.target.value);
+        });
+
+        // Document settings button
+        const documentSettingsBtn = document.getElementById('documentSettingsBtn');
+        console.log('Looking for document settings button:', documentSettingsBtn);
+        if (documentSettingsBtn) {
+            console.log('Document settings button found, adding event listener');
+            documentSettingsBtn.addEventListener('click', (e) => {
+                console.log('Document settings button clicked!');
+                e.stopPropagation();
+                this.showDocumentSettingsPopup();
+            });
+        } else {
+            console.error('Document settings button not found!');
+        }
+
+        // Document settings popup close handlers
+        const documentSettingsBackdrop = document.getElementById('documentSettingsBackdrop');
+        const documentSettingsClose = document.getElementById('documentSettingsClose');
+        
+        documentSettingsBackdrop.addEventListener('click', () => {
+            this.hideDocumentSettingsPopup();
+        });
+        
+        documentSettingsClose.addEventListener('click', () => {
+            this.hideDocumentSettingsPopup();
+        });
+
+        // Content filter selector (in popup)
         document.getElementById('contentFilterSelector').addEventListener('change', (e) => {
             console.log('Content filter changed to:', e.target.value);
             this.currentContentFilter = e.target.value;
             localStorage.setItem('ragme-content-filter', this.currentContentFilter);
+            this.updateFilterIndicator();
+            this.showNotification('Refreshing documents with new filter...', 'info');
             this.loadDocuments();
         });
 
-        // Date filter selector
+        // Date filter selector (in popup)
         document.getElementById('dateFilterSelector').addEventListener('change', (e) => {
             console.log('Date filter changed to:', e.target.value);
             this.currentDateFilter = e.target.value;
             localStorage.setItem('ragme-date-filter', this.currentDateFilter);
+            this.updateDateFilterIndicator();
+            this.showNotification('Refreshing documents with new date filter...', 'info');
             this.loadDocuments();
         });
 
@@ -828,6 +898,28 @@ class RAGmeAssistant {
 
         document.getElementById('temperature').addEventListener('input', (e) => {
             document.getElementById('temperatureValue').textContent = e.target.value;
+        });
+
+        // Pagination range input updates
+        document.getElementById('maxDocuments').addEventListener('input', (e) => {
+            document.getElementById('maxDocumentsValue').textContent = e.target.value;
+        });
+
+        document.getElementById('maxDisplayDocuments').addEventListener('input', (e) => {
+            document.getElementById('maxDisplayDocumentsValue').textContent = e.target.value;
+        });
+
+        document.getElementById('paginationSize').addEventListener('input', (e) => {
+            document.getElementById('paginationSizeValue').textContent = e.target.value;
+        });
+
+        // Pagination button event listeners
+        document.getElementById('paginationPrev').addEventListener('click', () => {
+            this.goToPreviousPage();
+        });
+
+        document.getElementById('paginationNext').addEventListener('click', () => {
+            this.goToNextPage();
         });
 
         // Content tabs
@@ -1099,6 +1191,182 @@ class RAGmeAssistant {
             });
             list.appendChild(item);
         });
+    }
+
+    // Document settings popup methods
+    showDocumentSettingsPopup() {
+        const popup = document.getElementById('documentSettingsPopup');
+        const backdrop = document.getElementById('documentSettingsBackdrop');
+        const button = document.getElementById('documentSettingsBtn');
+        
+        console.log('Opening document settings popup...');
+        console.log('Popup element:', popup);
+        console.log('Backdrop element:', backdrop);
+        console.log('Button element:', button);
+        
+        if (!popup) {
+            console.error('Document settings popup not found!');
+            return;
+        }
+        
+        if (!backdrop) {
+            console.error('Document settings backdrop not found!');
+            return;
+        }
+        
+        // Debug popup positioning
+        console.log('Popup position before:', popup.style.position);
+        console.log('Popup top before:', popup.style.top);
+        console.log('Popup right before:', popup.style.right);
+        
+        // Set current values in the popup
+        const contentFilterSelector = document.getElementById('contentFilterSelector');
+        const dateFilterSelector = document.getElementById('dateFilterSelector');
+        
+        if (contentFilterSelector && dateFilterSelector) {
+            contentFilterSelector.value = this.currentContentFilter;
+            dateFilterSelector.value = this.currentDateFilter;
+        }
+        
+        // Show backdrop and popup first
+        backdrop.classList.add('show');
+        popup.classList.add('show');
+        button.classList.add('active');
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+        
+        console.log('Document settings popup should be visible now');
+        console.log('Popup classes:', popup.className);
+        console.log('Backdrop classes:', backdrop.className);
+        console.log('Popup position after:', popup.style.position);
+        console.log('Popup top after:', popup.style.top);
+        console.log('Popup right after:', popup.style.right);
+        
+        // Position popup correctly below the sidebar header
+        const documentsSidebar = document.querySelector('.documents-sidebar');
+        const sidebarRect = documentsSidebar.getBoundingClientRect();
+        
+        console.log('Sidebar rect:', sidebarRect);
+        
+        // Calculate position - use sidebar top + header height + margin
+        const headerHeight = 80; // Approximate header height
+        const topPosition = sidebarRect.top + headerHeight + 8;
+        const leftPosition = sidebarRect.left + (sidebarRect.width / 2) - 150;
+        
+        console.log('Calculated top:', topPosition, 'left:', leftPosition);
+        
+        // Clear any existing inline styles and set new ones
+        popup.removeAttribute('style');
+        
+        // Position popup in center of screen
+        popup.style.position = 'fixed';
+        popup.style.top = '50%';
+        popup.style.left = '50%';
+        popup.style.transform = 'translate(-50%, -50%)';
+        popup.style.background = 'white';
+        popup.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+        popup.style.zIndex = '1000';
+        popup.style.width = '300px';
+        popup.style.maxHeight = '400px';
+        popup.style.overflow = 'auto';
+        
+        console.log('Popup positioned in center of screen');
+    }
+
+    hideDocumentSettingsPopup() {
+        const popup = document.getElementById('documentSettingsPopup');
+        const backdrop = document.getElementById('documentSettingsBackdrop');
+        const button = document.getElementById('documentSettingsBtn');
+        
+        // Hide backdrop and popup
+        backdrop.classList.remove('show');
+        popup.classList.remove('show');
+        button.classList.remove('active');
+        
+        // Restore body scroll
+        document.body.style.overflow = '';
+    }
+
+    // Document search functionality
+    filterDocuments(searchTerm) {
+        const documentCards = document.querySelectorAll('.document-card');
+        const searchLower = searchTerm.toLowerCase();
+        
+        documentCards.forEach(card => {
+            const title = card.querySelector('.document-title')?.textContent || '';
+            const url = card.querySelector('.document-url')?.textContent || '';
+            const date = card.querySelector('.document-date')?.textContent || '';
+            const content = card.querySelector('.document-content')?.textContent || '';
+            
+            const searchableText = `${title} ${url} ${date} ${content}`.toLowerCase();
+            
+            if (searchableText.includes(searchLower)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        // Update document count
+        const visibleCards = document.querySelectorAll('.document-card[style*="display: block"], .document-card:not([style*="display: none"])');
+        console.log(`Showing ${visibleCards.length} documents matching "${searchTerm}"`);
+    }
+
+    // Update filter indicator
+    updateFilterIndicator() {
+        const filterIcon = document.getElementById('filterIcon');
+        const filterIndicator = document.getElementById('filterIndicator');
+        
+        if (!filterIcon || !filterIndicator) return;
+        
+        switch (this.currentContentFilter) {
+            case 'documents':
+                filterIcon.className = 'fas fa-file-alt';
+                filterIndicator.title = 'Documents filter active';
+                break;
+            case 'images':
+                filterIcon.className = 'fas fa-images';
+                filterIndicator.title = 'Images filter active';
+                break;
+            case 'both':
+            default:
+                filterIcon.className = 'fas fa-th-large';
+                filterIndicator.title = 'All content filter active';
+                break;
+        }
+    }
+
+    // Update date filter indicator
+    updateDateFilterIndicator() {
+        const dateFilterIcon = document.getElementById('dateFilterIcon');
+        const dateFilterIndicator = document.getElementById('dateFilterIndicator');
+        
+        if (!dateFilterIcon || !dateFilterIndicator) return;
+        
+        switch (this.currentDateFilter) {
+            case 'today':
+                dateFilterIcon.className = 'fas fa-calendar-day';
+                dateFilterIndicator.title = 'Today filter active';
+                break;
+            case 'week':
+                dateFilterIcon.className = 'fas fa-calendar-week';
+                dateFilterIndicator.title = 'This week filter active';
+                break;
+            case 'month':
+                dateFilterIcon.className = 'fas fa-calendar-alt';
+                dateFilterIndicator.title = 'This month filter active';
+                break;
+            case 'year':
+                dateFilterIcon.className = 'fas fa-calendar';
+                dateFilterIndicator.title = 'This year filter active';
+                break;
+            case 'all':
+            default:
+                dateFilterIcon.className = 'fas fa-calendar';
+                dateFilterIndicator.title = 'All dates filter active';
+                break;
+        }
     }
 
     // MCP Tools popup methods
@@ -1968,6 +2236,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         
         // Populate general settings
         document.getElementById('maxDocuments').value = this.settings.maxDocuments;
+        document.getElementById('maxDocumentsValue').textContent = this.settings.maxDocuments;
         document.getElementById('showVectorDbInfo').checked = this.settings.showVectorDbInfo;
         document.getElementById('autoRefresh').checked = this.settings.autoRefresh;
         document.getElementById('refreshInterval').value = this.settings.refreshInterval / 1000; // Convert to seconds
@@ -1987,8 +2256,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         
         // Populate document settings
         document.getElementById('documentOverviewEnabled').checked = this.settings.documentOverviewEnabled;
-        document.getElementById('maxDisplayDocuments').value = this.settings.maxDisplayDocuments || 100;
-        document.getElementById('paginationSize').value = this.settings.paginationSize || 20;
+        document.getElementById('maxDisplayDocuments').value = this.settings.maxDisplayDocuments || 10;
+        document.getElementById('maxDisplayDocumentsValue').textContent = this.settings.maxDisplayDocuments || 10;
+        document.getElementById('paginationSize').value = this.settings.paginationSize || 10;
+        document.getElementById('paginationSizeValue').textContent = this.settings.paginationSize || 10;
         document.getElementById('defaultContentFilter').value = this.currentContentFilter;
         
         // Populate chat settings
@@ -2437,8 +2708,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
         
         // Validation
-        if (maxDocuments < 1 || maxDocuments > 100) {
-            this.showNotification('error', 'Max documents must be between 1 and 100');
+        if (maxDocuments < 5 || maxDocuments > 25) {
+            this.showNotification('error', 'Max documents must be between 5 and 25');
             return;
         }
         
@@ -2459,6 +2730,17 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         
         if (temperature < 0 || temperature > 2) {
             this.showNotification('error', 'Temperature must be between 0 and 2');
+            return;
+        }
+
+        // Validate pagination settings
+        if (maxDisplayDocuments < 5 || maxDisplayDocuments > 25) {
+            this.showNotification('error', 'Max display documents must be between 5 and 25');
+            return;
+        }
+
+        if (paginationSize < 5 || paginationSize > 25) {
+            this.showNotification('error', 'Pagination size must be between 5 and 25');
             return;
         }
 
@@ -2537,6 +2819,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 contentFilterSelector.value = this.currentContentFilter;
             }
         }
+        // Update filter indicator after loading preferences
+        this.updateFilterIndicator();
         
         // Load date filter preference
         const savedDateFilter = localStorage.getItem('ragme-date-filter');
@@ -2548,6 +2832,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 dateFilterSelector.value = this.currentDateFilter;
             }
         }
+        // Update date filter indicator after loading preferences
+        this.updateDateFilterIndicator();
         
         // Load visualization type preference
         const savedVisualizationType = localStorage.getItem('ragme-visualization-type');
@@ -2564,7 +2850,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Load individual settings from localStorage for backward compatibility
         const savedMaxDocuments = localStorage.getItem('ragme-max-documents');
         if (savedMaxDocuments) {
-            this.settings.maxDocuments = parseInt(savedMaxDocuments);
+            const loadedMaxDocuments = parseInt(savedMaxDocuments);
+            // Ensure the loaded value doesn't exceed our new limit of 25
+            this.settings.maxDocuments = Math.min(loadedMaxDocuments, 25);
+            // Clear the old value to prevent future issues
+            localStorage.removeItem('ragme-max-documents');
         }
         
         const savedDocumentOverviewEnabled = localStorage.getItem('ragme-document-overview-enabled');
@@ -2625,13 +2915,183 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('Loading content with filters - date:', this.currentDateFilter, 'content:', this.currentContentFilter);
         console.log('Socket connected:', this.socket?.connected);
         console.log('Emitting list_content event...');
+        
+        // Reset pagination to first page when loading new documents
+        this.pagination.currentPage = 1;
+        
+        // Only show loading notification for initial loads, not refreshes
+        if (!this.pagination.allDocuments || this.pagination.allDocuments.length === 0) {
+            this.showPaginationLoading(true);
+        }
+        
+        // Load more documents for client-side pagination (respect API limit of 25)
+        const fetchLimit = Math.min(25, this.settings.maxDocuments * 3); // Fetch up to 3 pages worth, max 25
         this.socket.emit('list_content', {
-            limit: this.settings.maxDocuments,
+            limit: fetchLimit,
             offset: 0,
             dateFilter: this.currentDateFilter,
             contentType: this.currentContentFilter
         });
-        console.log('list_content event emitted');
+        console.log('list_content event emitted with limit:', fetchLimit);
+    }
+
+    // Pagination helper functions
+
+    updatePagination() {
+        const paginationContainer = document.getElementById('paginationContainer');
+        const paginationPages = document.getElementById('paginationPages');
+        const paginationInfo = document.getElementById('paginationInfo');
+        const prevBtn = document.getElementById('paginationPrev');
+        const nextBtn = document.getElementById('paginationNext');
+
+        // Show/hide pagination based on total pages
+        if (this.pagination.totalPages <= 1) {
+            paginationContainer.style.display = 'none';
+            return;
+        }
+
+        paginationContainer.style.display = 'flex';
+
+        // Update pagination tooltip
+        const startDoc = (this.pagination.currentPage - 1) * this.pagination.documentsPerPage + 1;
+        const endDoc = Math.min(this.pagination.currentPage * this.pagination.documentsPerPage, this.pagination.totalDocuments);
+        const paginationControls = document.getElementById('paginationControls');
+        if (paginationControls) {
+            paginationControls.title = `Showing ${startDoc}-${endDoc} of ${this.pagination.totalDocuments} documents`;
+        }
+
+        // Update prev/next buttons
+        prevBtn.disabled = this.pagination.currentPage === 1;
+        nextBtn.disabled = this.pagination.currentPage === this.pagination.totalPages;
+
+        // Generate page numbers
+        paginationPages.innerHTML = '';
+        
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, this.pagination.currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(this.pagination.totalPages, startPage + maxVisiblePages - 1);
+        
+        // Adjust start page if we're near the end
+        if (endPage - startPage < maxVisiblePages - 1) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        // Add first page and ellipsis if needed
+        if (startPage > 1) {
+            this.addPageButton(paginationPages, 1);
+            if (startPage > 2) {
+                this.addEllipsis(paginationPages);
+            }
+        }
+
+        // Add visible page numbers
+        for (let i = startPage; i <= endPage; i++) {
+            this.addPageButton(paginationPages, i);
+        }
+
+        // Add last page and ellipsis if needed
+        if (endPage < this.pagination.totalPages) {
+            if (endPage < this.pagination.totalPages - 1) {
+                this.addEllipsis(paginationPages);
+            }
+            this.addPageButton(paginationPages, this.pagination.totalPages);
+        }
+        
+        // Add "Load More" button if we have more documents available than loaded
+        if (this.pagination.totalDocuments > this.pagination.allDocuments.length) {
+            this.addLoadMoreButton(paginationPages);
+        }
+    }
+
+    addPageButton(container, pageNumber) {
+        const button = document.createElement('button');
+        button.className = 'pagination-page';
+        button.textContent = pageNumber;
+        
+        if (pageNumber === this.pagination.currentPage) {
+            button.classList.add('active');
+        }
+        
+        button.addEventListener('click', () => {
+            this.goToPage(pageNumber);
+        });
+        
+        container.appendChild(button);
+    }
+
+    addEllipsis(container) {
+        const ellipsis = document.createElement('span');
+        ellipsis.className = 'pagination-ellipsis';
+        ellipsis.textContent = '...';
+        ellipsis.style.padding = '0 0.5rem';
+        ellipsis.style.color = '#6b7280';
+        container.appendChild(ellipsis);
+    }
+    
+    addLoadMoreButton(container) {
+        const button = document.createElement('button');
+        button.className = 'pagination-load-more';
+        button.innerHTML = '<i class="fas fa-plus"></i> Load More';
+        button.addEventListener('click', () => {
+            this.loadMoreDocuments();
+        });
+        container.appendChild(button);
+    }
+    
+    loadMoreDocuments() {
+        const currentLoaded = this.pagination.allDocuments.length;
+        const remaining = this.pagination.totalDocuments - currentLoaded;
+        const fetchLimit = Math.min(25, remaining); // Load up to 25 more documents (API limit)
+        
+        // Show specific loading notification for "Load More"
+        this.showNotification('📥 Loading more documents...', 'info');
+        
+        this.socket.emit('list_content', {
+            limit: fetchLimit,
+            offset: currentLoaded,
+            dateFilter: this.currentDateFilter,
+            contentType: this.currentContentFilter
+        });
+    }
+
+    goToPage(pageNumber) {
+        if (pageNumber < 1 || pageNumber > this.pagination.totalPages) {
+            return;
+        }
+        
+        // Client-side pagination - no API call needed
+        this.pagination.currentPage = pageNumber;
+        this.displayCurrentPage();
+        this.updatePagination();
+    }
+    
+    displayCurrentPage() {
+        // Get documents for current page from cached data
+        const startIndex = (this.pagination.currentPage - 1) * this.settings.maxDocuments;
+        const endIndex = startIndex + this.settings.maxDocuments;
+        this.documents = this.pagination.allDocuments.slice(startIndex, endIndex);
+        
+        // Update the UI
+        this.renderDocuments();
+        this.updateVisualization();
+    }
+    
+    showPaginationLoading(show) {
+        if (show) {
+            this.showNotification('📖 Loading documents...', 'info');
+        }
+    }
+
+    goToPreviousPage() {
+        if (this.pagination.currentPage > 1) {
+            this.goToPage(this.pagination.currentPage - 1);
+        }
+    }
+
+    goToNextPage() {
+        if (this.pagination.currentPage < this.pagination.totalPages) {
+            this.goToPage(this.pagination.currentPage + 1);
+        }
     }
 
     refreshDocuments() {
@@ -2658,17 +3118,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }, 1000);
         
         // Show notification
-        this.showNotification('info', `Refreshing documents (${this.getDateFilterDisplayName()})...`);
+        this.showNotification(`Refreshing documents (${this.getDateFilterDisplayName()})...`, 'info');
     }
 
     getDateFilterDisplayName() {
         const filterNames = {
-            'current': 'Current',
+            'today': 'Today',
+            'week': 'This Week',
             'month': 'This Month',
             'year': 'This Year',
             'all': 'All'
         };
-        return filterNames[this.currentDateFilter] || 'Current';
+        return filterNames[this.currentDateFilter] || 'Today';
     }
 
     startAutoRefresh() {
@@ -5028,7 +5489,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Show a brief notification
         const doc = this.documents[docIndex];
         const docName = doc.url || doc.metadata?.filename || `Document ${docIndex + 1}`;
-        this.showNotification('info', `Scrolled to: ${docName}`);
+                    this.showNotification(`Scrolled to: ${docName}`, 'info');
     }
 
     groupDocumentsByBaseUrl(documents) {
@@ -5114,7 +5575,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.sendMessage();
         
         // Show notification
-        this.showNotification('info', 'Retrying query...');
+                    this.showNotification('Retrying query...', 'info');
     }
 
     saveMessageAsFile(message) {

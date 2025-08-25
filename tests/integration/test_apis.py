@@ -577,7 +577,7 @@ class TestAPIIntegration:
         # Step 4a: Clean up existing images first
         print("Cleaning up existing images...")
         list_images_response = self.session.get(
-            f"{self.base_url}/list-content?content_type=image", timeout=60
+            f"{self.base_url}/list-content?content_type=images", timeout=60
         )
         assert list_images_response.status_code == 200
         images_result = list_images_response.json()
@@ -596,7 +596,7 @@ class TestAPIIntegration:
         # Step 4b: List images in empty collection
         print("Listing images in empty collection...")
         list_images_response = self.session.get(
-            f"{self.base_url}/list-content?content_type=image", timeout=60
+            f"{self.base_url}/list-content?content_type=images", timeout=60
         )
         assert list_images_response.status_code == 200
         images_result = list_images_response.json()
@@ -621,7 +621,7 @@ class TestAPIIntegration:
         # Step 4d: List images after adding
         print("Listing images after adding...")
         list_images_response = self.session.get(
-            f"{self.base_url}/list-content?content_type=image", timeout=60
+            f"{self.base_url}/list-content?content_type=images", timeout=60
         )
         assert list_images_response.status_code == 200
         images_result = list_images_response.json()
@@ -658,7 +658,7 @@ class TestAPIIntegration:
         # Step 4e: Verify image is deleted
         print("Verifying image is deleted...")
         list_images_response = self.session.get(
-            f"{self.base_url}/list-content?content_type=image", timeout=60
+            f"{self.base_url}/list-content?content_type=images", timeout=60
         )
         assert list_images_response.status_code == 200
         images_result = list_images_response.json()

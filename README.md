@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🎨 UI Height and Notification Fixes**: Fixed pagination container height and corrected notification system for better user experience. Load More button now shows proper loading messages! ⭐ **FIXED!**
 - **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
 - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
 - **🖼️ AI-Powered Image Support**: Complete image processing pipeline with PyTorch ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**

@@ -668,7 +668,7 @@ class StorageManager:
                 except Exception as e:
                     print(f"   ❌ Bucket access: FAILED - {e}")
 
-                # Show available buckets
+                # Show available buckets with file counts
                 try:
                     buckets = self.storage.list_buckets()
                     if buckets:
@@ -682,7 +682,47 @@ class StorageManager:
                                 size_str = f"{size / 1024:.1f} KB"
                             else:
                                 size_str = f"{size / (1024 * 1024):.1f} MB"
-                            print(f"      - {name} ({size_str})")
+
+                            # Get file count for this bucket
+                            try:
+                                if self.storage_type == "minio":
+                                    # For MinIO, count objects in the specific bucket
+                                    objects = list(
+                                        self.storage.client.list_objects(
+                                            name, recursive=True
+                                        )
+                                    )
+                                    file_count = len(objects)
+                                elif self.storage_type == "s3":
+                                    # For S3, count objects in the specific bucket
+                                    response = self.storage.client.list_objects_v2(
+                                        Bucket=name
+                                    )
+                                    file_count = response.get("KeyCount", 0)
+                                elif self.storage_type == "local":
+                                    # For local storage, count files in the specific bucket directory
+                                    bucket_path = self.storage.storage_path / name
+                                    if bucket_path.exists():
+                                        # Count only files, not directories
+                                        file_count = len(
+                                            [
+                                                f
+                                                for f in bucket_path.rglob("*")
+                                                if f.is_file()
+                                            ]
+                                        )
+                                    else:
+                                        file_count = 0
+                                else:
+                                    file_count = 0
+
+                                print(
+                                    f"      - {name} ({size_str}, {file_count} files)"
+                                )
+                            except Exception:
+                                print(
+                                    f"      - {name} ({size_str}, file count unavailable)"
+                                )
                     else:
                         print("   📦 No buckets found")
                 except Exception as e:
