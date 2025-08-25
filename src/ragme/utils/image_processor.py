@@ -7,6 +7,14 @@ from typing import Any
 import requests
 from exif import Image as ExifImage
 
+# Import FriendliAI client
+try:
+    from .friendli_client import FriendliAIClient
+
+    FRIENDLI_AVAILABLE = True
+except ImportError:
+    FRIENDLI_AVAILABLE = False
+
 # Import HEIC support
 try:
     import pillow_heif
@@ -27,6 +35,8 @@ class ImageProcessor:
         """Initialize the image processor."""
         self._ocr_reader = None
         self._ocr_initialized = False
+        self._friendli_client = None
+        self._friendli_initialized = False
 
     def _load_image_with_heic_support(self, image_data: bytes, file_path: str = None):
         """
@@ -112,6 +122,33 @@ class ImageProcessor:
             return False
         except Exception as e:
             print(f"Error initializing OCR: {e}")
+            return False
+
+    def _initialize_friendli(self) -> bool:
+        """Initialize FriendliAI client based on configuration."""
+        try:
+            if not FRIENDLI_AVAILABLE:
+                print("FriendliAI client not available")
+                return False
+
+            from ..utils.config_manager import config
+
+            ai_config = config.get("ai_acceleration", {})
+            if not ai_config.get("enabled", False):
+                return False
+
+            friendli_config = ai_config.get("friendli_ai", {})
+            if not friendli_config:
+                print("FriendliAI configuration not found")
+                return False
+
+            self._friendli_client = FriendliAIClient(friendli_config)
+            self._friendli_initialized = True
+            print("FriendliAI client initialized successfully")
+            return True
+
+        except Exception as e:
+            print(f"Error initializing FriendliAI: {e}")
             return False
 
     def _should_apply_ocr(self, classification_info: dict) -> bool:
@@ -269,6 +306,128 @@ class ImageProcessor:
         except Exception as e:
             print(f"Error getting image metadata: {e}")
             return {"type": "image", "source": image_source, "error": str(e)}
+
+    def classify_image_with_friendli(
+        self, image_data: bytes, filename: str = "image"
+    ) -> dict[str, Any]:
+        """
+        Classify an image using FriendliAI acceleration.
+
+        Args:
+            image_data: Raw image data as bytes
+            filename: Original filename for context
+
+        Returns:
+            Dictionary containing image classification results
+        """
+        try:
+            # Initialize FriendliAI if not already done
+            if not self._friendli_initialized:
+                if not self._initialize_friendli():
+                    return {
+                        "source": filename,
+                        "type": "image_classification",
+                        "error": "FriendliAI not available",
+                        "friendli_processing": False,
+                    }
+
+            # Use FriendliAI for classification
+            return self._friendli_client.classify_image(image_data, filename)
+
+        except Exception as e:
+            print(f"Error classifying image with FriendliAI: {e}")
+            return {
+                "source": filename,
+                "type": "image_classification",
+                "error": str(e),
+                "friendli_processing": False,
+            }
+
+    def extract_text_with_friendli(
+        self, image_data: bytes, filename: str = "image"
+    ) -> dict[str, Any]:
+        """
+        Extract text from an image using FriendliAI OCR acceleration.
+
+        Args:
+            image_data: Raw image data as bytes
+            filename: Original filename for context
+
+        Returns:
+            Dictionary containing OCR results
+        """
+        try:
+            # Initialize FriendliAI if not already done
+            if not self._friendli_initialized:
+                if not self._initialize_friendli():
+                    return {
+                        "source": filename,
+                        "type": "ocr_extraction",
+                        "error": "FriendliAI not available",
+                        "friendli_processing": False,
+                    }
+
+            # Use FriendliAI for OCR
+            return self._friendli_client.extract_text_with_ocr(image_data, filename)
+
+        except Exception as e:
+            print(f"Error extracting text with FriendliAI: {e}")
+            return {
+                "source": filename,
+                "type": "ocr_extraction",
+                "error": str(e),
+                "friendli_processing": False,
+            }
+
+    def process_image_with_friendli(
+        self, image_data: bytes, filename: str = "image"
+    ) -> dict[str, Any]:
+        """
+        Process an image with both classification and OCR using FriendliAI acceleration.
+
+        Args:
+            image_data: Raw image data as bytes
+            filename: Original filename for context
+
+        Returns:
+            Dictionary containing all image processing results
+        """
+        try:
+            # Initialize FriendliAI if not already done
+            if not self._friendli_initialized:
+                if not self._initialize_friendli():
+                    return {
+                        "source": filename,
+                        "type": "image_processing",
+                        "error": "FriendliAI not available",
+                        "friendli_processing": False,
+                    }
+
+            # Use FriendliAI for parallel processing
+            results = self._friendli_client.process_image_parallel(image_data, filename)
+
+            # Add metadata
+            metadata = {
+                "type": "image",
+                "source": filename,
+                "exif": {},
+                "processing_timestamp": self._get_timestamp(),
+            }
+
+            return {
+                **metadata,
+                "classification": results.get("classification", {}),
+                "ocr_content": results.get("ocr_content", {}),
+            }
+
+        except Exception as e:
+            print(f"Error processing image with FriendliAI: {e}")
+            return {
+                "source": filename,
+                "type": "image_processing",
+                "error": str(e),
+                "friendli_processing": False,
+            }
 
     def classify_image_with_pytorch(
         self, image_source: str, top_k: int = 5
@@ -585,6 +744,53 @@ class ImageProcessor:
         Returns:
             Dictionary containing all image processing results including OCR content
         """
+        # Check if AI acceleration is enabled
+        from ..utils.config_manager import config
+
+        ai_config = config.get("ai_acceleration", {})
+        use_ai_acceleration = ai_config.get("enabled", False)
+
+        # Load image data for potential AI acceleration
+        try:
+            if image_source.startswith("file://"):
+                # Local file path
+                file_path = image_source[7:]  # Remove file:// prefix
+                with open(file_path, "rb") as f:
+                    image_data = f.read()
+                filename = file_path.split("/")[-1] if "/" in file_path else file_path
+            else:
+                # URL
+                response = requests.get(image_source, timeout=10)
+                response.raise_for_status()
+                image_data = response.content
+                filename = (
+                    image_source.split("/")[-1] if "/" in image_source else image_source
+                )
+        except Exception as e:
+            print(f"Error loading image data: {e}")
+            # Fallback to original processing
+            use_ai_acceleration = False
+
+        # Use AI acceleration if enabled and available
+        if use_ai_acceleration and FRIENDLI_AVAILABLE:
+            try:
+                # Try AI acceleration first
+                ai_results = self.process_image_with_friendli(image_data, filename)
+
+                # If AI acceleration was successful, return results
+                if ai_results.get("friendli_processing", False) is not False:
+                    # Add EXIF metadata
+                    metadata = self.get_image_metadata(image_source)
+                    ai_results.update(metadata)
+                    return ai_results
+                else:
+                    print("AI acceleration failed, falling back to standard processing")
+            except Exception as e:
+                print(
+                    f"AI acceleration error, falling back to standard processing: {e}"
+                )
+
+        # Standard processing (fallback or when AI acceleration is disabled)
         # Get EXIF metadata
         metadata = self.get_image_metadata(image_source)
 
@@ -599,8 +805,6 @@ class ImageProcessor:
             ocr_result = self.extract_text_with_ocr(image_source)
         else:
             # Still try OCR if classification failed or OCR is forced
-            from ..utils.config_manager import config
-
             ocr_config = config.get("ocr", {})
             if ocr_config.get("enabled", True):
                 ocr_result = self.extract_text_with_ocr(image_source)

@@ -49,12 +49,22 @@ class ConfigManager:
         """Load configuration from config.yaml file."""
         # Look for config.yaml in the project root directory
         config_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
+        example_config_path = (
+            Path(__file__).parent.parent.parent.parent / "config.yaml.example"
+        )
 
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        # Try config.yaml first, then fall back to config.yaml.example
+        if config_path.exists():
+            config_file_path = config_path
+        elif example_config_path.exists():
+            config_file_path = example_config_path
+        else:
+            raise FileNotFoundError(
+                f"Configuration file not found: {config_path} or {example_config_path}"
+            )
 
         try:
-            with open(config_path, encoding="utf-8") as file:
+            with open(config_file_path, encoding="utf-8") as file:
                 config = yaml.safe_load(file)
 
             # Substitute environment variables

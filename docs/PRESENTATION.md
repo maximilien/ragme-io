@@ -22,8 +22,9 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **RAG**: Combines document retrieval with AI generation
 - **Personal**: Focuses on your specific content and interests
 - **Agentic**: Uses LLM agents for intelligent interaction
-- **Multi-modal**: Supports web pages, PDFs, and DOCX documents
+- **Multi-modal**: Supports web pages, PDFs, DOCX documents, and images
 - **Vector Database Agnostic**: Supports multiple vector databases (Milvus, Weaviate, etc.)
+- **AI Accelerated**: Optional cloud-based AI acceleration for enhanced processing
 
 ---
 
@@ -37,9 +38,10 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 
 **Key Features:**
 - **Left Sidebar**: Chat history with collapsible design
-- **Center**: Main chat area with markdown support
+- **Center**: Main chat area with markdown support and voice input
 - **Right Sidebar**: Document management with D3.js visualizations
 - **Real-time Updates**: WebSocket communication for live interactions
+- **Voice-to-Text**: Microphone button for hands-free querying
 
 ---
 
@@ -58,6 +60,7 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Enhanced URL-Based Deletion**: Delete documents by URL with support for various formats (full URLs, filenames, file:// URLs) and confirmation prompts for destructive operations
 - **Destructive Operation Confirmation**: All destructive operations require user confirmation before execution to prevent accidental data loss
 - **Enhanced Metadata**: Rich document information and chunk counts
+- **Pattern-Based Deletion**: Delete documents matching regex patterns
 
 ---
 
@@ -75,20 +78,39 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Network Graphs**: Document relationship mapping
 - **Click-to-Scroll**: Interactive navigation to documents
 - **Responsive Design**: Adapts to different screen sizes
+- **Real-time Updates**: Synchronized with document operations
+
+---
+
+## 🎤 Voice Input & Enhanced Settings
+
+### Modern User Experience
+
+<div style="display: flex; justify-content: center; margin: 20px 0;">
+  <img src="../images/ragme4.png" alt="RAGme.io Interface - Prompt Ideas" style="width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+</div>
+
+**Enhanced Features:**
+- **Voice-to-Text Input**: Microphone button using browser's Web Speech API
+- **Enhanced Settings UI**: Complete redesign with organized tabbed interface
+- **Recent Prompts & Ideas**: Quick access to sample prompts and chat history
+- **Comprehensive Configuration**: All config.yaml options accessible via UI
+- **Real-time Configuration**: Settings changes apply immediately
 
 ---
 
 ## 🚀 Key Features & Use Cases
 
 ### 1. **Interactive Personal RAG**
-- Add websites and documents (PDFs and DOCX)
-- Query using natural language
+- Add websites, documents (PDFs and DOCX), and images
+- Query using natural language or voice input
 - Get intelligent responses based on your content
 - **Smart document chunking** for large files
 
 ### 2. **Content Collection & Processing**
 - **Web Crawling**: Automatically discover and process web pages
 - **Document Processing**: PDF and DOCX file ingestion with automatic chunking
+- **Image Processing**: AI-powered image classification and OCR text extraction
 - **Watch Directory**: Automatic processing of new files with consistent chunking
 - **Chrome Extension**: One-click web page capture
 - **Unified Processing**: Same chunking logic across all input methods
@@ -98,10 +120,12 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - Get summaries and insights
 - Cross-reference information across sources
 - **Enhanced context**: Better handling of large documents through chunking
+- **Image Summarization**: Get AI-generated summaries of image collections by date range
 
 ### 4. **Modern Web Interface** ⭐ **ENHANCED!**
 - **Three-pane layout** with resizable and collapsible sidebars
 - **Real-time chat** with markdown support and copy functionality
+- **🎤 Voice Input**: Microphone button for hands-free querying
 - **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history via bottom sheet interface
 - **Interactive document visualization** with D3.js charts (bar, pie, network graphs)
 - **Click-to-scroll functionality** - click visualization nodes to find documents
@@ -110,15 +134,38 @@ npx @marp-team/marp-cli@latest PRESENTATION.md --html --allow-local-files -o ~/D
 - **Smart document management** with chunked document grouping
 - **Bulk operations** for document deletion and management
 
-### 5. **💡 Recent Prompts & Ideas** ⭐ **NEW!**
-- **Smart prompt suggestions**: Context-aware prompts based on chat state
-- **New chat experience**: 5 sample prompts to help users get started
-- **Ongoing chat support**: Shows 5 most recent user prompts + 3 sample prompts
-- **Bottom sheet interface**: Modern mobile-friendly popup design
-- **Quick access**: History button positioned for easy access
-- **Seamless integration**: Click to fill chat input, edit, and submit
+### 5. **🖼️ AI-Powered Image Support** ⭐ **NEW!**
+- **Complete Image Processing Pipeline**: PyTorch ResNet50 classification and EXIF metadata extraction
+- **OCR Text Extraction**: Automatic text extraction from images containing text
+- **AI Classification**: Intelligent content classification with confidence scores
+- **Image Summarization**: Get comprehensive summaries of image collections by date range
+- **Drag-and-Drop Interface**: Easy image upload and processing
+- **Natural Language Queries**: Ask questions about your images using text
 
-### 6. **Advanced Document Management** ⭐ **ENHANCED!**
+### 6. **⚡ AI Acceleration** ⭐ **NEW!**
+- **FriendliAI Integration**: Optional cloud-based AI acceleration for enhanced processing
+- **Parallel Processing**: Classification and OCR run simultaneously instead of sequentially
+- **Faster Response Times**: Reduced processing time for complex images
+- **Enhanced Accuracy**: Better classification and OCR with confidence scores
+- **Fallback Processing**: Automatic fallback to local processing if AI acceleration fails
+- **Configurable**: Enable/disable via settings interface
+
+### 7. **💾 S3-Compatible File Storage** ⭐ **NEW!**
+- **MinIO Integration**: Local development with S3-compatible storage
+- **Multiple Backends**: Support for MinIO, AWS S3, and local filesystem
+- **Automatic Bucket Management**: Creates and manages storage buckets
+- **Presigned URLs**: Secure file access with time-limited URLs
+- **Comprehensive File Operations**: Upload, download, delete, and metadata management
+- **Production Ready**: Easy migration to cloud storage services
+
+### 8. **🎛️ Enhanced Settings & Configuration** ⭐ **NEW!**
+- **Complete Settings UI**: All config.yaml options accessible via web interface
+- **Organized Tabs**: General, Interface, Documents, Chat, and AI Acceleration settings
+- **Real-time Configuration**: Settings changes apply immediately
+- **Client Customization**: Easy branding and customization options
+- **Environment Switching**: Seamless switching between different application environments
+
+### 9. **Advanced Document Management** ⭐ **ENHANCED!**
 - **Automatic chunking**: Large documents split at sentence boundaries (1000 chars)
 - **Chunked document grouping**: Multiple chunks displayed as single documents
 - **Enhanced metadata**: Rich document information including chunk counts

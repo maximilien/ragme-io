@@ -61,6 +61,9 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **[🎛️ Configuration Guide](docs/CONFIG.md)** - Comprehensive configuration system for client customization ⭐ **NEW!**
 - **[🤖 Agent Architecture](docs/AGENT_REFACTOR.md)** - Three-agent architecture design and implementation ⭐ **NEW!**
 - **[💾 Storage Service](docs/STORAGE_SERVICE.md)** - S3-compatible file storage service with MinIO ⭐ **NEW!**
+- **[⚡ AI Acceleration](docs/AI_ACCELERATION.md)** - Cloud-based AI processing guide ⭐ **NEW!**
+- **[🖼️ Image Processing](docs/IMAGE_SUMMARIZATION.md)** - Image analysis and summarization ⭐ **NEW!**
+- **[📝 OCR Feature](docs/OCR_FEATURE.md)** - Text extraction from images ⭐ **NEW!**
 - **[🔧 Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture  
 - **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
 - **[📖 Documentation Index](docs/README.md)** - Full documentation structure
@@ -349,6 +352,7 @@ RAGme now includes comprehensive image support with AI-powered analysis:
 - **OCR Text Extraction**: Automatically extracts text from images containing text (websites, documents, slides, etc.)
 - **EXIF Metadata Extraction**: Extracts camera settings, GPS data, and other technical metadata
 - **Smart Storage**: Images stored as base64 BLOB data in Weaviate with rich metadata including OCR content
+- **🚀 AI Acceleration**: Optional FriendliAI integration for faster, more accurate image processing with parallel classification and OCR
 
 **📦 Dependencies:**
 ```bash
@@ -358,9 +362,14 @@ pip install ragme-ai[ml]
 # Or install dependencies separately
 pip install torch>=2.0.0 torchvision>=0.15.0
 pip install easyocr pytesseract opencv-python Pillow
+
+# For AI acceleration with FriendliAI (optional)
+# No additional Python dependencies required - uses HTTP API
 ```
 
 > **Note**: AI classification requires PyTorch, and OCR requires EasyOCR or pytesseract. These are optional dependencies. Images will still be processed and stored without them, but won't include AI-generated labels or extracted text.
+>
+> **AI Acceleration**: FriendliAI integration provides faster, more accurate image processing. Configure your FriendliAI token, team ID, and endpoint in the `.env` file and enable AI acceleration in Settings.
 
 **💬 Agent Tools:**
 - `write_image_to_collection(image_url)` - Add images from URLs to the collection
@@ -380,6 +389,50 @@ Agent: Shows images with classifications, confidence scores, metadata, and OCR c
 
 User: "What images do I have of dogs?"
 Agent: Searches image collection for dog-related classifications
+
+### 🚀 AI Acceleration with FriendliAI
+
+RAGme now supports optional AI acceleration for image processing using FriendliAI:
+
+**⚡ Benefits:**
+- **Faster Processing**: Parallel classification and OCR processing
+- **Improved Accuracy**: Better handling of complex images and text extraction
+- **Reduced Resource Usage**: Offloads processing to FriendliAI's optimized infrastructure
+- **Enhanced Metadata**: More detailed classification and OCR results
+
+**🔧 Configuration:**
+1. **Environment Setup**: Add your FriendliAI credentials to `.env`:
+   ```bash
+   FRIENDLI_TOKEN=your_friendli_token
+   FRIENDLI_TEAM_ID=your_team_id
+   FRIENDLI_ENDPOINT_ID=your_endpoint_id
+   ```
+
+2. **Enable in Settings**: Go to Settings → AI Acceleration tab and enable:
+   - AI Acceleration (master toggle)
+   - Image Classification Acceleration
+   - Image OCR Acceleration
+
+3. **Configuration File**: Update `config.yaml`:
+   ```yaml
+   ai_acceleration:
+     enabled: true
+     image_classification: true
+     image_ocr: true
+     friendli_ai:
+       friendli_token: "${FRIENDLI_TOKEN}"
+       friendli_team_id: "${FRIENDLI_TEAM_ID}"
+       friendli_model:
+         acceleration_type:
+           - "image_classification"
+           - "image_ocr"
+         endpoint_url: "https://api.friendli.ai/dedicated"
+         endpoint_id: "${FRIENDLI_ENDPOINT_ID}"
+   ```
+
+**🔄 Fallback Behavior**: If AI acceleration fails or is disabled, RAGme automatically falls back to standard PyTorch classification and EasyOCR processing.
+
+**📊 Status Monitoring**: The Settings interface shows FriendliAI configuration status, acceleration types, and endpoint information.
 
 User: "Find images containing the text 'RAGme'"
 Agent: Searches image collection using OCR-extracted text content

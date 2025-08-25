@@ -308,6 +308,21 @@ features:
   authentication: false  # Future feature
   multi_tenant: false    # Future feature
 
+# AI Acceleration Configuration
+ai_acceleration:
+  enabled: false  # Enable/disable AI acceleration for image processing
+  image_classification: true  # Use AI acceleration for image classification
+  image_ocr: true  # Use AI acceleration for OCR text extraction
+  friendli_ai:
+    friendli_token: "${FRIENDLI_TOKEN}"
+    friendli_team_id: "${FRIENDLI_TEAM_ID}"
+    friendli_model:
+      acceleration_type:
+        - "image_classification"
+        - "image_ocr"
+      endpoint_url: "https://api.friendli.ai/dedicated"
+      endpoint_id: "${FRIENDLI_ENDPOINT_ID}"
+
 # Client Customization
 client:
   # Branding
