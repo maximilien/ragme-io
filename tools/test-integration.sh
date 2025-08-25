@@ -892,6 +892,77 @@ cleanup() {
     # First, clean up test documents from vector database
     cleanup_test_documents
     
+    # Clean up test files from storage
+    echo -e "  🗄️ Cleaning up test files from storage..."
+    if command -v python3 >/dev/null 2>&1; then
+        # Use Python to clean up storage files
+        python3 -c "
+import sys
+import os
+sys.path.insert(0, 'src')
+try:
+    from ragme.utils.storage import StorageService
+    from ragme.utils.config_manager import config
+    
+    storage_service = StorageService(config)
+    
+    # List of test file patterns to clean up
+    test_patterns = [
+        'test_image.png',
+        'test_data.bin', 
+        'test_url.pdf',
+        'cleanup_test.pdf',
+        'test_storage.txt',
+        'test_document.txt'
+    ]
+    
+    # Also clean up timestamped test files from today
+    from datetime import datetime
+    today = datetime.now().strftime('%Y%m%d')
+    test_patterns.extend([
+        f'{today}_*_test_*.png',
+        f'{today}_*_test_*.pdf',
+        f'{today}_*_test_*.txt',
+        f'{today}_*_test_*.bin'
+    ])
+    
+    deleted_count = 0
+    
+    # Get all files from storage
+    all_files = storage_service.list_files()
+    
+    for file_info in all_files:
+        file_name = file_info.get('name', '')
+        
+        # Check if file matches any test pattern
+        should_delete = False
+        for pattern in test_patterns:
+            if pattern in file_name:
+                should_delete = True
+                break
+        
+        if should_delete:
+            try:
+                if storage_service.delete_file(file_name):
+                    print(f'    ✅ Deleted test file: {file_name}')
+                    deleted_count += 1
+                else:
+                    print(f'    ⚠️ Failed to delete: {file_name}')
+            except Exception as e:
+                print(f'    ❌ Error deleting {file_name}: {e}')
+    
+    if deleted_count > 0:
+        print(f'  ✅ Cleaned up {deleted_count} test files from storage')
+    else:
+        print('  ✅ No test files found to clean up')
+        
+except Exception as e:
+    print(f'  ⚠️ Warning: Failed to cleanup storage files: {e}')
+" 2>/dev/null || echo -e "  ⚠️ Could not clean up storage files (Python not available)"
+    else
+        echo -e "  ⚠️ Could not clean up storage files (Python not available)"
+    fi
+    
     # Then remove test files from watch directory
     local test_files=(
         "$WATCH_DIR/test_integration.pdf"

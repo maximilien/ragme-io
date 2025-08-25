@@ -69,9 +69,45 @@ class RagMeTools:
             str: Success or error message
         """
         try:
+            # First get the document to check if it has a storage path
+            documents = self.ragme.list_documents(limit=1000, offset=0)
+            document = next(
+                (doc for doc in documents if str(doc.get("id")) == doc_id), None
+            )
+
+            storage_path = None
+            storage_deleted = False
+
+            if document:
+                storage_path = document.get("metadata", {}).get("storage_path")
+                if storage_path:
+                    try:
+                        from ..utils.config_manager import config
+                        from ..utils.storage import StorageService
+
+                        storage_service = StorageService(config)
+                        storage_deleted = storage_service.delete_file(storage_path)
+                        if storage_deleted:
+                            print(f"Deleted document from storage: {storage_path}")
+                        else:
+                            print(
+                                f"Failed to delete document from storage: {storage_path}"
+                            )
+                    except Exception as storage_error:
+                        print(
+                            f"Error deleting document from storage {storage_path}: {storage_error}"
+                        )
+                        # Continue with vector database deletion even if storage deletion fails
+
+            # Delete from vector database
             success = self.ragme.delete_document(doc_id)
             if success:
-                return f"Document {doc_id} deleted successfully"
+                message = f"Document {doc_id} deleted successfully"
+                if storage_path and storage_deleted:
+                    message += f" (also deleted from storage: {storage_path})"
+                elif storage_path and not storage_deleted:
+                    message += f" (failed to delete from storage: {storage_path})"
+                return message
             else:
                 return f"Document {doc_id} not found or could not be deleted"
         except Exception as e:
@@ -114,15 +150,45 @@ class RagMeTools:
             # Get all documents first
             documents = self.ragme.list_documents(limit=1000, offset=0)
             deleted_count = 0
+            storage_deleted_count = 0
 
             for _i, doc in enumerate(documents):
                 doc_id = doc.get("id")
                 if doc_id:
+                    # Check if document has a storage path and delete from storage if it exists
+                    storage_path = doc.get("metadata", {}).get("storage_path")
+                    if storage_path:
+                        try:
+                            from ..utils.config_manager import config
+                            from ..utils.storage import StorageService
+
+                            storage_service = StorageService(config)
+                            storage_deleted = storage_service.delete_file(storage_path)
+                            if storage_deleted:
+                                print(f"Deleted document from storage: {storage_path}")
+                                storage_deleted_count += 1
+                            else:
+                                print(
+                                    f"Failed to delete document from storage: {storage_path}"
+                                )
+                        except Exception as storage_error:
+                            print(
+                                f"Error deleting document from storage {storage_path}: {storage_error}"
+                            )
+                            # Continue with vector database deletion even if storage deletion fails
+
+                    # Delete from vector database
                     success = self.ragme.delete_document(doc_id)
                     if success:
                         deleted_count += 1
 
-            return f"Successfully deleted {deleted_count} documents from the collection"
+            message = (
+                f"Successfully deleted {deleted_count} documents from the collection"
+            )
+            if storage_deleted_count > 0:
+                message += f" (also deleted {storage_deleted_count} files from storage)"
+
+            return message
         except Exception as e:
             return f"Error deleting documents: {str(e)}"
 
@@ -565,26 +631,66 @@ class RagMeTools:
             )
 
             actual_image_id = image_id
+            image_document = None
 
             # If it doesn't look like a UUID, try to find by filename
             if not uuid_pattern.match(image_id):
                 # Try to find the image by filename
-                image = image_vdb.find_image_by_filename(image_id)
-                if image:
-                    actual_image_id = image.get("id")
+                image_document = image_vdb.find_image_by_filename(image_id)
+                if image_document:
+                    actual_image_id = image_document.get("id")
                     if not actual_image_id:
                         return f"Image with filename '{image_id}' found but has no ID"
                 else:
                     return f"Image with filename '{image_id}' not found"
+            else:
+                # If it looks like a UUID, find the image by ID
+                images = image_vdb.list_images(limit=1000, offset=0)
+                image_document = next(
+                    (img for img in images if str(img.get("id")) == image_id), None
+                )
+
+            # Check if image has a storage path and delete from storage if it exists
+            storage_path = None
+            storage_deleted = False
+
+            if image_document:
+                storage_path = image_document.get("metadata", {}).get("storage_path")
+                if storage_path:
+                    try:
+                        from ..utils.config_manager import config
+                        from ..utils.storage import StorageService
+
+                        storage_service = StorageService(config)
+                        storage_deleted = storage_service.delete_file(storage_path)
+                        if storage_deleted:
+                            print(f"Deleted image from storage: {storage_path}")
+                        else:
+                            print(
+                                f"Failed to delete image from storage: {storage_path}"
+                            )
+                    except Exception as storage_error:
+                        print(
+                            f"Error deleting image from storage {storage_path}: {storage_error}"
+                        )
+                        # Continue with vector database deletion even if storage deletion fails
 
             # Delete the image using the actual ID
             success = image_vdb.delete_image(actual_image_id)
 
             if success:
+                message = "Successfully deleted image"
                 if actual_image_id != image_id:
-                    return f"Successfully deleted image '{image_id}' (ID: {actual_image_id})"
+                    message += f" '{image_id}' (ID: {actual_image_id})"
                 else:
-                    return f"Successfully deleted image with ID: {image_id}"
+                    message += f" with ID: {image_id}"
+
+                if storage_path and storage_deleted:
+                    message += f" (also deleted from storage: {storage_path})"
+                elif storage_path and not storage_deleted:
+                    message += f" (failed to delete from storage: {storage_path})"
+
+                return message
             else:
                 return f"Image with ID {actual_image_id} not found"
 

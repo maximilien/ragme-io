@@ -312,6 +312,165 @@ Storage service logs include:
 - Consider CDN integration for frequently accessed files
 - Monitor S3 costs and usage patterns
 
+## Storage Management
+
+RAGme.io includes a comprehensive storage management tool for administrative tasks and content management.
+
+### Storage Management Tool
+
+The `./tools/storage.sh` script provides a command-line interface for managing storage content with support for multiple buckets:
+
+```bash
+# Show help and available commands
+./tools/storage.sh help
+
+# Check storage service health and connectivity (shows available buckets)
+./tools/storage.sh health
+
+# List all available buckets
+./tools/storage.sh buckets
+
+# List buckets with detailed information
+./tools/storage.sh buckets --details
+
+# Show storage configuration and status
+./tools/storage.sh info
+
+# List all files in storage
+./tools/storage.sh list
+
+# List files with detailed information
+./tools/storage.sh list --details
+
+# List files with specific prefix
+./tools/storage.sh list --prefix "documents/"
+
+# List files from all buckets
+./tools/storage.sh list --all
+
+# List files from specific bucket
+./tools/storage.sh list --bucket documents
+
+# Show download links for all files
+./tools/storage.sh links
+
+# Show download link for specific file
+./tools/storage.sh links document.pdf
+
+# Delete specific file (with confirmation)
+./tools/storage.sh delete document.pdf
+
+# Delete specific file without confirmation
+./tools/storage.sh delete document.pdf --force
+
+# Delete file from specific bucket
+./tools/storage.sh delete document.pdf --bucket documents
+
+# Delete all files (with confirmation)
+./tools/storage.sh delete-all
+
+# Delete all files without confirmation
+./tools/storage.sh delete-all --force
+
+# Delete files with specific prefix
+./tools/storage.sh delete-all --prefix "temp/"
+
+# Delete all files from specific bucket
+./tools/storage.sh delete-all --bucket documents
+
+# Delete all files from all buckets
+./tools/storage.sh delete-all --all
+```
+
+### Health Monitoring
+
+The health check command provides comprehensive storage service monitoring:
+
+```bash
+# Basic health check
+./tools/storage.sh health
+
+# Detailed health check with verbose output
+./tools/storage.sh health --verbose
+```
+
+The health check verifies:
+- Storage service configuration
+- Connectivity to storage backend
+- Basic operations (list, bucket access)
+- Available buckets and their sizes
+- URL generation capabilities
+- Provides troubleshooting tips if issues are detected
+
+### Safety Features
+
+All destructive operations include safety measures:
+
+- **Confirmation Required**: Delete operations require explicit user confirmation
+- **Force Option**: `--force` flag bypasses confirmation for automation
+- **File Information**: Shows file size and type before deletion
+- **Bulk Operations**: Supports prefix-based selective deletion
+- **Error Handling**: Graceful handling of storage service issues
+
+### Use Cases
+
+Common use cases for the storage management tool:
+
+- **Administrative Tasks**: Monitor storage usage, health, and bucket management
+- **Content Cleanup**: Remove old or unnecessary files from specific buckets or all buckets
+- **Troubleshooting**: Diagnose storage service issues and bucket access problems
+- **Development**: Manage test data and temporary files across multiple buckets
+- **Maintenance**: Regular storage health checks, bucket monitoring, and cleanup
+- **Multi-bucket Operations**: Manage files across different storage buckets efficiently
+
+### Integration
+
+The storage management tool:
+- Uses the same configuration as RAGme (config.yaml + .env)
+- Reuses the existing StorageService implementation
+- Works independently of RAGme services
+- Supports all storage backends (MinIO, S3, Local)
+
+## Storage Deletion Integration
+
+### Automatic Storage Cleanup
+
+RAGme automatically manages storage cleanup when documents and images are deleted from the system. When a document or image is deleted from the frontend or through API calls, the system:
+
+1. **Checks for Storage Path**: Looks for a `storage_path` in the document/image metadata
+2. **Deletes from Storage**: If a storage path exists, automatically deletes the file from storage
+3. **Removes from Vector DB**: Deletes the document/image from the vector database
+4. **Provides Feedback**: Reports whether storage deletion was successful
+
+### How It Works
+
+The storage deletion integration is implemented across multiple layers:
+
+- **API Endpoints**: `/delete-document/{document_id}` and `/delete-image/{image_id}` endpoints
+- **Agent Tools**: `delete_document`, `delete_image_from_collection`, and `delete_all_documents` methods
+- **VDB Management**: Bulk deletion operations for collections
+
+### Error Handling
+
+The system is designed to be resilient:
+- **Storage Failures**: If storage deletion fails, the system continues with vector database deletion
+- **Missing Files**: Gracefully handles cases where files no longer exist in storage
+- **Service Unavailability**: Continues operation even if storage service is temporarily unavailable
+
+### Benefits
+
+- **Storage Cleanup**: Prevents accumulation of orphaned files in storage
+- **Consistency**: Ensures complete deletion of uploaded content
+- **Resource Management**: Frees up storage space when documents are deleted
+- **User Experience**: Users can trust that deletion removes content completely
+
+### Configuration
+
+No additional configuration is required. The storage deletion integration:
+- Works with all storage backends (MinIO, S3, Local)
+- Respects existing storage configuration
+- Maintains backward compatibility with documents that don't have storage paths
+
 ## Future Enhancements
 
 Potential improvements to the storage service:

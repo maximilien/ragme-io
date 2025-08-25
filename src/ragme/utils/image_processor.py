@@ -633,10 +633,11 @@ class ImageProcessor:
                 with open(file_path, "rb") as f:
                     image_data = f.read()
             else:
-                # URL
-                response = requests.get(image_source, timeout=10)
-                response.raise_for_status()
-                image_data = response.content
+                # URL - use session to ensure proper connection cleanup
+                with requests.Session() as session:
+                    response = session.get(image_source, timeout=10)
+                    response.raise_for_status()
+                    image_data = response.content
 
             # Check if this is a HEIC file and convert to JPEG for web compatibility
             if image_source.lower().endswith((".heic", ".heif")):

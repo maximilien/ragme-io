@@ -32,15 +32,6 @@ warnings.filterwarnings(
     "ignore", category=DeprecationWarning, message=".*class-based `config`.*"
 )
 
-# Suppress ResourceWarnings from dependencies
-warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
-warnings.filterwarnings(
-    "ignore", category=ResourceWarning, message=".*Enable tracemalloc.*"
-)
-warnings.filterwarnings(
-    "ignore", category=ResourceWarning
-)  # General ResourceWarning suppression
-
 # Get application configuration
 app_config = config.get("application", {})
 app = FastAPI(

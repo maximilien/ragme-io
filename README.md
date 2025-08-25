@@ -450,6 +450,15 @@ This will start all services and you can access the **new frontend** at `http://
 ./tools/tail-logs.sh mcp        # MCP logs (port 8022)
 ./tools/tail-logs.sh frontend   # Frontend logs (port 8020)
 ./tools/tail-logs.sh minio      # MinIO logs (port 9000)
+
+# Storage management and health checks
+./tools/storage.sh health       # Check storage service health and show available buckets
+./tools/storage.sh buckets      # List all available buckets
+./tools/storage.sh info         # Show storage configuration and status
+./tools/storage.sh list         # List all files in storage
+./tools/storage.sh list --all   # List files from all buckets
+./tools/storage.sh list --bucket <name>  # List files from specific bucket
+./tools/storage.sh help         # Show all storage management commands
 ```
 
 For detailed process management, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).

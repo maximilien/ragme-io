@@ -96,13 +96,13 @@ start_core_services() {
     
     # Start api.py
     echo "Starting api.py..."
-    uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
+    PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
     # Start mcp.py
     echo "Starting mcp.py..."
-    uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port ${RAGME_MCP_PORT:-8022} > logs/mcp.log 2>&1 &
+    PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port ${RAGME_MCP_PORT:-8022} > logs/mcp.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
@@ -137,14 +137,14 @@ start_service() {
         "api")
             check_port ${RAGME_API_PORT:-8021}
             echo "Starting api.py..."
-            uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
+            PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
             echo $! >> .pid
             sleep 3
             ;;
         "mcp")
             check_port ${RAGME_MCP_PORT:-8022}
             echo "Starting mcp.py..."
-            uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port ${RAGME_MCP_PORT:-8022} > logs/mcp.log 2>&1 &
+            PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.mcp:app --reload --host 0.0.0.0 --port ${RAGME_MCP_PORT:-8022} > logs/mcp.log 2>&1 &
             echo $! >> .pid
             sleep 3
             ;;

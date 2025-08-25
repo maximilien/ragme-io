@@ -65,7 +65,7 @@ main() {
 }
 
 # Handle help command specially for better formatting
-if [[ "$1" == "help" ]]; then
+if [[ "$1" == "help" ]] || [[ $# -eq 0 ]]; then
     print_status $BLUE "RAGme VDB Management Tool"
     print_status $BLUE "========================"
     echo
