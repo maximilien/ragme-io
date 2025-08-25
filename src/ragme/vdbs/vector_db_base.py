@@ -177,7 +177,7 @@ class VectorDatabase(ABC):
         Count documents in the text collection of the vector database efficiently.
 
         Args:
-            date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+            date_filter: Date filter to apply ('today', 'week', 'month', 'year', 'all')
 
         Returns:
             Number of documents matching the filter
@@ -190,7 +190,7 @@ class VectorDatabase(ABC):
         Count images in the image collection of the vector database efficiently.
 
         Args:
-            date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+            date_filter: Date filter to apply ('today', 'week', 'month', 'year', 'all')
 
         Returns:
             Number of images matching the filter

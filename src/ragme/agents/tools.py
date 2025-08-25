@@ -414,7 +414,7 @@ class RagMeTools:
         date filtering.
 
         Args:
-            date_filter: Filter by date - 'all', 'current', 'month', 'year'
+            date_filter: Filter by date - 'all', 'today', 'week', 'month', 'year'
 
         Returns:
             str: Formatted count message
@@ -435,7 +435,7 @@ class RagMeTools:
 
                     now = datetime.datetime.now()
 
-                    if date_filter == "current":
+                    if date_filter == "today":
                         start_of_week = now - datetime.timedelta(days=now.weekday())
                         cutoff = start_of_week.isoformat()
                     elif date_filter == "month":

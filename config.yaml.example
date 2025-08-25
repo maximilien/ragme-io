@@ -201,7 +201,7 @@ mcp_servers:
 frontend:
   # Default user settings
   settings:
-    max_documents: 10  # Max documents to list before pagination
+    max_documents: 10  # Max documents to list before pagination (default: 10, max: 25)
     auto_refresh: true
     refresh_interval_ms: 30000  # 30 seconds
     max_tokens: 4000
@@ -230,9 +230,9 @@ frontend:
     
   # Document limits
   documents:
-    max_display: 100
-    default_limit: 50
-    pagination_size: 20
+    max_display: 25  # Maximum documents to display (limited to 25 for pagination)
+    default_limit: 10  # Default number of documents per page
+    pagination_size: 10  # Number of documents per page (default: 10, max: 25)
     
   # Connection settings
   connection:

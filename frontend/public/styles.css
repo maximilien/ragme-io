@@ -463,7 +463,7 @@ body {
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .documents-sidebar.collapsed {
@@ -477,6 +477,7 @@ body {
     justify-content: space-between;
     align-items: center;
     background: rgba(255, 255, 255, 0.95);
+    position: relative;
 }
 
 .sidebar-header h3 {
@@ -484,6 +485,88 @@ body {
     font-weight: 600;
     color: #333;
     margin: 0;
+}
+
+/* Search container */
+.search-container {
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.75rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+    z-index: 1;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-input::placeholder {
+    color: #9ca3af;
+}
+
+/* Filter indicator */
+.filter-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 6px;
+    color: #667eea;
+    font-size: 0.875rem;
+    margin-right: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.filter-indicator:hover {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+/* Date filter indicator */
+.date-filter-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 6px;
+    color: #667eea;
+    font-size: 0.875rem;
+    margin-right: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.date-filter-indicator:hover {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
 }
 
 .sidebar-header-actions {
@@ -1076,6 +1159,138 @@ body {
 
 .recent-prompts-item:hover {
     background-color: rgba(102, 126, 234, 0.1);
+}
+
+/* Document settings button */
+.document-settings-btn {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.document-settings-btn:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+.document-settings-btn.active {
+    background: rgba(102, 126, 234, 0.3);
+    border-color: rgba(102, 126, 234, 0.6);
+}
+
+/* Document settings popup */
+.document-settings-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.document-settings-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.document-settings-popup {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 300px;
+    max-height: 400px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease-in-out;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    margin-top: 0.5rem;
+}
+
+.document-settings-popup.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.document-settings-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(102, 126, 234, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.document-settings-title {
+    font-weight: 600;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+.document-settings-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.document-settings-close:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.document-settings-content {
+    padding: 1.5rem;
+    max-height: calc(60vh - 80px);
+    overflow-y: auto;
+}
+
+.document-settings-content .settings-section {
+    margin-bottom: 2rem;
+}
+
+.document-settings-content .settings-section h4 {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.document-settings-content .content-filter-selector,
+.document-settings-content .date-filter-selector {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.document-settings-content .content-filter-selector:focus,
+.document-settings-content .date-filter-selector:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .recent-prompts-item:last-child {
@@ -3184,4 +3399,148 @@ body {
 
 .text-muted {
     color: #6b7280;
+}
+
+/* Pagination Styles */
+.pagination-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    background: #f8fafc;
+    margin-top: auto;
+    min-height: 60px; /* Reduced height to match chat input better */
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.pagination-btn {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    color: #374151;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+    color: #1f2937;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f9fafb;
+}
+
+.pagination-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+.pagination-btn.active:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.pagination-pages {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.pagination-page {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #374151;
+    font-weight: 500;
+}
+
+.pagination-page:hover:not(.active) {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+    color: #1f2937;
+}
+
+.pagination-page.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+.pagination-page.active:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+
+
+
+
+.pagination-load-more {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    color: #374151;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.pagination-load-more:hover {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Responsive pagination */
+@media (max-width: 768px) {
+    .pagination-controls {
+        gap: 0.25rem;
+    }
+    
+    .pagination-btn,
+    .pagination-page {
+        min-width: 2rem;
+        height: 2.25rem;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .pagination-pages {
+        gap: 0.125rem;
+    }
 } 

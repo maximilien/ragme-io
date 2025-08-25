@@ -49,7 +49,7 @@
                     socketScript.src = 'http://localhost:8020/socket.io/socket.io.js';
                     socketScript.onload = function() {
                         const appScript = document.createElement('script');
-                        appScript.src = 'http://localhost:8020/app.js';
+                        appScript.src = 'http://localhost:8020/app.js?v=1.2';
                         document.head.appendChild(appScript);
                     };
                     document.head.appendChild(socketScript);
@@ -177,19 +177,22 @@
             <!-- Recent Documents sidebar (resizable) -->
             <div class="documents-sidebar" id="documentsSidebar">
                 <div class="sidebar-header">
-                    <h3>Documents</h3>
+                    <div class="search-container">
+                        <div class="search-input-wrapper">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="documentSearchInput" class="search-input" placeholder="Search documents..." />
+                        </div>
+                    </div>
                     <div class="sidebar-header-actions">
-                        <select class="content-filter-selector" id="contentFilterSelector" title="Filter by content type">
-                            <option value="both">All</option>
-                            <option value="documents">Documents</option>
-                            <option value="images">Images</option>
-                        </select>
-                        <select class="date-filter-selector" id="dateFilterSelector" title="Filter documents by date">
-                            <option value="current">Current</option>
-                            <option value="month">This Month</option>
-                            <option value="year">This Year</option>
-                            <option value="all">All</option>
-                        </select>
+                        <div class="filter-indicator" id="filterIndicator" title="Content type filter">
+                            <i class="fas fa-file-alt" id="filterIcon"></i>
+                        </div>
+                        <div class="date-filter-indicator" id="dateFilterIndicator" title="Date filter">
+                            <i class="fas fa-calendar-day" id="dateFilterIcon"></i>
+                        </div>
+                        <button class="document-settings-btn" id="documentSettingsBtn" title="Document listing settings">
+                            <i class="fas fa-sliders-h"></i>
+                        </button>
                         <button class="refresh-btn" id="refreshDocuments" title="Refresh documents">
                             <i class="fas fa-sync-alt"></i>
                         </button>
@@ -235,6 +238,52 @@
                     <!-- Documents list container -->
                     <div class="documents-list-container" id="documentsListContainer">
                         <!-- Document cards will be populated here -->
+                    </div>
+                    
+                    <!-- Pagination container -->
+                    <div class="pagination-container" id="paginationContainer" style="display: none;">
+                        <div class="pagination-controls" id="paginationControls" title="">
+                            <button class="pagination-btn" id="paginationPrev" title="Previous page">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <div class="pagination-pages" id="paginationPages">
+                                <!-- Page numbers will be populated here -->
+                            </div>
+                            <button class="pagination-btn" id="paginationNext" title="Next page">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Document Settings Popup -->
+                <div class="document-settings-backdrop" id="documentSettingsBackdrop"></div>
+                <div class="document-settings-popup" id="documentSettingsPopup">
+                    <div class="document-settings-header">
+                        <div class="document-settings-title">Document Listing Settings</div>
+                        <button class="document-settings-close" id="documentSettingsClose">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="document-settings-content">
+                        <div class="settings-section">
+                            <h4>Content Type Filter</h4>
+                            <select class="content-filter-selector" id="contentFilterSelector" title="Filter by content type">
+                                <option value="both">All</option>
+                                <option value="documents">Documents</option>
+                                <option value="images">Images</option>
+                            </select>
+                        </div>
+                        <div class="settings-section">
+                            <h4>Date Filter</h4>
+                            <select class="date-filter-selector" id="dateFilterSelector" title="Filter documents by date">
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                                <option value="year">This Year</option>
+                                <option value="all">All</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -468,8 +517,9 @@
                             </div>
                             <div class="setting-item">
                                 <label for="maxDocuments">Max Documents Display:</label>
-                                <input type="number" id="maxDocuments" value="20" min="1" max="100">
-                                <small>Maximum number of documents to display (1-100)</small>
+                                <input type="range" id="maxDocuments" value="10" min="5" max="25" step="5">
+                                <span class="range-value" id="maxDocumentsValue">10</span>
+                                <small>Maximum number of documents to display (5-25)</small>
                             </div>
                         </div>
                     </div>
@@ -554,13 +604,15 @@
                             </div>
                             <div class="setting-item">
                                 <label for="maxDisplayDocuments">Max Display Documents:</label>
-                                <input type="number" id="maxDisplayDocuments" value="100" min="10" max="1000">
-                                <small>Maximum documents to display in lists (10-1000)</small>
+                                <input type="range" id="maxDisplayDocuments" value="10" min="5" max="25" step="5">
+                                <span class="range-value" id="maxDisplayDocumentsValue">10</span>
+                                <small>Maximum documents to display in lists (5-25)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="paginationSize">Pagination Size:</label>
-                                <input type="number" id="paginationSize" value="20" min="5" max="100">
-                                <small>Number of documents per page (5-100)</small>
+                                <input type="range" id="paginationSize" value="10" min="5" max="25" step="5">
+                                <span class="range-value" id="paginationSizeValue">10</span>
+                                <small>Number of documents per page (5-25)</small>
                             </div>
                         </div>
                         
@@ -716,6 +768,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=1.1"></script>
+    <script src="app.js?v=1.2"></script>
 </body>
 </html> 

@@ -281,7 +281,7 @@ def filter_documents_by_date(
 
     Args:
         documents: List of documents to filter
-        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+        date_filter: Date filter to apply ('today', 'week', 'month', 'year', 'all')
 
     Returns:
         Filtered list of documents
@@ -291,8 +291,11 @@ def filter_documents_by_date(
 
     now = datetime.now()
 
-    if date_filter == "current":
-        # Current = this week (last 7 days)
+    if date_filter == "today":
+        # Current = today
+        cutoff_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif date_filter == "week":
+        # This week (last 7 days)
         cutoff_date = now - timedelta(days=7)
     elif date_filter == "month":
         # This month (current month)
@@ -355,7 +358,7 @@ async def count_documents(
     date_filter: str = Query(
         default="all",
         description=(
-            "Date filter: 'current' (this week), 'month' (this month), "
+            "Date filter: 'today' (today), 'week' (this week), 'month' (this month), "
             "'year' (this year), 'all' (all documents)"
         ),
     ),
@@ -364,7 +367,7 @@ async def count_documents(
     Get the count of documents in the RAG system.
 
     Args:
-        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+        date_filter: Date filter to apply ('today', 'week', 'month', 'year', 'all')
 
     Returns:
         dict: Document count information
@@ -391,19 +394,19 @@ async def count_documents(
 @app.get("/list-documents")
 async def list_documents(
     limit: int = Query(
-        default=10, ge=1, le=100, description="Maximum number of documents to return"
+        default=10, ge=1, le=25, description="Maximum number of documents to return"
     ),
     offset: int = Query(default=0, ge=0, description="Number of documents to skip"),
     date_filter: str = Query(
         default="all",
-        description="Date filter: 'current' (this week), 'month' (this month), 'year' (this year), 'all' (all documents)",
+        description="Date filter: 'current' (today), 'week' (this week), 'month' (this month), 'year' (this year), 'all' (all documents)",
     ),
 ):
     """
     List documents in the RAG system.
 
     Args:
-        limit: Maximum number of documents to return (1-100)
+        limit: Maximum number of documents to return (1-25)
         offset: Number of documents to skip
         date_filter: Date filter to apply ('current', 'month', 'year', 'all')
 
@@ -433,25 +436,25 @@ async def list_documents(
 @app.get("/list-content")
 async def list_content(
     limit: int = Query(
-        default=10, ge=1, le=100, description="Maximum number of items to return"
+        default=10, ge=1, le=25, description="Maximum number of items to return"
     ),
     offset: int = Query(default=0, ge=0, description="Number of items to skip"),
     date_filter: str = Query(
         default="all",
-        description="Date filter: 'current' (this week), 'month' (this month), 'year' (this year), 'all' (all items)",
+        description="Date filter: 'current' (today), 'week' (this week), 'month' (this month), 'year' (this year), 'all' (all items)",
     ),
     content_type: str = Query(
         default="both",
-        description="Content type filter: 'documents', 'image', or 'both'",
+        description="Content type filter: 'documents', 'images', or 'both'",
     ),
 ):
     """
     List documents and/or images in the RAG system.
 
     Args:
-        limit: Maximum number of items to return (1-100)
+        limit: Maximum number of items to return (1-25)
         offset: Number of items to skip
-        date_filter: Date filter to apply ('current', 'month', 'year', 'all')
+        date_filter: Date filter to apply ('today', 'week', 'month', 'year', 'all')
         content_type: Content type filter ('documents', 'image', 'both')
 
     Returns:
@@ -461,14 +464,14 @@ async def list_content(
         all_items = []
 
         # Get documents if requested
-        if content_type in ["documents", "both"]:
+        if content_type in ["document", "documents", "both"]:
             documents = get_ragme().list_documents(limit=1000, offset=0)
             for doc in documents:
                 doc["content_type"] = "document"
             all_items.extend(documents)
 
         # Get images if requested
-        if content_type in ["image", "both"]:
+        if content_type in ["images", "both"]:
             try:
                 from ..utils.config_manager import config
                 from ..vdbs.vector_db_factory import create_vector_database
@@ -1608,7 +1611,7 @@ try:
             all_items = []
 
             # Get text documents
-            if content_type in ["both", "documents"]:
+            if content_type in ["both", "document", "documents"]:
                 documents = get_ragme().list_documents(limit=1000, offset=0)
                 for doc in documents:
                     doc["content_type"] = "document"
@@ -1649,9 +1652,14 @@ try:
                                 date_added.replace("Z", "+00:00")
                             )
 
-                            if date_filter == "current":
-                                # Current day
+                            if date_filter == "today":
+                                # Today
                                 if item_date.date() == current_time.date():
+                                    filtered_items.append(item)
+                            elif date_filter == "week":
+                                # Current week (last 7 days)
+                                week_ago = current_time - timedelta(days=7)
+                                if item_date >= week_ago:
                                     filtered_items.append(item)
                             elif date_filter == "month":
                                 # Current month
