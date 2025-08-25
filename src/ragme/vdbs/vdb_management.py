@@ -253,17 +253,45 @@ class VDBManager:
 
             # Delete each document
             deleted_count = 0
+            storage_deleted_count = 0
             for doc in all_docs:
                 try:
+                    # Check if document has a storage path and delete from storage if it exists
+                    storage_path = doc.get("metadata", {}).get("storage_path")
+                    if storage_path:
+                        try:
+                            from ..utils.config_manager import config
+                            from ..utils.storage import StorageService
+
+                            storage_service = StorageService(config)
+                            storage_deleted = storage_service.delete_file(storage_path)
+                            if storage_deleted:
+                                print(f"Deleted document from storage: {storage_path}")
+                                storage_deleted_count += 1
+                            else:
+                                print(
+                                    f"Failed to delete document from storage: {storage_path}"
+                                )
+                        except Exception as storage_error:
+                            print(
+                                f"Error deleting document from storage {storage_path}: {storage_error}"
+                            )
+                            # Continue with vector database deletion even if storage deletion fails
+
+                    # Delete from vector database
                     vdb.delete_document(doc["id"])
                     deleted_count += 1
                 except Exception as e:
                     print(f"Warning: Failed to delete document {doc['id']}: {e}")
 
+            message = f"Successfully deleted {deleted_count} documents"
+            if storage_deleted_count > 0:
+                message += f" (also deleted {storage_deleted_count} files from storage)"
+
             return {
                 "status": "success",
                 "collection": vdb.get_text_collection_name(),
-                "message": f"Successfully deleted {deleted_count} documents",
+                "message": message,
                 "deleted_count": deleted_count,
             }
         except Exception as e:
@@ -299,17 +327,45 @@ class VDBManager:
 
             # Delete each image
             deleted_count = 0
+            storage_deleted_count = 0
             for image in all_images:
                 try:
+                    # Check if image has a storage path and delete from storage if it exists
+                    storage_path = image.get("metadata", {}).get("storage_path")
+                    if storage_path:
+                        try:
+                            from ..utils.config_manager import config
+                            from ..utils.storage import StorageService
+
+                            storage_service = StorageService(config)
+                            storage_deleted = storage_service.delete_file(storage_path)
+                            if storage_deleted:
+                                print(f"Deleted image from storage: {storage_path}")
+                                storage_deleted_count += 1
+                            else:
+                                print(
+                                    f"Failed to delete image from storage: {storage_path}"
+                                )
+                        except Exception as storage_error:
+                            print(
+                                f"Error deleting image from storage {storage_path}: {storage_error}"
+                            )
+                            # Continue with vector database deletion even if storage deletion fails
+
+                    # Delete from vector database
                     vdb.delete_image(image["id"])
                     deleted_count += 1
                 except Exception as e:
                     print(f"Warning: Failed to delete image {image['id']}: {e}")
 
+            message = f"Successfully deleted {deleted_count} images"
+            if storage_deleted_count > 0:
+                message += f" (also deleted {storage_deleted_count} files from storage)"
+
             return {
                 "status": "success",
                 "collection": vdb.get_image_collection_name(),
-                "message": f"Successfully deleted {deleted_count} images",
+                "message": message,
                 "deleted_count": deleted_count,
             }
         except Exception as e:

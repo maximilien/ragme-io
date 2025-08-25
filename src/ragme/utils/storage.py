@@ -538,8 +538,20 @@ class StorageService:
 
     def _get_file_url_local(self, object_name: str) -> str:
         """Get local file URL (for development)"""
-        # For local storage, return a relative path
-        return f"/storage/{object_name}"
+        # For local storage, construct a proper URL using the API server
+        try:
+            # Get the API URL from configuration
+            api_url = (
+                self.config.get("network", {})
+                .get("frontend", {})
+                .get("api_url", "http://localhost:8021")
+            )
+            # Remove trailing slash if present
+            api_url = api_url.rstrip("/")
+            return f"{api_url}/storage/{object_name}"
+        except Exception:
+            # Fallback to relative path if configuration is not available
+            return f"/storage/{object_name}"
 
     def get_file_info(self, object_name: str) -> dict[str, Any]:
         """
@@ -599,3 +611,256 @@ class StorageService:
             "content_type": mimetypes.guess_type(str(file_path))[0]
             or "application/octet-stream",
         }
+
+    def list_buckets(self) -> list[dict[str, Any]]:
+        """
+        List all available buckets
+
+        Returns:
+            List of bucket information dictionaries
+        """
+        try:
+            if self.storage_type == "minio":
+                return self._list_buckets_minio()
+            elif self.storage_type == "s3":
+                return self._list_buckets_s3()
+            elif self.storage_type == "local":
+                return self._list_buckets_local()
+        except Exception as e:
+            logger.error(f"Error listing buckets: {e}")
+            raise
+
+    def _list_buckets_minio(self) -> list[dict[str, Any]]:
+        """List buckets using MinIO client"""
+        buckets = []
+        for bucket in self.client.list_buckets():
+            buckets.append(
+                {
+                    "name": bucket.name,
+                    "creation_date": bucket.creation_date,
+                    "size": 0,  # MinIO doesn't provide bucket size directly
+                }
+            )
+        return buckets
+
+    def _list_buckets_s3(self) -> list[dict[str, Any]]:
+        """List buckets using S3 client"""
+        response = self.client.list_buckets()
+        buckets = []
+        for bucket in response["Buckets"]:
+            # Get bucket size by listing objects
+            try:
+                size = 0
+                paginator = self.client.get_paginator("list_objects_v2")
+                for page in paginator.paginate(Bucket=bucket["Name"]):
+                    if "Contents" in page:
+                        size += sum(obj["Size"] for obj in page["Contents"])
+                buckets.append(
+                    {
+                        "name": bucket["Name"],
+                        "creation_date": bucket["CreationDate"],
+                        "size": size,
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Could not get size for bucket {bucket['Name']}: {e}")
+                buckets.append(
+                    {
+                        "name": bucket["Name"],
+                        "creation_date": bucket["CreationDate"],
+                        "size": 0,
+                    }
+                )
+        return buckets
+
+    def _list_buckets_local(self) -> list[dict[str, Any]]:
+        """List buckets for local storage (directories)"""
+        buckets = []
+        if self.storage_path.exists():
+            for item in self.storage_path.iterdir():
+                if item.is_dir():
+                    # Calculate directory size
+                    size = 0
+                    try:
+                        for file_path in item.rglob("*"):
+                            if file_path.is_file():
+                                size += file_path.stat().st_size
+                    except Exception:
+                        size = 0
+
+                    buckets.append(
+                        {
+                            "name": item.name,
+                            "creation_date": datetime.fromtimestamp(
+                                item.stat().st_ctime
+                            ),
+                            "size": size,
+                        }
+                    )
+        return buckets
+
+    def bucket_exists(self, bucket_name: str) -> bool:
+        """
+        Check if a bucket exists
+
+        Args:
+            bucket_name: Name of the bucket to check
+
+        Returns:
+            True if bucket exists, False otherwise
+        """
+        try:
+            if self.storage_type == "minio":
+                return self.client.bucket_exists(bucket_name)
+            elif self.storage_type == "s3":
+                try:
+                    self.client.head_bucket(Bucket=bucket_name)
+                    return True
+                except ClientError as e:
+                    if e.response["Error"]["Code"] == "404":
+                        return False
+                    raise
+            elif self.storage_type == "local":
+                bucket_path = self.storage_path / bucket_name
+                return bucket_path.exists() and bucket_path.is_dir()
+        except Exception as e:
+            logger.error(f"Error checking bucket existence: {e}")
+            return False
+
+    def list_files_in_bucket(
+        self, bucket_name: str, prefix: str = "", recursive: bool = True
+    ) -> list[dict[str, Any]]:
+        """
+        List files in a specific bucket
+
+        Args:
+            bucket_name: Name of the bucket
+            prefix: Prefix to filter files
+            recursive: Whether to list recursively
+
+        Returns:
+            List of file information dictionaries
+        """
+        try:
+            if self.storage_type == "minio":
+                return self._list_files_in_bucket_minio(bucket_name, prefix, recursive)
+            elif self.storage_type == "s3":
+                return self._list_files_in_bucket_s3(bucket_name, prefix, recursive)
+            elif self.storage_type == "local":
+                return self._list_files_in_bucket_local(bucket_name, prefix, recursive)
+        except Exception as e:
+            logger.error(f"Error listing files in bucket {bucket_name}: {e}")
+            raise
+
+    def _list_files_in_bucket_minio(
+        self, bucket_name: str, prefix: str = "", recursive: bool = True
+    ) -> list[dict[str, Any]]:
+        """List files in bucket using MinIO client"""
+        files = []
+        try:
+            objects = self.client.list_objects(
+                bucket_name, prefix=prefix, recursive=recursive
+            )
+            for obj in objects:
+                files.append(
+                    {
+                        "name": obj.object_name,
+                        "size": obj.size,
+                        "last_modified": obj.last_modified,
+                        "etag": obj.etag,
+                    }
+                )
+        except S3Error as e:
+            if e.code == "NoSuchBucket":
+                return []
+            raise
+        return files
+
+    def _list_files_in_bucket_s3(
+        self, bucket_name: str, prefix: str = "", recursive: bool = True
+    ) -> list[dict[str, Any]]:
+        """List files in bucket using S3 client"""
+        files = []
+        try:
+            paginator = self.client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+                if "Contents" in page:
+                    for obj in page["Contents"]:
+                        files.append(
+                            {
+                                "name": obj["Key"],
+                                "size": obj["Size"],
+                                "last_modified": obj["LastModified"],
+                                "etag": obj["ETag"],
+                            }
+                        )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchBucket":
+                return []
+            raise
+        return files
+
+    def _list_files_in_bucket_local(
+        self, bucket_name: str, prefix: str = "", recursive: bool = True
+    ) -> list[dict[str, Any]]:
+        """List files in bucket for local storage"""
+        files = []
+        bucket_path = self.storage_path / bucket_name
+        if not bucket_path.exists() or not bucket_path.is_dir():
+            return files
+
+        try:
+            if recursive:
+                file_paths = bucket_path.rglob("*")
+            else:
+                file_paths = bucket_path.glob("*")
+
+            for file_path in file_paths:
+                if file_path.is_file():
+                    # Check if file matches prefix
+                    relative_path = file_path.relative_to(bucket_path)
+                    if not prefix or str(relative_path).startswith(prefix):
+                        stat = file_path.stat()
+                        files.append(
+                            {
+                                "name": str(relative_path),
+                                "size": stat.st_size,
+                                "last_modified": datetime.fromtimestamp(stat.st_mtime),
+                                "etag": str(stat.st_mtime),
+                            }
+                        )
+        except Exception as e:
+            logger.error(f"Error listing files in local bucket {bucket_name}: {e}")
+            raise
+
+        return files
+
+    def delete_file_from_bucket(self, bucket_name: str, object_name: str) -> bool:
+        """
+        Delete a file from a specific bucket
+
+        Args:
+            bucket_name: Name of the bucket
+            object_name: Name of the object to delete
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if self.storage_type == "minio":
+                self.client.remove_object(bucket_name, object_name)
+                return True
+            elif self.storage_type == "s3":
+                self.client.delete_object(Bucket=bucket_name, Key=object_name)
+                return True
+            elif self.storage_type == "local":
+                file_path = self.storage_path / bucket_name / object_name
+                if file_path.exists():
+                    file_path.unlink()
+                    return True
+                return False
+        except Exception as e:
+            logger.error(
+                f"Error deleting file {object_name} from bucket {bucket_name}: {e}"
+            )
+            return False

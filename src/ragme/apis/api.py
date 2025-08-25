@@ -39,12 +39,6 @@ warnings.filterwarnings(
     "ignore", category=DeprecationWarning, message=".*class-based `config`.*"
 )
 
-# Suppress ResourceWarnings from dependencies
-warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
-warnings.filterwarnings(
-    "ignore", category=ResourceWarning, message=".*Enable tracemalloc.*"
-)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1144,12 +1138,36 @@ async def delete_document(document_id: str):
                 break
 
         if text_document:
-            # Document exists in text collection, delete it
+            # Check if document has a storage path and delete from storage if it exists
+            storage_path = text_document.get("metadata", {}).get("storage_path")
+            storage_deleted = False
+
+            if storage_path:
+                try:
+                    storage_service = get_storage_service()
+                    storage_deleted = storage_service.delete_file(storage_path)
+                    if storage_deleted:
+                        print(f"Deleted document from storage: {storage_path}")
+                    else:
+                        print(f"Failed to delete document from storage: {storage_path}")
+                except Exception as storage_error:
+                    print(
+                        f"Error deleting document from storage {storage_path}: {storage_error}"
+                    )
+                    # Continue with vector database deletion even if storage deletion fails
+
+            # Document exists in text collection, delete it from vector database
             success = get_ragme().delete_document(document_id)
             if success:
+                message = f"Document {document_id} deleted successfully"
+                if storage_path and storage_deleted:
+                    message += f" (also deleted from storage: {storage_path})"
+                elif storage_path and not storage_deleted:
+                    message += f" (failed to delete from storage: {storage_path})"
+
                 return {
                     "status": "success",
-                    "message": f"Document {document_id} deleted successfully",
+                    "message": message,
                 }
             else:
                 raise HTTPException(
@@ -1306,11 +1324,13 @@ async def get_storage_status():
         # Check MinIO status
         minio_status = "Not Available"
         try:
-            response = requests.get(
-                "http://localhost:9000/minio/health/live", timeout=2
-            )
-            if response.status_code == 200:
-                minio_status = "Available"
+            # Use a session to ensure proper connection cleanup
+            with requests.Session() as session:
+                response = session.get(
+                    "http://localhost:9000/minio/health/live", timeout=2
+                )
+                if response.status_code == 200:
+                    minio_status = "Available"
         except RequestException:
             minio_status = "Not Available"
 
@@ -1327,6 +1347,58 @@ async def get_storage_status():
         return {"status": "success", "storage": storage_config}
     except Exception as e:
         return {"status": "error", "message": f"Failed to get storage status: {str(e)}"}
+
+
+@app.get("/storage/{file_path:path}")
+async def serve_storage_file(file_path: str):
+    """
+    Serve files directly from storage by file path.
+
+    This endpoint allows direct access to files stored in the storage service
+    using the file path as provided by the storage management tool.
+
+    Args:
+        file_path: The file path within storage (e.g., 'documents/file.pdf')
+
+    Returns:
+        FileResponse: The file content with appropriate headers
+    """
+    try:
+        storage_service = get_storage_service()
+
+        # Check if file exists
+        if not storage_service.file_exists(file_path):
+            return JSONResponse(
+                status_code=404,
+                content={"detail": "File not found", "file_path": file_path},
+            )
+
+        # Get file info
+        file_info = storage_service.get_file_info(file_path)
+
+        # Get file content
+        file_content = storage_service.get_file(file_path)
+
+        # Determine content type
+        content_type = file_info.get("content_type", "application/octet-stream")
+
+        # Create response with appropriate headers
+        from fastapi.responses import Response
+
+        headers = {
+            "Content-Type": content_type,
+            "Content-Length": str(file_info.get("size", 0)),
+            "Content-Disposition": f"inline; filename={file_path.split('/')[-1]}",
+        }
+
+        return Response(content=file_content, headers=headers)
+
+    except Exception as e:
+        print(f"Error serving file {file_path}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "error": str(e)},
+        )
 
 
 @app.post("/update-storage-settings")
@@ -1710,12 +1782,36 @@ async def delete_image(image_id: str):
                 break
 
         if image_document:
-            # Image exists in image collection, delete it
+            # Check if image has a storage path and delete from storage if it exists
+            storage_path = image_document.get("metadata", {}).get("storage_path")
+            storage_deleted = False
+
+            if storage_path:
+                try:
+                    storage_service = get_storage_service()
+                    storage_deleted = storage_service.delete_file(storage_path)
+                    if storage_deleted:
+                        print(f"Deleted image from storage: {storage_path}")
+                    else:
+                        print(f"Failed to delete image from storage: {storage_path}")
+                except Exception as storage_error:
+                    print(
+                        f"Error deleting image from storage {storage_path}: {storage_error}"
+                    )
+                    # Continue with vector database deletion even if storage deletion fails
+
+            # Image exists in image collection, delete it from vector database
             image_success = image_vdb.delete_image(image_id)
             if image_success:
+                message = f"Image {image_id} deleted successfully"
+                if storage_path and storage_deleted:
+                    message += f" (also deleted from storage: {storage_path})"
+                elif storage_path and not storage_deleted:
+                    message += f" (failed to delete from storage: {storage_path})"
+
                 return {
                     "status": "success",
-                    "message": f"Image {image_id} deleted successfully",
+                    "message": message,
                 }
             else:
                 raise HTTPException(

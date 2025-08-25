@@ -30,10 +30,12 @@ def crawl_webpage(start_url: str, max_pages: int = 10) -> list[str]:
         visited.add(url)
 
         try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
+            # Use session to ensure proper connection cleanup
+            with requests.Session() as session:
+                response = session.get(url, timeout=10)
+                response.raise_for_status()
 
-            soup = BeautifulSoup(response.content, "html.parser")
+                soup = BeautifulSoup(response.content, "html.parser")
 
             # Extract all links
             for link in soup.find_all("a", href=True):

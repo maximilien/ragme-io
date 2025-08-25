@@ -20,6 +20,12 @@ warnings.filterwarnings(
     message=".*Support for class-based `config`.*",
 )
 
+# Suppress weaviate connection warnings
+warnings.filterwarnings("ignore", message=".*Con004.*")
+warnings.filterwarnings(
+    "ignore", message=".*connection to Weaviate was not closed properly.*"
+)
+
 
 class WeaviateLocalVectorDatabase(VectorDatabase):
     """Local Weaviate implementation of the vector database interface."""
