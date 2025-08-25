@@ -1329,6 +1329,58 @@ async def get_storage_status():
         return {"status": "error", "message": f"Failed to get storage status: {str(e)}"}
 
 
+@app.get("/storage/{file_path:path}")
+async def serve_storage_file(file_path: str):
+    """
+    Serve files directly from storage by file path.
+
+    This endpoint allows direct access to files stored in the storage service
+    using the file path as provided by the storage management tool.
+
+    Args:
+        file_path: The file path within storage (e.g., 'documents/file.pdf')
+
+    Returns:
+        FileResponse: The file content with appropriate headers
+    """
+    try:
+        storage_service = get_storage_service()
+
+        # Check if file exists
+        if not storage_service.file_exists(file_path):
+            return JSONResponse(
+                status_code=404,
+                content={"detail": "File not found", "file_path": file_path},
+            )
+
+        # Get file info
+        file_info = storage_service.get_file_info(file_path)
+
+        # Get file content
+        file_content = storage_service.get_file(file_path)
+
+        # Determine content type
+        content_type = file_info.get("content_type", "application/octet-stream")
+
+        # Create response with appropriate headers
+        from fastapi.responses import Response
+
+        headers = {
+            "Content-Type": content_type,
+            "Content-Length": str(file_info.get("size", 0)),
+            "Content-Disposition": f"inline; filename={file_path.split('/')[-1]}",
+        }
+
+        return Response(content=file_content, headers=headers)
+
+    except Exception as e:
+        print(f"Error serving file {file_path}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "error": str(e)},
+        )
+
+
 @app.post("/update-storage-settings")
 async def update_storage_settings(request: dict):
     """Update storage settings."""

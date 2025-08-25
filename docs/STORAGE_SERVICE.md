@@ -312,6 +312,102 @@ Storage service logs include:
 - Consider CDN integration for frequently accessed files
 - Monitor S3 costs and usage patterns
 
+## Storage Management
+
+RAGme.io includes a comprehensive storage management tool for administrative tasks and content management.
+
+### Storage Management Tool
+
+The `./tools/storage.sh` script provides a command-line interface for managing storage content:
+
+```bash
+# Show help and available commands
+./tools/storage.sh help
+
+# Check storage service health and connectivity
+./tools/storage.sh health
+
+# Show storage configuration and status
+./tools/storage.sh info
+
+# List all files in storage
+./tools/storage.sh list
+
+# List files with detailed information
+./tools/storage.sh list --details
+
+# List files with specific prefix
+./tools/storage.sh list --prefix "documents/"
+
+# Show download links for all files
+./tools/storage.sh links
+
+# Show download link for specific file
+./tools/storage.sh links document.pdf
+
+# Delete specific file (with confirmation)
+./tools/storage.sh delete document.pdf
+
+# Delete specific file without confirmation
+./tools/storage.sh delete document.pdf --force
+
+# Delete all files (with confirmation)
+./tools/storage.sh delete-all
+
+# Delete all files without confirmation
+./tools/storage.sh delete-all --force
+
+# Delete files with specific prefix
+./tools/storage.sh delete-all --prefix "temp/"
+```
+
+### Health Monitoring
+
+The health check command provides comprehensive storage service monitoring:
+
+```bash
+# Basic health check
+./tools/storage.sh health
+
+# Detailed health check with verbose output
+./tools/storage.sh health --verbose
+```
+
+The health check verifies:
+- Storage service configuration
+- Connectivity to storage backend
+- Basic operations (list, bucket access)
+- URL generation capabilities
+- Provides troubleshooting tips if issues are detected
+
+### Safety Features
+
+All destructive operations include safety measures:
+
+- **Confirmation Required**: Delete operations require explicit user confirmation
+- **Force Option**: `--force` flag bypasses confirmation for automation
+- **File Information**: Shows file size and type before deletion
+- **Bulk Operations**: Supports prefix-based selective deletion
+- **Error Handling**: Graceful handling of storage service issues
+
+### Use Cases
+
+Common use cases for the storage management tool:
+
+- **Administrative Tasks**: Monitor storage usage and health
+- **Content Cleanup**: Remove old or unnecessary files
+- **Troubleshooting**: Diagnose storage service issues
+- **Development**: Manage test data and temporary files
+- **Maintenance**: Regular storage health checks and cleanup
+
+### Integration
+
+The storage management tool:
+- Uses the same configuration as RAGme (config.yaml + .env)
+- Reuses the existing StorageService implementation
+- Works independently of RAGme services
+- Supports all storage backends (MinIO, S3, Local)
+
 ## Future Enhancements
 
 Potential improvements to the storage service:

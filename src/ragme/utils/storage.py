@@ -538,8 +538,20 @@ class StorageService:
 
     def _get_file_url_local(self, object_name: str) -> str:
         """Get local file URL (for development)"""
-        # For local storage, return a relative path
-        return f"/storage/{object_name}"
+        # For local storage, construct a proper URL using the API server
+        try:
+            # Get the API URL from configuration
+            api_url = (
+                self.config.get("network", {})
+                .get("frontend", {})
+                .get("api_url", "http://localhost:8021")
+            )
+            # Remove trailing slash if present
+            api_url = api_url.rstrip("/")
+            return f"{api_url}/storage/{object_name}"
+        except Exception:
+            # Fallback to relative path if configuration is not available
+            return f"/storage/{object_name}"
 
     def get_file_info(self, object_name: str) -> dict[str, Any]:
         """
