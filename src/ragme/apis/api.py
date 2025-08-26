@@ -192,9 +192,13 @@ async def add_json(json_input: JSONInput):
                 # Generate unique URL to prevent overwriting
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 if url.startswith("file://"):
-                    # For file URLs, add timestamp to prevent overwriting
-                    base_url = url
-                    unique_url = f"{base_url}#{timestamp}"
+                    # For file URLs, check if they already have a timestamp
+                    if "#" in url:
+                        # URL already has a timestamp, use it as is
+                        unique_url = url
+                    else:
+                        # Add timestamp to prevent overwriting
+                        unique_url = f"{url}#{timestamp}"
                 else:
                     # For web URLs, add timestamp as fragment
                     unique_url = f"{url}#{timestamp}"

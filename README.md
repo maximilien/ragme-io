@@ -25,6 +25,8 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**
+- **📄 Robust PDF Processing**: Enhanced PDF processing with multiple library fallbacks (PyMuPDF, pdfplumber, PyPDF2) to handle corrupted PDFs and "EOF marker not found" errors. Automatic PDF repair and graceful error handling! ⭐ **NEW!**
 - **🎨 UI Height and Notification Fixes**: Fixed pagination container height and corrected notification system for better user experience. Load More button now shows proper loading messages! ⭐ **FIXED!**
 - **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
 - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
