@@ -83,7 +83,7 @@ class TestConfigManager(unittest.TestCase):
         # Create a fresh ConfigManager instance for testing
         with patch.object(ConfigManager, "_instance", None):
             config = ConfigManager()
-            result = config._config
+            result = config.config
 
         self.assertEqual(result["application"]["name"], "TestRAGme")
         mock_yaml.assert_called()
@@ -112,8 +112,9 @@ class TestConfigManager(unittest.TestCase):
         mock_yaml.side_effect = yaml.YAMLError("Invalid YAML")
 
         with patch.object(ConfigManager, "_instance", None):
+            config = ConfigManager()
             with self.assertRaises(ValueError) as context:
-                ConfigManager()
+                _ = config.config
 
         self.assertIn("Error parsing configuration file", str(context.exception))
 

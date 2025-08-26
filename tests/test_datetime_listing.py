@@ -171,13 +171,21 @@ class TestDateTimeListing:
 
     @patch("src.ragme.agents.tools.parse_date_query")
     @patch("src.ragme.agents.tools.filter_items_by_date_range")
-    def test_list_images_by_datetime(self, mock_filter, mock_parse):
+    @patch("src.ragme.vdbs.vector_db_factory.create_vector_database")
+    @patch("src.ragme.utils.config_manager.config")
+    def test_list_images_by_datetime(
+        self, mock_config, mock_create_vdb, mock_filter, mock_parse
+    ):
         """Test list_images_by_datetime tool."""
         import json
 
         # Setup mocks
         mock_ragme = Mock()
-        mock_ragme.vector_db.list_images.return_value = [
+        mock_config.get_image_collection_name.return_value = "TestImages"
+
+        # Mock the vector database
+        mock_vdb = Mock()
+        mock_vdb.list_images.return_value = [
             {
                 "id": "1",
                 "url": "test.jpg",
@@ -191,6 +199,7 @@ class TestDateTimeListing:
                 ),
             }
         ]
+        mock_create_vdb.return_value = mock_vdb
 
         start_date = datetime(2025, 1, 1, 0, 0, 0)
         end_date = datetime(2025, 1, 1, 23, 59, 59)

@@ -426,6 +426,10 @@ class ConfigManager:
         """Get client customization configuration."""
         return self.get("client", {})
 
+    def get_ocr_config(self) -> dict[str, Any]:
+        """Get OCR configuration."""
+        return self.get("ocr", {})
+
     def get_safe_config(self) -> dict[str, Any]:
         """
         Get configuration safe for frontend/API exposure.

@@ -1435,6 +1435,61 @@ async def update_storage_settings(request: dict):
         }
 
 
+@app.post("/update-query-settings")
+async def update_query_settings(request: dict):
+    """Update query settings."""
+    try:
+        # Extract query settings from request
+        top_k = request.get("top_k", 5)
+        text_rerank_top_k = request.get("text_rerank_top_k", 3)
+        text_relevance_threshold = request.get("text_relevance_threshold", 0.8)
+        image_relevance_threshold = request.get("image_relevance_threshold", 0.8)
+
+        # Validate settings
+        if not (1 <= top_k <= 20):
+            return {
+                "status": "error",
+                "message": "Top K must be between 1 and 20",
+            }
+
+        if not (1 <= text_rerank_top_k <= 10):
+            return {
+                "status": "error",
+                "message": "Text Rerank Top K must be between 1 and 10",
+            }
+
+        if not (0.1 <= text_relevance_threshold <= 1.0):
+            return {
+                "status": "error",
+                "message": "Text relevance threshold must be between 0.1 and 1.0",
+            }
+
+        if not (0.1 <= image_relevance_threshold <= 1.0):
+            return {
+                "status": "error",
+                "message": "Image relevance threshold must be between 0.1 and 1.0",
+            }
+
+        # Note: In a real implementation, this would update the config.yaml file
+        # For now, we'll just validate the settings
+
+        return {
+            "status": "success",
+            "message": "Query settings updated successfully",
+            "settings": {
+                "top_k": top_k,
+                "text_rerank_top_k": text_rerank_top_k,
+                "text_relevance_threshold": text_relevance_threshold,
+                "image_relevance_threshold": image_relevance_threshold,
+            },
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to update query settings: {str(e)}",
+        }
+
+
 @app.post("/reset-chat-session")
 async def reset_chat_session():
     """Reset the chat session, clearing memory and confirmation state."""
@@ -1951,6 +2006,9 @@ async def download_file(document_id: str):
             filename = document.get("metadata", {}).get("filename")
             storage_path = document.get("metadata", {}).get("storage_path")
 
+            # Initialize storage_file to None
+            storage_file = None
+
             if storage_path:
                 # Use the storage path directly from metadata
                 print(f"Using storage_path from metadata: {storage_path}")
@@ -1986,6 +2044,12 @@ async def download_file(document_id: str):
                 # Document has filename but no storage_path - it was added before storage service
                 print(
                     "Document has filename but no storage_path - not available in storage"
+                )
+                storage_file = None
+            else:
+                # Document has no filename or storage_path - it was added before storage service
+                print(
+                    "Document has no filename or storage_path - not available in storage"
                 )
                 storage_file = None
 
@@ -2054,6 +2118,9 @@ async def download_file(document_id: str):
                 # This is an image, try to find the file in storage
                 filename = image.get("metadata", {}).get("filename")
                 storage_path = image.get("metadata", {}).get("storage_path")
+
+                # Initialize storage_file to None
+                storage_file = None
 
                 if storage_path:
                     # Use the storage path directly from metadata

@@ -2,10 +2,17 @@
 # Copyright (c) 2025 dr.max
 
 import json
+import logging
 import warnings
 from typing import Any
 
+import weaviate
+from weaviate import classes as wvc
+
 from .vector_db_base import CollectionConfig, VectorDatabase
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(
@@ -38,8 +45,6 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
     def _create_client(self):
         """Create the local Weaviate client."""
         import os
-
-        import weaviate
 
         # Get local Weaviate URL from environment or use default
         weaviate_url = os.getenv("WEAVIATE_LOCAL_URL", "http://localhost:8080")
@@ -85,6 +90,23 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                 f"Failed to connect to local Weaviate at {weaviate_url}. "
                 f"Make sure Weaviate is running locally. Error: {str(e)}"
             ) from e
+
+    def close(self):
+        """Close the Weaviate client connection."""
+        if self.client is not None:
+            try:
+                self.client.close()
+                self.client = None
+            except Exception as e:
+                logger.warning(f"Error closing Weaviate client: {e}")
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with proper cleanup."""
+        self.close()
 
     def setup(self):
         """Set up local Weaviate collections if they don't exist."""
@@ -299,9 +321,41 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             return []
 
         collection = self.client.collections.get(self.text_collection.name)
-        response = collection.query.near_text(
-            query=query, limit=limit, include_vector=False
-        )
+
+        # Try hybrid search first (provides better scoring)
+        try:
+            response = collection.query.hybrid(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                    score=True,  # Request BM25F score
+                ),
+            )
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception as e:
+            logger.warning(f"Hybrid search failed, falling back to near_text: {e}")
+
+        # Fallback to near_text with metadata
+        try:
+            response = collection.query.near_text(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                ),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Near_text with metadata failed, falling back to basic: {e}"
+            )
+            response = collection.query.near_text(
+                query=query, limit=limit, include_vector=False
+            )
         return self._convert_weaviate_response(response)
 
     def search_image_collection(
@@ -332,31 +386,59 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             results = self._convert_weaviate_response(response)
             if results:
                 return results
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"BM25 filename search failed: {e}")
 
-        # Try hybrid search
+        # Try hybrid search with score
         try:
             response = collection.query.hybrid(
-                query=query, limit=limit, include_vector=False
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                    score=True,  # Request BM25F score
+                ),
             )
-            return self._convert_weaviate_response(response)
-        except Exception:
-            pass
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception as e:
+            logger.warning(f"Hybrid search failed, falling back to BM25: {e}")
 
-        # Fallback to BM25 (general search)
+        # Fallback to BM25 (general search) with score
         try:
             response = collection.query.bm25(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    score=True,  # Request BM25F score
+                ),
+            )
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception as e:
+            logger.warning(f"BM25 failed, falling back to near_text: {e}")
+
+        # Last resort: near_text with metadata
+        try:
+            response = collection.query.near_text(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                ),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Near_text with metadata failed, falling back to basic: {e}"
+            )
+            response = collection.query.near_text(
                 query=query, limit=limit, include_vector=False
             )
-            return self._convert_weaviate_response(response)
-        except Exception:
-            pass
-
-        # Last resort: near_text
-        response = collection.query.near_text(
-            query=query, limit=limit, include_vector=False
-        )
         return self._convert_weaviate_response(response)
 
     def create_query_agent(self):
@@ -399,8 +481,12 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             return []
 
         collection = self.client.collections.get(self.image_collection.name)
+        # Explicitly fetch all properties to ensure metadata is included
         response = collection.query.fetch_objects(
-            limit=limit, offset=offset, include_vector=False
+            limit=limit,
+            offset=offset,
+            include_vector=False,
+            properties=["url", "text", "metadata", "image"],
         )
         return self._convert_weaviate_response(response)
 
@@ -424,7 +510,11 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
         collection = self.client.collections.get(self.image_collection.name)
         try:
             # Use fetch_objects with a high limit and filter in Python
-            response = collection.query.fetch_objects(limit=1000, include_vector=False)
+            response = collection.query.fetch_objects(
+                limit=1000,
+                include_vector=False,
+                properties=["url", "text", "metadata", "image"],
+            )
             results = self._convert_weaviate_response(response)
 
             # Filter by URL in Python
@@ -443,7 +533,11 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
         collection = self.client.collections.get(self.image_collection.name)
         try:
             # Use fetch_objects with a high limit and filter in Python
-            response = collection.query.fetch_objects(limit=1000, include_vector=False)
+            response = collection.query.fetch_objects(
+                limit=1000,
+                include_vector=False,
+                properties=["url", "text", "metadata", "image"],
+            )
             results = self._convert_weaviate_response(response)
 
             # Filter by filename in metadata
@@ -498,8 +592,15 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                 else:
                     result["image_data"] = image_value
 
-            # Add score if available
-            if hasattr(obj, "score") and obj.score is not None:
+            # Add score if available (from metadata)
+            if (
+                hasattr(obj, "metadata")
+                and obj.metadata
+                and hasattr(obj.metadata, "score")
+                and obj.metadata.score is not None
+            ):
+                result["score"] = obj.metadata.score
+            elif hasattr(obj, "score") and obj.score is not None:
                 result["score"] = obj.score
 
             results.append(result)

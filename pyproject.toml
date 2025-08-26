@@ -99,6 +99,8 @@ line-ending = "auto"
 addopts = "--disable-warnings"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
     "ignore::DeprecationWarning:pydantic.*:",
     "ignore::UserWarning:src.ragme.vector_db_milvus:",
     "ignore:Support for class-based `config` is deprecated:DeprecationWarning:pydantic.*:",

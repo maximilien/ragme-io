@@ -211,9 +211,17 @@ class DirectoryMonitor:
 class RagMeLocalAgent:
     """Local agent for processing files and adding them to RAG system"""
 
-    def __init__(self, api_url: str | None = None, mcp_url: str | None = None):
+    def __init__(
+        self,
+        api_url: str | None = None,
+        mcp_url: str | None = None,
+        watch_directory: str | None = None,
+    ):
         self.api_url = api_url or RAGME_API_URL
         self.mcp_url = mcp_url or RAGME_MCP_URL
+        self.watch_directory = (
+            Path(watch_directory) if watch_directory else Path("./watch_directory")
+        )
         self.processing_files = set()  # Track files currently being processed
         self.processed_files = set()  # Track files that have been processed recently
 
@@ -222,7 +230,31 @@ class RagMeLocalAgent:
         if not self.mcp_url:
             raise ValueError("RAGME_MCP_URL environment variable is required")
 
+        # Clean up old processed markers on startup
+        self._cleanup_old_processed_markers()
+
     # private methods
+
+    def _cleanup_old_processed_markers(self):
+        """Clean up old processed marker files on startup"""
+        try:
+            # Only look for .processed files in the watch directory
+            if self.watch_directory.exists():
+                for processed_file in self.watch_directory.rglob("*.processed"):
+                    try:
+                        # Check if the marker is old (older than 60 seconds)
+                        marker_age = time.time() - processed_file.stat().st_mtime
+                        if marker_age > 60:
+                            processed_file.unlink(missing_ok=True)
+                            logging.info(
+                                f"Cleaned up old processed marker: {processed_file}"
+                            )
+                    except Exception as e:
+                        logging.warning(
+                            f"Failed to clean up processed marker {processed_file}: {e}"
+                        )
+        except Exception as e:
+            logging.warning(f"Error during processed marker cleanup: {e}")
 
     def _process_pdf_file(self, file_path: Path) -> bool:
         """Process a PDF file using the MCP server"""
@@ -249,6 +281,11 @@ class RagMeLocalAgent:
                         logging.info(
                             f"Extracted {len(data['text'])} characters of text"
                         )
+                        # Log extracted images count if available
+                        if "extracted_images_count" in data:
+                            logging.info(
+                                f"Extracted and processed {data['extracted_images_count']} images from PDF"
+                            )
                         # Add to RAG
                         self.add_to_rag(
                             {"data": data, "metadata": result["data"]["metadata"]}
@@ -385,6 +422,15 @@ class RagMeLocalAgent:
     def process_file(self, file_path: Path):
         """Process detected files based on their type"""
         file_ext = file_path.suffix.lower()
+
+        # Only process files that are within the watch directory
+        try:
+            file_path.relative_to(self.watch_directory)
+        except ValueError:
+            logging.warning(
+                f"File {file_path} is outside watch directory {self.watch_directory}, skipping"
+            )
+            return
 
         # Create a lock file to prevent duplicate processing
         lock_file = file_path.with_suffix(file_path.suffix + ".lock")
@@ -535,9 +581,10 @@ class RagMeLocalAgent:
 
 if __name__ == "__main__":
     # Example usage
-    local_agent = RagMeLocalAgent()
+    watch_dir = "./watch_directory"
+    local_agent = RagMeLocalAgent(watch_directory=watch_dir)
     monitor = DirectoryMonitor(
-        directory="./watch_directory",  # Directory to monitor
+        directory=watch_dir,  # Directory to monitor
         callback=local_agent.process_file,
     )
 

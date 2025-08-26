@@ -101,14 +101,26 @@ class TestCountDocumentsAPI:
         assert response.status_code == 500
         assert "Database connection failed" in response.text
 
-    def test_count_documents_invalid_date_filter(self):
+    @patch("src.ragme.apis.api.get_ragme")
+    def test_count_documents_invalid_date_filter(self, mock_get_ragme):
         """Test with invalid date filter parameter."""
+        # Create a mock RagMe instance
+        mock_ragme_instance = MagicMock()
+        mock_ragme_instance.vector_db.count_documents = Mock(return_value=10)
+
+        # Make get_ragme() return the mock instance
+        mock_get_ragme.return_value = mock_ragme_instance
+
         # Make request with invalid date filter
         response = self.client.get("/count-documents?date_filter=invalid")
 
         # Should still work but pass invalid filter to filter function
         # The filter function will handle the invalid filter
-        assert response.status_code in [200, 422]  # Depending on validation
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["count"] == 10
+        assert data["date_filter"] == "invalid"
 
     @patch("src.ragme.apis.api.get_ragme")
     def test_count_documents_month_filter(self, mock_get_ragme):

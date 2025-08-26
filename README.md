@@ -27,6 +27,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 - **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**
 - **📄 Robust PDF Processing**: Enhanced PDF processing with multiple library fallbacks (PyMuPDF, pdfplumber, PyPDF2) to handle corrupted PDFs and "EOF marker not found" errors. Automatic PDF repair and graceful error handling! ⭐ **NEW!**
+- **🖼️ PDF Image Extraction**: Automatically extract and process images from PDF documents using PyMuPDF. Extracted images are processed with AI classification, OCR text extraction, and stored in the image collection with rich metadata including page numbers and PDF source information! ⭐ **NEW!**
 - **🎨 UI Height and Notification Fixes**: Fixed pagination container height and corrected notification system for better user experience. Load More button now shows proper loading messages! ⭐ **FIXED!**
 - **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
 - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
@@ -391,6 +392,88 @@ Agent: Searches image collection using OCR-extracted text content
 The backend automatically routes image operations to the image collection. The frontend shows separate upload tabs for files and images, and the agent intelligently handles both text and image content.
 
 The backend automatically uses the text collection for document operations. The `/config` endpoint returns the list of collections, and the frontend top bar shows `Collections:` with icons.
+
+#### 📄 PDF Image Extraction
+
+RAGme now automatically extracts and processes images from PDF documents:
+
+**🔍 Automatic Extraction:**
+- **PyMuPDF Integration**: Uses PyMuPDF (fitz) to extract embedded images from PDF pages as 8-bit/color RGB PNG
+- **Smart Filtering**: Configurable size and format constraints to filter relevant images
+- **Page-Level Tracking**: Each extracted image includes page number and PDF source information
+- **Caption Detection**: Attempts to extract captions from OCR content when available
+- **Web-Compatible Format**: Extracts images in proper color format (no more "black rectangle" display issues)
+
+**⚙️ Configuration:**
+```yaml
+# PDF Image Extraction Configuration
+pdf_image_extraction:
+  enabled: true  # Enable/disable PDF image extraction
+  min_image_size_kb: 1  # Minimum image size to extract (in KB)
+  max_image_size_mb: 10  # Maximum image size to extract (in MB)
+  supported_formats: ["jpeg", "jpg", "png", "gif", "bmp", "tiff"]  # Supported image formats
+  extract_captions: true  # Try to extract captions from OCR content
+  process_with_ai: true  # Apply AI classification and OCR to extracted images
+```
+
+**🔄 Processing Pipeline:**
+1. **PDF Upload**: When a PDF is uploaded, RAGme extracts text content as usual
+2. **Image Detection**: PyMuPDF scans each page for embedded images
+3. **Image Extraction**: Images are extracted as 8-bit/color RGB PNG with metadata (page number, PDF filename)
+4. **AI Processing**: Extracted images go through the same AI pipeline as uploaded images
+5. **Storage**: Images are stored in the image collection with rich metadata
+6. **Integration**: Extracted images are searchable alongside other images
+
+**📊 Metadata Structure:**
+```json
+{
+  "source_type": "pdf_extracted_image",
+  "pdf_filename": "document.pdf",
+  "pdf_page_number": 3,
+  "pdf_image_name": "X39.png",
+  "pdf_storage_path": "documents/20250826_123456_document.pdf",
+  "extraction_timestamp": "2025-08-26T14:21:22",
+  "extracted_caption": "Figure 1: System Architecture",
+  "classification": {
+    "top_prediction": {
+      "label": "diagram",
+      "confidence": 0.95
+    }
+  },
+  "ocr_content": {
+    "text": "System Architecture Diagram",
+    "confidence": 0.88
+  }
+}
+```
+
+**💡 Use Cases:**
+- **Technical Documentation**: Extract diagrams, charts, and screenshots from technical PDFs
+- **Research Papers**: Extract figures, graphs, and tables from academic papers
+- **Reports**: Extract visualizations and charts from business reports
+- **Presentations**: Extract slides and graphics from PDF presentations
+
+**🔍 Search Capabilities:**
+- Search extracted images by PDF source: "Show me images from document.pdf"
+- Search by page number: "Find images from page 5 of the report"
+- Search by content: "Find diagrams or charts in my PDFs"
+- Search by extracted text: "Find images containing 'architecture' text"
+
+**Example Workflow:**
+```
+User: "Upload this technical document: architecture.pdf"
+RAGme: 
+  - Extracts text content (20 pages, 15,000 characters)
+  - Extracts 8 images (diagrams, screenshots, charts)
+  - Processes images with AI classification
+  - Stores everything in respective collections
+
+User: "Show me the diagrams from the architecture document"
+RAGme: Lists 3 images classified as "diagram" from architecture.pdf
+
+User: "Find images with 'API' in the text"
+RAGme: Searches OCR content and finds 2 images containing "API" text
+```
 
 ## 🏃‍♂️ Run RAGme.io
 

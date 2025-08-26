@@ -181,6 +181,9 @@
                         <div class="search-input-wrapper">
                             <i class="fas fa-search search-icon"></i>
                             <input type="text" id="documentSearchInput" class="search-input" placeholder="Search documents..." />
+                            <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear search" style="display: none;">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="sidebar-header-actions">
@@ -470,6 +473,9 @@
                         <button class="settings-tab-btn" data-settings-tab="chatTab">
                             <i class="fas fa-comments"></i> Chat
                         </button>
+                        <button class="settings-tab-btn" data-settings-tab="queryTab">
+                            <i class="fas fa-search"></i> Query
+                        </button>
                     </div>
                     
                     <!-- General Settings Tab -->
@@ -697,6 +703,61 @@
                                     Auto-Save Chat Sessions
                                 </label>
                                 <small>Automatically save chat sessions to browser storage</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Query Settings Tab -->
+                    <div class="settings-tab-content" id="queryTab">
+                        <div class="settings-section">
+                            <h4><i class="fas fa-search"></i> Search Configuration</h4>
+                            <div class="setting-item">
+                                <label for="topK">Top K Results:</label>
+                                <input type="number" id="topK" value="5" min="1" max="20">
+                                <small>Number of most relevant documents to retrieve for queries (1-20)</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="textRerankTopK">Text Rerank Top K:</label>
+                                <input type="number" id="textRerankTopK" value="3" min="1" max="10">
+                                <small>Number of top text results to rerank for better relevance (1-10)</small>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-percentage"></i> Similarity Thresholds</h4>
+                            <div class="setting-item">
+                                <label for="textRelevanceThreshold">Text Relevance Threshold:</label>
+                                <input type="range" id="textRelevanceThreshold" value="0.8" min="0.1" max="1.0" step="0.1">
+                                <span class="range-value" id="textRelevanceThresholdValue">0.8</span>
+                                <small>Minimum similarity score for text documents (0.1-1.0). Higher values = more strict filtering.</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="imageRelevanceThreshold">Image Relevance Threshold:</label>
+                                <input type="range" id="imageRelevanceThreshold" value="0.8" min="0.1" max="1.0" step="0.1">
+                                <span class="range-value" id="imageRelevanceThresholdValue">0.8</span>
+                                <small>Minimum similarity score for image documents (0.1-1.0). Higher values = more strict filtering.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h4><i class="fas fa-lightbulb"></i> Recommendations</h4>
+                            <div class="recommendations">
+                                <div class="recommendation-item">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Text Threshold (0.8):</strong> Good balance between relevance and recall. Lower values (0.5-0.7) return more results but may be less relevant.
+                                </div>
+                                <div class="recommendation-item">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Image Threshold (0.8):</strong> Images typically need higher thresholds due to visual similarity challenges. Lower values (0.6-0.7) for broader image search.
+                                </div>
+                                <div class="recommendation-item">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Top K (5):</strong> Start with 5-10 results. Increase for comprehensive searches, decrease for focused results.
+                                </div>
+                                <div class="recommendation-item">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Text Rerank (3):</strong> Reranking improves relevance but adds processing time. Use 3-5 for optimal balance.
+                                </div>
                             </div>
                         </div>
                     </div>

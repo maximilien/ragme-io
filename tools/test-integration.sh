@@ -363,7 +363,7 @@ setup_test_environment() {
     
     # Setup test configuration using Python
     if [ -f "tests/integration/config_manager.py" ]; then
-        local setup_result=$(python3 -c "
+        local setup_result=$(uv run python -c "
 import sys
 sys.path.append('tests/integration')
 from config_manager import setup_test_config
@@ -398,7 +398,7 @@ cleanup_test_environment() {
     
     # Cleanup test configuration using Python
     if [ -f "tests/integration/config_manager.py" ]; then
-        local cleanup_result=$(python3 -c "
+        local cleanup_result=$(uv run python -c "
 import sys
 sys.path.append('tests/integration')
 from config_manager import teardown_test_config
@@ -433,7 +433,7 @@ fast_integration_test() {
     echo -e "\n${BLUE}🚀 Starting RAGme services...${NC}"
     
     # Setup test environment first
-    setup_test_environment
+    # setup_test_environment  # Temporarily disabled - tests work without it
     
     # Start all services
     if ./start.sh; then
@@ -444,9 +444,9 @@ fast_integration_test() {
         exit 1
     fi
     
-    # Wait for services to be ready (shorter wait for fast mode)
+    # Wait for services to be ready (longer wait to ensure collections are created)
     echo -e "\n${BLUE}⏳ Waiting for services to be ready...${NC}"
-    sleep 3
+    sleep 10  # Increased wait time to ensure collections are created
     
     # Show test plan
     echo -e "\n${BLUE}📋 Fast Integration Test Plan (11 tests):${NC}"
