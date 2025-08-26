@@ -251,7 +251,14 @@ class TestRagMeLocalAgent:
         with patch.object(agent, "_process_pdf_file") as mock_process_pdf:
             mock_process_pdf.return_value = True
 
-            file_path = Path("test.pdf")
+            # Use a unique file path to avoid conflicts with processed markers
+            file_path = Path("test_unique_pdf.pdf")
+
+            # Clean up any existing processed marker
+            processed_marker = file_path.with_suffix(file_path.suffix + ".processed")
+            if processed_marker.exists():
+                processed_marker.unlink()
+
             agent.process_file(file_path)
 
             mock_process_pdf.assert_called_once_with(file_path)
@@ -263,10 +270,18 @@ class TestRagMeLocalAgent:
         mock_ragme = RagMeLocalAgent()
         mock_ragme._process_docx_file = Mock(return_value=True)
 
+        # Use a unique file path to avoid conflicts with processed markers
+        file_path = Path("test_unique_docx.docx")
+
+        # Clean up any existing processed marker
+        processed_marker = file_path.with_suffix(file_path.suffix + ".processed")
+        if processed_marker.exists():
+            processed_marker.unlink()
+
         # Test with a DOCX file
-        result = mock_ragme.process_file(Path("test.docx"))
+        result = mock_ragme.process_file(file_path)
         assert result is None  # process_file doesn't return anything
-        mock_ragme._process_docx_file.assert_called_once_with(Path("test.docx"))
+        mock_ragme._process_docx_file.assert_called_once_with(file_path)
 
     @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
     @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
@@ -374,7 +389,7 @@ class TestFileHandler:
         callback.assert_not_called()
 
     def test_on_modified_supported_file(self):
-        """Test on_modified with supported file"""
+        """Test on_modified with supported file - should ignore modification events"""
         callback = Mock()
         handler = FileHandler(callback)
 
@@ -385,7 +400,8 @@ class TestFileHandler:
 
         handler.on_modified(event)
 
-        callback.assert_called_once_with(Path("/path/to/test.docx"))
+        # on_modified should not call the callback (ignores modification events)
+        callback.assert_not_called()
 
     def test_on_modified_unsupported_file(self):
         """Test on_modified with unsupported file"""

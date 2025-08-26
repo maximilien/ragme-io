@@ -10,7 +10,6 @@ import time
 import traceback
 import warnings
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 
 import dotenv
@@ -140,22 +139,44 @@ class FileHandler(FileSystemEventHandler):
     def __init__(self, callback: Callable | None = None):
         self.callback = callback
         self.supported_extensions = {".pdf", ".docx"}
+        self.recently_processed = {}  # Track recently processed files to prevent duplicates
+
+    def _should_process_file(self, file_path: Path) -> bool:
+        """Check if file should be processed (debouncing mechanism)"""
+        current_time = time.time()
+        file_key = str(file_path)
+
+        # Check if file was processed recently (within 10 seconds)
+        if file_key in self.recently_processed:
+            last_processed = self.recently_processed[file_key]
+            if current_time - last_processed < 10:  # 10 second debounce
+                logging.info(f"Skipping recently processed file: {file_path}")
+                return False
+
+        # Update the timestamp
+        self.recently_processed[file_key] = current_time
+
+        # Clean up old entries (older than 60 seconds)
+        cutoff_time = current_time - 60
+        self.recently_processed = {
+            k: v for k, v in self.recently_processed.items() if v > cutoff_time
+        }
+
+        return True
 
     def on_created(self, event):
         if not event.is_directory:
             file_path = Path(event.src_path)
             if file_path.suffix.lower() in self.supported_extensions:
-                logging.info(f"New file detected: {file_path}")
-                if self.callback:
-                    self.callback(file_path)
+                if self._should_process_file(file_path):
+                    logging.info(f"New file detected: {file_path}")
+                    if self.callback:
+                        self.callback(file_path)
 
     def on_modified(self, event):
-        if not event.is_directory:
-            file_path = Path(event.src_path)
-            if file_path.suffix.lower() in self.supported_extensions:
-                logging.info(f"File modified: {file_path}")
-                if self.callback:
-                    self.callback(file_path)
+        # Completely ignore file modification events to prevent duplicate processing
+        # Only process files when they are first created
+        pass
 
 
 class DirectoryMonitor:
@@ -193,6 +214,8 @@ class RagMeLocalAgent:
     def __init__(self, api_url: str | None = None, mcp_url: str | None = None):
         self.api_url = api_url or RAGME_API_URL
         self.mcp_url = mcp_url or RAGME_MCP_URL
+        self.processing_files = set()  # Track files currently being processed
+        self.processed_files = set()  # Track files that have been processed recently
 
         if not self.api_url:
             raise ValueError("RAGME_API_URL environment variable is required")
@@ -363,14 +386,55 @@ class RagMeLocalAgent:
         """Process detected files based on their type"""
         file_ext = file_path.suffix.lower()
 
-        if file_ext == ".pdf":
-            self._process_pdf_file(file_path)
-        elif file_ext == ".docx":
-            self._process_docx_file(file_path)
-        elif file_ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}:
-            self._process_image_file(file_path)
-        else:
-            logging.warning(f"Unsupported file type: {file_path}")
+        # Create a lock file to prevent duplicate processing
+        lock_file = file_path.with_suffix(file_path.suffix + ".lock")
+
+        # Check if lock file exists (file is being processed)
+        if lock_file.exists():
+            logging.info(
+                f"File is being processed (lock exists), skipping: {file_path}"
+            )
+            return
+
+        # Check if file was recently processed (within 60 seconds)
+        processed_marker = file_path.with_suffix(file_path.suffix + ".processed")
+        if processed_marker.exists():
+            # Check if marker is recent (within 60 seconds)
+            marker_age = time.time() - processed_marker.stat().st_mtime
+            if marker_age < 60:
+                logging.info(
+                    f"File recently processed (marker exists), skipping: {file_path}"
+                )
+                return
+            else:
+                # Remove old marker
+                processed_marker.unlink(missing_ok=True)
+
+        # Create lock file
+        try:
+            lock_file.touch()
+        except Exception as e:
+            logging.error(f"Failed to create lock file for {file_path}: {e}")
+            return
+
+        try:
+            if file_ext == ".pdf":
+                success = self._process_pdf_file(file_path)
+            elif file_ext == ".docx":
+                success = self._process_docx_file(file_path)
+            elif file_ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}:
+                success = self._process_image_file(file_path)
+            else:
+                logging.warning(f"Unsupported file type: {file_path}")
+                success = False
+
+            if success:
+                # Create processed marker
+                processed_marker.touch()
+
+        finally:
+            # Remove lock file
+            lock_file.unlink(missing_ok=True)
 
     def add_to_rag(self, data: dict) -> bool:
         """Add processed data to RAG system"""
@@ -399,10 +463,9 @@ class RagMeLocalAgent:
             # Chunk the text if it's large
             chunks = chunkText(text)
 
-            # Generate unique URL to prevent overwriting
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            # Generate URL like the frontend (no timestamp, API will add one if needed)
             base_filename = metadata.get("filename", "unknown")
-            unique_url = f"file://{base_filename}#{timestamp}"
+            unique_url = f"file://{base_filename}"
 
             if len(chunks) == 1:
                 # Single chunk - send as regular document

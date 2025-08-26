@@ -2,6 +2,7 @@
 # Copyright (c) 2025 dr.max
 
 import atexit
+import logging
 import os
 import signal
 import tempfile
@@ -15,6 +16,23 @@ from pydantic import BaseModel
 
 from ..utils.config_manager import config
 from ..utils.storage import StorageService
+
+# Try to import additional PDF processing libraries
+try:
+    import pdfplumber
+
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+    logging.warning("pdfplumber not available, falling back to PyPDF2")
+
+try:
+    import fitz  # PyMuPDF
+
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+    logging.warning("PyMuPDF not available, falling back to PyPDF2")
 
 # Suppress Pydantic deprecation and schema warnings from dependencies
 warnings.filterwarnings(
@@ -97,6 +115,111 @@ class Base64FileRequest(BaseModel):
     content_type: str
 
 
+def process_pdf_with_fallback(pdf_path: str) -> tuple[str, int, dict]:
+    """
+    Process PDF using multiple libraries as fallbacks to handle corrupted PDFs.
+    Returns (text, page_count, metadata)
+    """
+    errors = []
+
+    # Try PyMuPDF first (most robust for corrupted PDFs)
+    if PYMUPDF_AVAILABLE:
+        try:
+            doc = fitz.open(pdf_path)
+            text = ""
+            for page in doc:
+                text += page.get_text() + "\n"
+            metadata = doc.metadata
+            page_count = len(doc)
+            doc.close()
+            logging.info(f"Successfully processed PDF with PyMuPDF: {pdf_path}")
+            return text, page_count, metadata
+        except Exception as e:
+            error_msg = f"PyMuPDF failed: {str(e)}"
+            errors.append(error_msg)
+            logging.warning(error_msg)
+
+    # Try pdfplumber (good for complex layouts)
+    if PDFPLUMBER_AVAILABLE:
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                metadata = pdf.metadata
+                page_count = len(pdf.pages)
+            logging.info(f"Successfully processed PDF with pdfplumber: {pdf_path}")
+            return text, page_count, metadata
+        except Exception as e:
+            error_msg = f"pdfplumber failed: {str(e)}"
+            errors.append(error_msg)
+            logging.warning(error_msg)
+
+    # Try PyPDF2 (original method)
+    try:
+        with open(pdf_path, "rb") as pdf_file:
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            metadata = pdf_reader.metadata or {}
+            page_count = len(pdf_reader.pages)
+        logging.info(f"Successfully processed PDF with PyPDF2: {pdf_path}")
+        return text, page_count, metadata
+    except Exception as e:
+        error_msg = f"PyPDF2 failed: {str(e)}"
+        errors.append(error_msg)
+        logging.error(error_msg)
+
+    # If all methods fail, try to repair the PDF
+    try:
+        # Try to read the file as binary and look for PDF structure
+        with open(pdf_path, "rb") as f:
+            content = f.read()
+
+        # Look for PDF header
+        if content.startswith(b"%PDF"):
+            # Try to find the end of the PDF
+            end_marker = b"%%EOF"
+            if end_marker in content:
+                # Try to truncate at the last %%EOF
+                last_eof = content.rfind(end_marker)
+                if last_eof > 0:
+                    # Create a temporary repaired file
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as temp_file:
+                        temp_file.write(content[: last_eof + len(end_marker)])
+                        temp_path = temp_file.name
+
+                    try:
+                        # Try PyMuPDF again with repaired file
+                        if PYMUPDF_AVAILABLE:
+                            doc = fitz.open(temp_path)
+                            text = ""
+                            for page in doc:
+                                text += page.get_text() + "\n"
+                            metadata = doc.metadata
+                            page_count = len(doc)
+                            doc.close()
+                            logging.info(
+                                f"Successfully processed repaired PDF with PyMuPDF: {pdf_path}"
+                            )
+                            return text, page_count, metadata
+                    finally:
+                        os.unlink(temp_path)
+
+        # If repair attempt fails, return partial text
+        logging.warning(f"All PDF processing methods failed for {pdf_path}")
+        return f"[PDF processing failed: {'; '.join(errors)}]", 0, {}
+
+    except Exception as e:
+        logging.error(f"PDF repair attempt failed: {str(e)}")
+        return f"[PDF processing failed: {'; '.join(errors)}]", 0, {}
+
+
 @app.post("/tool/process_pdf", response_model=ToolResponse)
 async def process_pdf(file: UploadFile = File(...)):
     """Process a PDF file uploaded via multipart form data"""
@@ -114,55 +237,50 @@ async def process_pdf(file: UploadFile = File(...)):
             temp_file_path = temp_file.name
 
         try:
-            # Process the PDF using PyPDF2
-            with open(temp_file_path, "rb") as pdf_file:
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
+            # Process the PDF using robust fallback method
+            text, page_count, pdf_metadata = process_pdf_with_fallback(temp_file_path)
 
-                # Extract text from all pages
-                text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text() + "\n"
+            # Get metadata and ensure filename is preserved
+            metadata = {
+                "filename": file.filename,  # Always preserve the filename
+                **(
+                    pdf_metadata or {}
+                ),  # Include PDF metadata but don't let it override filename
+            }
 
-                # Get metadata and ensure filename is preserved
-                pdf_metadata = pdf_reader.metadata or {}
-                metadata = {
-                    "filename": file.filename,  # Always preserve the filename
-                    **pdf_metadata,  # Include PDF metadata but don't let it override filename
-                }
+            # Copy file to storage if enabled
+            storage_path = None
+            if config.is_copy_uploaded_docs_enabled():
+                try:
+                    from datetime import datetime
 
-                # Copy file to storage if enabled
-                storage_path = None
-                if config.is_copy_uploaded_docs_enabled():
-                    try:
-                        from datetime import datetime
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    storage_path = f"documents/{timestamp}_{file.filename}"
+                    get_storage_service().upload_data(
+                        data=content,
+                        object_name=storage_path,
+                        content_type="application/pdf",
+                    )
+                    print(f"Copied PDF to storage: {storage_path}")
+                except Exception as storage_error:
+                    print(f"Failed to copy PDF to storage: {storage_error}")
+                    storage_path = None
 
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                        storage_path = f"documents/{timestamp}_{file.filename}"
-                        get_storage_service().upload_data(
-                            data=content,
-                            object_name=storage_path,
-                            content_type="application/pdf",
-                        )
-                        print(f"Copied PDF to storage: {storage_path}")
-                    except Exception as storage_error:
-                        print(f"Failed to copy PDF to storage: {storage_error}")
-                        storage_path = None
+            # Add storage path to metadata if file was copied to storage
+            if storage_path:
+                metadata["storage_path"] = storage_path
 
-                # Add storage path to metadata if file was copied to storage
-                if storage_path:
-                    metadata["storage_path"] = storage_path
-
-                return ToolResponse(
-                    success=True,
-                    data={
-                        "data": {
-                            "filename": file.filename,
-                            "text": text,
-                            "page_count": len(pdf_reader.pages),
-                        },
-                        "metadata": metadata,
+            return ToolResponse(
+                success=True,
+                data={
+                    "data": {
+                        "filename": file.filename,
+                        "text": text,
+                        "page_count": page_count,
                     },
-                )
+                    "metadata": metadata,
+                },
+            )
         finally:
             # Clean up the temporary file
             os.unlink(temp_file_path)
