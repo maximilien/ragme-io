@@ -90,6 +90,9 @@ class TestVectorDatabaseImageMethods:
             def find_image_by_url(self, url):
                 return None
 
+            def find_image_by_filename(self, filename):
+                return None
+
             def supports_images(self):
                 return True
 
@@ -157,6 +160,9 @@ class TestVectorDatabaseImageMethods:
                 return True
 
             def find_image_by_url(self, url):
+                return None
+
+            def find_image_by_filename(self, filename):
                 return None
 
             def supports_images(self):

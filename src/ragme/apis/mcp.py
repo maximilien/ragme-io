@@ -270,6 +270,41 @@ async def process_pdf(file: UploadFile = File(...)):
             if storage_path:
                 metadata["storage_path"] = storage_path
 
+            # Extract and process images from PDF if enabled
+            extracted_images_count = 0
+            if config.get("pdf_image_extraction", {}).get("enabled", True):
+                try:
+                    from ..utils.pdf_image_extractor import pdf_image_extractor
+
+                    # Extract images from the PDF
+                    extracted_images = pdf_image_extractor.extract_images_from_pdf(
+                        temp_file_path, file.filename, storage_path
+                    )
+
+                    if extracted_images:
+                        # Add extracted images to the image collection
+                        success = (
+                            pdf_image_extractor.add_extracted_images_to_collection(
+                                extracted_images
+                            )
+                        )
+                        if success:
+                            extracted_images_count = len(extracted_images)
+                            print(
+                                f"Successfully extracted and processed {extracted_images_count} images from PDF"
+                            )
+                        else:
+                            print("Failed to add extracted images to collection")
+                    else:
+                        print("No images found in PDF")
+
+                except Exception as image_error:
+                    print(f"Error extracting images from PDF: {image_error}")
+                    # Don't fail the entire PDF processing if image extraction fails
+
+            # Add extracted images count to metadata
+            metadata["extracted_images_count"] = extracted_images_count
+
             return ToolResponse(
                 success=True,
                 data={
@@ -277,6 +312,7 @@ async def process_pdf(file: UploadFile = File(...)):
                         "filename": file.filename,
                         "text": text,
                         "page_count": page_count,
+                        "extracted_images_count": extracted_images_count,
                     },
                     "metadata": metadata,
                 },
@@ -430,6 +466,38 @@ async def process_pdf_base64(request: Base64FileRequest):
                 if storage_path:
                     metadata["storage_path"] = storage_path
 
+                # Extract and process images from PDF if enabled
+                extracted_images_count = 0
+                if config.get("pdf_image_extraction", {}).get("enabled", True):
+                    try:
+                        from ..utils.pdf_image_extractor import pdf_image_extractor
+
+                        # Extract images from the PDF
+                        extracted_images = pdf_image_extractor.extract_images_from_pdf(
+                            temp_file_path, request.filename, storage_path
+                        )
+
+                        if extracted_images:
+                            # Add extracted images to the image collection
+                            success = (
+                                pdf_image_extractor.add_extracted_images_to_collection(
+                                    extracted_images
+                                )
+                            )
+                            if success:
+                                extracted_images_count = len(extracted_images)
+                                print(
+                                    f"Successfully extracted and processed {extracted_images_count} images from PDF"
+                                )
+                            else:
+                                print("Failed to add extracted images to collection")
+                        else:
+                            print("No images found in PDF")
+
+                    except Exception as image_error:
+                        print(f"Error extracting images from PDF: {image_error}")
+                        # Don't fail the entire PDF processing if image extraction fails
+
                 return ToolResponse(
                     success=True,
                     data={
@@ -437,6 +505,7 @@ async def process_pdf_base64(request: Base64FileRequest):
                             "filename": request.filename,
                             "text": text,
                             "page_count": len(pdf_reader.pages),
+                            "extracted_images_count": extracted_images_count,
                         },
                         "metadata": metadata,
                     },

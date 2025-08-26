@@ -69,22 +69,16 @@ class TestVDBManager(unittest.TestCase):
     @patch("ragme.vdbs.vdb_management.create_vector_database")
     def test_check_health_success(self, mock_create_vdb):
         """Test check_health method with successful connections."""
-        # Mock VDB instances
-        mock_text_vdb = Mock()
-        mock_text_vdb.count_documents.return_value = 10
+        # Mock VDB instance that supports both text and image collections
+        mock_vdb = Mock()
+        mock_vdb.has_text_collection.return_value = True
+        mock_vdb.has_image_collection.return_value = True
+        mock_vdb.count_documents.return_value = 10
+        mock_vdb.count_images.return_value = 5
+        mock_vdb.get_text_collection_name.return_value = "RagMeDocs"
+        mock_vdb.get_image_collection_name.return_value = "RagMeImages"
 
-        mock_image_vdb = Mock()
-        mock_image_vdb.count_documents.return_value = 5
-
-        # Configure mock to return different VDBs based on collection name
-        def create_vdb_side_effect(collection_name):
-            if collection_name == "RagMeDocs":
-                return mock_text_vdb
-            elif collection_name == "RagMeImages":
-                return mock_image_vdb
-            return Mock()
-
-        mock_create_vdb.side_effect = create_vdb_side_effect
+        mock_create_vdb.return_value = mock_vdb
 
         health_info = self.vdb_manager.check_health()
 
@@ -112,22 +106,24 @@ class TestVDBManager(unittest.TestCase):
 
         health_info = self.vdb_manager.check_health()
 
-        self.assertEqual(health_info["status"], "unhealthy")
+        self.assertEqual(health_info["status"], "error")
         self.assertEqual(health_info["vdb_type"], "weaviate-cloud")
-        self.assertEqual(len(health_info["errors"]), 2)
+        self.assertEqual(len(health_info["errors"]), 1)
 
-        # Check text collection error
-        text_coll = health_info["collections"]["text"]
-        self.assertEqual(text_coll["status"], "error")
-        self.assertIn("Connection failed", text_coll["error"])
+        # When VDB creation fails, collections won't be checked
+        self.assertIn("VDB connection error", health_info["errors"][0])
 
-        # Check image collection error
-        image_coll = health_info["collections"]["image"]
-        self.assertEqual(image_coll["status"], "error")
-        self.assertIn("Connection failed", image_coll["error"])
-
-    def test_list_collections(self):
+    @patch("ragme.vdbs.vdb_management.create_vector_database")
+    def test_list_collections(self, mock_create_vdb):
         """Test list_collections method."""
+        mock_vdb = Mock()
+        mock_vdb.has_text_collection.return_value = True
+        mock_vdb.has_image_collection.return_value = True
+        mock_vdb.get_text_collection_name.return_value = "RagMeDocs"
+        mock_vdb.get_image_collection_name.return_value = "RagMeImages"
+
+        mock_create_vdb.return_value = mock_vdb
+
         collections = self.vdb_manager.list_collections()
 
         expected = {
@@ -141,6 +137,7 @@ class TestVDBManager(unittest.TestCase):
     def test_list_text_documents_success(self, mock_create_vdb):
         """Test list_text_documents method with success."""
         mock_vdb = Mock()
+        mock_vdb.get_text_collection_name.return_value = "RagMeDocs"
         mock_documents = [
             {"id": "1", "url": "http://example.com", "text": "Sample text"},
             {"id": "2", "url": "http://example2.com", "text": "Another text"},
@@ -157,7 +154,7 @@ class TestVDBManager(unittest.TestCase):
         self.assertEqual(result["documents"], mock_documents)
 
         # Verify the VDB was called correctly
-        mock_create_vdb.assert_called_once_with(collection_name="RagMeDocs")
+        mock_create_vdb.assert_called_once_with()
         mock_vdb.list_documents.assert_called_once_with(limit=50, offset=0)
 
     @patch("ragme.vdbs.vdb_management.create_vector_database")
@@ -168,13 +165,15 @@ class TestVDBManager(unittest.TestCase):
         result = self.vdb_manager.list_text_documents()
 
         self.assertEqual(result["status"], "error")
-        self.assertEqual(result["collection"], "RagMeDocs")
+        self.assertEqual(result["collection"], "text")
         self.assertIn("VDB error", result["error"])
 
     @patch("ragme.vdbs.vdb_management.create_vector_database")
     def test_list_image_documents_success(self, mock_create_vdb):
         """Test list_image_documents method with success."""
         mock_vdb = Mock()
+        mock_vdb.has_image_collection.return_value = True
+        mock_vdb.get_image_collection_name.return_value = "RagMeImages"
         mock_documents = [
             {
                 "id": "1",
@@ -187,7 +186,7 @@ class TestVDBManager(unittest.TestCase):
                 "image_data": "base64data2",
             },
         ]
-        mock_vdb.list_documents.return_value = mock_documents
+        mock_vdb.list_images.return_value = mock_documents
 
         mock_create_vdb.return_value = mock_vdb
 
@@ -199,8 +198,8 @@ class TestVDBManager(unittest.TestCase):
         self.assertEqual(result["documents"], mock_documents)
 
         # Verify the VDB was called correctly
-        mock_create_vdb.assert_called_once_with(collection_name="RagMeImages")
-        mock_vdb.list_documents.assert_called_once_with(limit=30, offset=0)
+        mock_create_vdb.assert_called_once()
+        mock_vdb.list_images.assert_called_once_with(limit=30, offset=0)
 
     @patch("ragme.vdbs.vdb_management.create_vector_database")
     def test_list_image_documents_failure(self, mock_create_vdb):
@@ -210,7 +209,7 @@ class TestVDBManager(unittest.TestCase):
         result = self.vdb_manager.list_image_documents()
 
         self.assertEqual(result["status"], "error")
-        self.assertEqual(result["collection"], "RagMeImages")
+        self.assertEqual(result["collection"], "image")
         self.assertIn("Image VDB error", result["error"])
 
     @patch("ragme.vdbs.vdb_management.create_vector_database")
@@ -218,6 +217,7 @@ class TestVDBManager(unittest.TestCase):
         """Test delete_text_collection_content with empty collection."""
         mock_vdb = Mock()
         mock_vdb.list_documents.return_value = []
+        mock_vdb.get_text_collection_name.return_value = "RagMeDocs"
 
         mock_create_vdb.return_value = mock_vdb
 
@@ -232,6 +232,7 @@ class TestVDBManager(unittest.TestCase):
     def test_delete_text_collection_content_success(self, mock_create_vdb):
         """Test delete_text_collection_content with documents to delete."""
         mock_vdb = Mock()
+        mock_vdb.get_text_collection_name.return_value = "RagMeDocs"
         mock_documents = [
             {"id": "1", "url": "http://example.com", "text": "Sample text"},
             {"id": "2", "url": "http://example2.com", "text": "Another text"},
@@ -257,6 +258,7 @@ class TestVDBManager(unittest.TestCase):
     def test_delete_text_collection_content_partial_failure(self, mock_create_vdb):
         """Test delete_text_collection_content with some delete failures."""
         mock_vdb = Mock()
+        mock_vdb.get_text_collection_name.return_value = "RagMeDocs"
         mock_documents = [
             {"id": "1", "url": "http://example.com", "text": "Sample text"},
             {"id": "2", "url": "http://example2.com", "text": "Another text"},
@@ -285,6 +287,8 @@ class TestVDBManager(unittest.TestCase):
     def test_delete_image_collection_content_success(self, mock_create_vdb):
         """Test delete_image_collection_content with documents to delete."""
         mock_vdb = Mock()
+        mock_vdb.has_image_collection.return_value = True
+        mock_vdb.get_image_collection_name.return_value = "RagMeImages"
         mock_documents = [
             {
                 "id": "1",
@@ -297,8 +301,8 @@ class TestVDBManager(unittest.TestCase):
                 "image_data": "base64data2",
             },
         ]
-        mock_vdb.list_documents.return_value = mock_documents
-        mock_vdb.delete_document.return_value = None
+        mock_vdb.list_images.return_value = mock_documents
+        mock_vdb.delete_image.return_value = None
 
         mock_create_vdb.return_value = mock_vdb
 
@@ -307,7 +311,7 @@ class TestVDBManager(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["collection"], "RagMeImages")
         self.assertEqual(result["deleted_count"], 2)
-        self.assertIn("Successfully deleted 2 documents", result["message"])
+        self.assertIn("Successfully deleted 2 images", result["message"])
 
     @patch("ragme.vdbs.vdb_management.create_vector_database")
     def test_delete_image_collection_content_failure(self, mock_create_vdb):
@@ -317,7 +321,7 @@ class TestVDBManager(unittest.TestCase):
         result = self.vdb_manager.delete_image_collection_content()
 
         self.assertEqual(result["status"], "error")
-        self.assertEqual(result["collection"], "RagMeImages")
+        self.assertEqual(result["collection"], "image")
         self.assertIn("Image VDB error", result["error"])
 
 

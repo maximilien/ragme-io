@@ -51,15 +51,31 @@ class QueryAgent:
         temperature = llm_config.get("temperature", 0.7)
 
         # Get query configuration
-        self.top_k = config.get(
-            "query.top_k", 5
+        query_config = config.get("query", {})
+        self.top_k = query_config.get(
+            "top_k", 5
         )  # Default to 5 most relevant documents
 
         # Get relevance thresholds
-        query_config = config.get("query", {})
-        relevance_thresholds = query_config.get("relevance_thresholds", {})
-        self.text_relevance_threshold = relevance_thresholds.get("text", 0.8)
-        self.image_relevance_threshold = relevance_thresholds.get("image", 0.8)
+        self.text_relevance_threshold = query_config.get(
+            "text_relevance_threshold", 0.8
+        )
+        self.image_relevance_threshold = query_config.get(
+            "image_relevance_threshold", 0.8
+        )
+        self.text_rerank_top_k = query_config.get("text_rerank_top_k", 3)
+
+        # Legacy support for old configuration structure
+        if "relevance_thresholds" in query_config:
+            relevance_thresholds = query_config.get("relevance_thresholds", {})
+            self.text_relevance_threshold = relevance_thresholds.get(
+                "text", self.text_relevance_threshold
+            )
+            self.image_relevance_threshold = relevance_thresholds.get(
+                "image", self.image_relevance_threshold
+            )
+
+        # Get rerank settings (legacy support)
         self.image_rerank_with_llm: bool = query_config.get(
             "image_rerank_with_llm", False
         )
@@ -67,7 +83,6 @@ class QueryAgent:
         self.text_rerank_with_llm: bool = query_config.get(
             "text_rerank_with_llm", False
         )
-        self.text_rerank_top_k: int = query_config.get("text_rerank_top_k", 10)
 
         # Get language settings
         llm_config = config.get_llm_config()
@@ -456,12 +471,14 @@ Please provide a clear, well-structured summary:"""
                     text_results = self._rerank_text_with_llm(
                         query, text_results, self.text_rerank_top_k
                     )
-                # Filter text results by relevance threshold
-                text_results = [
-                    result
-                    for result in text_results
-                    if result.get("score", 0) >= self.text_relevance_threshold
-                ]
+                # Filter text results by relevance threshold (only if scores are available)
+                if any("score" in result for result in text_results):
+                    text_results = [
+                        result
+                        for result in text_results
+                        if result.get("score", 0) >= self.text_relevance_threshold
+                    ]
+                # If no scores are available, keep all results
                 logger.info(
                     f"QueryAgent found {len(text_results)} relevant text documents (threshold: {self.text_relevance_threshold})"
                 )

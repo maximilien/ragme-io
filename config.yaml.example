@@ -133,6 +133,9 @@ llm:
 # Query Configuration
 query:
   top_k: 5  # Number of most relevant documents to retrieve for queries
+'s  text_relevance_threshold: 0.8  # Minimum similarity score for text documents (0.0 to 1.0)
+  image_relevance_threshold: 0.8  # Minimum similarity score for image documents (0.0 to 1.0)
+  text_rerank_top_k: 3  # Number of top text results to rerank for better relevance
 
 # Agent Configuration
 agents:
@@ -307,6 +310,15 @@ features:
   bypass_delete_confirmation: false  # Skip confirmation for delete operations (useful for testing)
   authentication: false  # Future feature
   multi_tenant: false    # Future feature
+
+# PDF Image Extraction Configuration
+pdf_image_extraction:
+  enabled: true  # Enable/disable PDF image extraction
+  min_image_size_kb: 1  # Minimum image size to extract (in KB)
+  max_image_size_mb: 10  # Maximum image size to extract (in MB)
+  supported_formats: ["jpeg", "jpg", "png", "gif", "bmp", "tiff"]  # Supported image formats
+  extract_captions: true  # Try to extract captions from OCR content
+  process_with_ai: true  # Apply AI classification and OCR to extracted images
 
 # Client Customization
 client:

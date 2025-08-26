@@ -509,7 +509,7 @@ body {
 
 .search-input {
     width: 100%;
-    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    padding: 0.5rem 2.25rem 0.5rem 2.25rem;
     border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 0.875rem;
@@ -525,6 +525,37 @@ body {
 
 .search-input::placeholder {
     color: #9ca3af;
+}
+
+/* Clear search button */
+.clear-search-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 0.875rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 2;
+}
+
+.clear-search-btn:hover {
+    background: rgba(107, 114, 128, 0.1);
+    color: #374151;
+}
+
+.clear-search-btn:focus {
+    outline: none;
+    background: rgba(107, 114, 128, 0.1);
+    color: #374151;
 }
 
 /* Filter indicator */
@@ -1882,9 +1913,7 @@ body {
     transition: all 0.2s;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     position: relative;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    display: block;
     max-width: 100%;
     overflow: hidden;
 }
@@ -1963,10 +1992,8 @@ body {
 }
 
 .document-content {
-    flex: 1;
-    min-width: 0; /* Allow flex item to shrink below content size */
     overflow: hidden;
-    max-width: calc(100% - 3rem); /* Leave space for delete button */
+    max-width: 100%;
 }
 
 .document-delete-btn {
@@ -1979,8 +2006,9 @@ body {
     transition: all 0.2s ease;
     opacity: 0;
     transform: scale(0.8);
-    flex-shrink: 0; /* Prevent button from shrinking */
-    position: relative;
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
     z-index: 2; /* Ensure button stays on top */
 }
 
@@ -2031,7 +2059,7 @@ body {
     white-space: nowrap;
     flex: 1;
     min-width: 0;
-    max-width: calc(100% - 2rem); /* Leave space for chunk badge */
+    max-width: calc(100% - 4rem); /* Leave space for chunk badge and delete button */
 }
 
 /* Chunk badge styling */
@@ -3543,4 +3571,44 @@ body {
     .pagination-pages {
         gap: 0.125rem;
     }
+}
+
+/* Query Settings Recommendations */
+.recommendations {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.recommendation-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 6px;
+    border-left: 3px solid #3b82f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.recommendation-item:last-child {
+    margin-bottom: 0;
+}
+
+.recommendation-item i {
+    color: #3b82f6;
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+
+.recommendation-item strong {
+    color: #1f2937;
+    font-weight: 600;
+}
+
+.recommendation-item:not(:last-child) {
+    border-bottom: 1px solid #f1f5f9;
 } 

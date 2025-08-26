@@ -210,3 +210,6 @@ tags.txt
 
 # MinIO data directory
 minio_data/
+
+# RAGme processed file markers (only in watch directory)
+watch_directory/**/*.processed

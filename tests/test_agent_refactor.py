@@ -56,8 +56,8 @@ class TestAgentRefactor:
         tools = RagMeTools(self.mock_ragme)
         all_tools = tools.get_all_tools()
         assert (
-            len(all_tools) == 15
-        )  # 15 tools: write, delete_collection, delete_document, delete_document_by_url, delete_all_documents, delete_documents_by_pattern, get_document_details, write_to_ragme_collection, get_vector_db_info, count_documents, list_documents_by_datetime, write_image_to_collection, list_image_collection, list_images_by_datetime, delete_image_from_collection
+            len(all_tools) == 17
+        )  # 17 tools: write, delete_collection, delete_document, delete_document_by_url, delete_all_documents, delete_documents_by_pattern, get_document_details, write_to_ragme_collection, get_vector_db_info, count_documents, list_documents_by_datetime, write_image_to_collection, list_image_collection, list_images_by_datetime, delete_image_from_collection, get_todays_images_with_data, get_images_by_date_range_with_data
 
     def test_functional_agent_initialization(self):
         """Test that FunctionalAgent initializes correctly."""

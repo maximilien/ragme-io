@@ -676,8 +676,19 @@ class RAGmeAssistant {
 
         // Document search input
         const documentSearchInput = document.getElementById('documentSearchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        
         documentSearchInput.addEventListener('input', (e) => {
             this.filterDocuments(e.target.value);
+            this.toggleClearSearchButton(e.target.value);
+        });
+        
+        // Clear search button
+        clearSearchBtn.addEventListener('click', () => {
+            documentSearchInput.value = '';
+            this.filterDocuments('');
+            this.toggleClearSearchButton('');
+            documentSearchInput.focus();
         });
 
         // Document settings button
@@ -911,6 +922,15 @@ class RAGmeAssistant {
 
         document.getElementById('paginationSize').addEventListener('input', (e) => {
             document.getElementById('paginationSizeValue').textContent = e.target.value;
+        });
+        
+        // Query settings range input updates
+        document.getElementById('textRelevanceThreshold').addEventListener('input', (e) => {
+            document.getElementById('textRelevanceThresholdValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('imageRelevanceThreshold').addEventListener('input', (e) => {
+            document.getElementById('imageRelevanceThresholdValue').textContent = e.target.value;
         });
 
         // Pagination button event listeners
@@ -1311,6 +1331,14 @@ class RAGmeAssistant {
         // Update document count
         const visibleCards = document.querySelectorAll('.document-card[style*="display: block"], .document-card:not([style*="display: none"])');
         console.log(`Showing ${visibleCards.length} documents matching "${searchTerm}"`);
+    }
+
+    // Toggle clear search button visibility
+    toggleClearSearchButton(searchValue) {
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = searchValue.trim() ? 'flex' : 'none';
+        }
     }
 
     // Update filter indicator
@@ -2279,6 +2307,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             document.getElementById('copyUploadedImages').checked = this.settings.copyUploadedImages || false;
         }
         
+        // Populate query settings
+        document.getElementById('topK').value = this.settings.topK || 5;
+        document.getElementById('textRerankTopK').value = this.settings.textRerankTopK || 3;
+        document.getElementById('textRelevanceThreshold').value = this.settings.textRelevanceThreshold || 0.8;
+        document.getElementById('textRelevanceThresholdValue').textContent = this.settings.textRelevanceThreshold || 0.8;
+        document.getElementById('imageRelevanceThreshold').value = this.settings.imageRelevanceThreshold || 0.8;
+        document.getElementById('imageRelevanceThresholdValue').textContent = this.settings.imageRelevanceThreshold || 0.8;
+        
         // Ensure configuration is loaded
         if (!this.config) {
             await this.loadConfiguration();
@@ -2680,6 +2716,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const chatHistoryLimit = parseInt(document.getElementById('chatHistoryLimit').value);
         const autoSaveChats = document.getElementById('autoSaveChats').checked;
         
+        // Query settings
+        const topK = parseInt(document.getElementById('topK').value);
+        const textRerankTopK = parseInt(document.getElementById('textRerankTopK').value);
+        const textRelevanceThreshold = parseFloat(document.getElementById('textRelevanceThreshold').value);
+        const imageRelevanceThreshold = parseFloat(document.getElementById('imageRelevanceThreshold').value);
+        
         // Storage settings
         const copyUploadedDocs = document.getElementById('copyUploadedDocs').checked;
         const copyUploadedImages = document.getElementById('copyUploadedImages').checked;
@@ -2705,6 +2747,31 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             }
         } catch (error) {
             console.warn('Failed to save storage settings to backend:', error);
+        }
+        
+        // Save query settings to backend
+        try {
+            const queryResponse = await fetch('http://localhost:8021/update-query-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    top_k: topK,
+                    text_rerank_top_k: textRerankTopK,
+                    text_relevance_threshold: textRelevanceThreshold,
+                    image_relevance_threshold: imageRelevanceThreshold
+                })
+            });
+            
+            if (queryResponse.ok) {
+                const queryResult = await queryResponse.json();
+                if (queryResult.status === 'success') {
+                    console.log('Query settings saved to backend');
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to save query settings to backend:', error);
         }
         
         // Validation
@@ -2743,6 +2810,27 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.showNotification('error', 'Pagination size must be between 5 and 25');
             return;
         }
+        
+        // Validate query settings
+        if (topK < 1 || topK > 20) {
+            this.showNotification('error', 'Top K must be between 1 and 20');
+            return;
+        }
+        
+        if (textRerankTopK < 1 || textRerankTopK > 10) {
+            this.showNotification('error', 'Text Rerank Top K must be between 1 and 10');
+            return;
+        }
+        
+        if (textRelevanceThreshold < 0.1 || textRelevanceThreshold > 1.0) {
+            this.showNotification('error', 'Text relevance threshold must be between 0.1 and 1.0');
+            return;
+        }
+        
+        if (imageRelevanceThreshold < 0.1 || imageRelevanceThreshold > 1.0) {
+            this.showNotification('error', 'Image relevance threshold must be between 0.1 and 1.0');
+            return;
+        }
 
         // Update settings
         this.settings.maxDocuments = maxDocuments;
@@ -2764,6 +2852,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.settings.copyUploadedDocs = copyUploadedDocs;
         this.settings.copyUploadedImages = copyUploadedImages;
         
+        // Query settings
+        this.settings.topK = topK;
+        this.settings.textRerankTopK = textRerankTopK;
+        this.settings.textRelevanceThreshold = textRelevanceThreshold;
+        this.settings.imageRelevanceThreshold = imageRelevanceThreshold;
+        
         // Update global settings
         this.currentVisualizationType = defaultVisualization;
         this.currentDateFilter = defaultDateFilter;
@@ -2783,6 +2877,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         localStorage.setItem('ragme-chat-history-width', chatHistoryWidth.toString());
         localStorage.setItem('ragme-copy-uploaded-docs', copyUploadedDocs.toString());
         localStorage.setItem('ragme-copy-uploaded-images', copyUploadedImages.toString());
+        
+        // Save query settings to localStorage
+        localStorage.setItem('ragme-top-k', topK.toString());
+        localStorage.setItem('ragme-text-rerank-top-k', textRerankTopK.toString());
+        localStorage.setItem('ragme-text-relevance-threshold', textRelevanceThreshold.toString());
+        localStorage.setItem('ragme-image-relevance-threshold', imageRelevanceThreshold.toString());
         
         this.hideModal('settingsModal');
         this.showNotification('success', 'Settings saved successfully');
@@ -2902,6 +3002,27 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const savedCopyUploadedImages = localStorage.getItem('ragme-copy-uploaded-images');
         if (savedCopyUploadedImages !== null) {
             this.settings.copyUploadedImages = savedCopyUploadedImages === 'true';
+        }
+        
+        // Load query settings
+        const savedTopK = localStorage.getItem('ragme-top-k');
+        if (savedTopK) {
+            this.settings.topK = parseInt(savedTopK);
+        }
+        
+        const savedTextRerankTopK = localStorage.getItem('ragme-text-rerank-top-k');
+        if (savedTextRerankTopK) {
+            this.settings.textRerankTopK = parseInt(savedTextRerankTopK);
+        }
+        
+        const savedTextRelevanceThreshold = localStorage.getItem('ragme-text-relevance-threshold');
+        if (savedTextRelevanceThreshold) {
+            this.settings.textRelevanceThreshold = parseFloat(savedTextRelevanceThreshold);
+        }
+        
+        const savedImageRelevanceThreshold = localStorage.getItem('ragme-image-relevance-threshold');
+        if (savedImageRelevanceThreshold) {
+            this.settings.imageRelevanceThreshold = parseFloat(savedImageRelevanceThreshold);
         }
         
         // Update the visualization type selector to reflect the saved preference
@@ -4240,8 +4361,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (imageData) {
                 // If we have base64 image data, display it
                 // Determine the correct MIME type based on metadata or default to jpeg
-                const mimeType = doc.metadata?.format || 
-                                doc.metadata?.mime_type || 
+                const mimeType = doc.metadata?.mime_type || 
+                                doc.metadata?.format || 
                                 doc.metadata?.content_type || 
                                 'image/jpeg';
                 
@@ -4285,8 +4406,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             .then(response => response.json())
             .then(result => {
                 if (result.image_data) {
-                    const mimeType = result.metadata?.format || 
-                                    result.metadata?.mime_type || 
+                    const mimeType = result.metadata?.mime_type || 
+                                    result.metadata?.format || 
                                     result.metadata?.content_type || 
                                     'image/jpeg';
                     

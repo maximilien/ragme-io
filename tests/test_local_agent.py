@@ -251,17 +251,27 @@ class TestRagMeLocalAgent:
         with patch.object(agent, "_process_pdf_file") as mock_process_pdf:
             mock_process_pdf.return_value = True
 
-            # Use a unique file path to avoid conflicts with processed markers
-            file_path = Path("test_unique_pdf.pdf")
+            # Use a unique file path within the watch directory to avoid conflicts with processed markers
+            file_path = Path("watch_directory/test_unique_pdf.pdf")
+
+            # Create the test file
+            file_path.parent.mkdir(exist_ok=True)
+            file_path.touch()
 
             # Clean up any existing processed marker
             processed_marker = file_path.with_suffix(file_path.suffix + ".processed")
             if processed_marker.exists():
                 processed_marker.unlink()
 
-            agent.process_file(file_path)
-
-            mock_process_pdf.assert_called_once_with(file_path)
+            try:
+                agent.process_file(file_path)
+                mock_process_pdf.assert_called_once_with(file_path)
+            finally:
+                # Clean up test files
+                file_path.unlink(missing_ok=True)
+                processed_marker.unlink(missing_ok=True)
+                lock_file = file_path.with_suffix(file_path.suffix + ".lock")
+                lock_file.unlink(missing_ok=True)
 
     @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
     @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
@@ -270,18 +280,29 @@ class TestRagMeLocalAgent:
         mock_ragme = RagMeLocalAgent()
         mock_ragme._process_docx_file = Mock(return_value=True)
 
-        # Use a unique file path to avoid conflicts with processed markers
-        file_path = Path("test_unique_docx.docx")
+        # Use a unique file path within the watch directory to avoid conflicts with processed markers
+        file_path = Path("watch_directory/test_unique_docx.docx")
+
+        # Create the test file
+        file_path.parent.mkdir(exist_ok=True)
+        file_path.touch()
 
         # Clean up any existing processed marker
         processed_marker = file_path.with_suffix(file_path.suffix + ".processed")
         if processed_marker.exists():
             processed_marker.unlink()
 
-        # Test with a DOCX file
-        result = mock_ragme.process_file(file_path)
-        assert result is None  # process_file doesn't return anything
-        mock_ragme._process_docx_file.assert_called_once_with(file_path)
+        try:
+            # Test with a DOCX file
+            result = mock_ragme.process_file(file_path)
+            assert result is None  # process_file doesn't return anything
+            mock_ragme._process_docx_file.assert_called_once_with(file_path)
+        finally:
+            # Clean up test files
+            file_path.unlink(missing_ok=True)
+            processed_marker.unlink(missing_ok=True)
+            lock_file = file_path.with_suffix(file_path.suffix + ".lock")
+            lock_file.unlink(missing_ok=True)
 
     @patch("src.ragme.agents.local_agent.RAGME_API_URL", "http://test-api.com")
     @patch("src.ragme.agents.local_agent.RAGME_MCP_URL", "http://test-mcp.com")
@@ -327,12 +348,22 @@ class TestRagMeLocalAgent:
         )
 
         with patch("src.ragme.agents.local_agent.logging") as mock_logging:
-            file_path = Path("test.txt")
-            agent.process_file(file_path)
+            file_path = Path("watch_directory/test.txt")
 
-            mock_logging.warning.assert_called_once_with(
-                f"Unsupported file type: {file_path}"
-            )
+            # Create the test file
+            file_path.parent.mkdir(exist_ok=True)
+            file_path.touch()
+
+            try:
+                agent.process_file(file_path)
+                mock_logging.warning.assert_called_once_with(
+                    f"Unsupported file type: {file_path}"
+                )
+            finally:
+                # Clean up test files
+                file_path.unlink(missing_ok=True)
+                lock_file = file_path.with_suffix(file_path.suffix + ".lock")
+                lock_file.unlink(missing_ok=True)
 
 
 class TestFileHandler:

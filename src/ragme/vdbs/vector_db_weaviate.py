@@ -2,10 +2,17 @@
 # Copyright (c) 2025 dr.max
 
 import json
+import logging
 import warnings
 from typing import Any
 
+import weaviate
+from weaviate import classes as wvc
+
 from .vector_db_base import CollectionConfig, VectorDatabase
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Suppress Pydantic deprecation warnings from dependencies
 warnings.filterwarnings(
@@ -39,8 +46,6 @@ class WeaviateVectorDatabase(VectorDatabase):
         """Create the Weaviate client."""
         import os
 
-        import weaviate
-
         # Get environment variables
         weaviate_url = os.getenv("WEAVIATE_URL")
         weaviate_api_key = os.getenv("WEAVIATE_API_KEY")
@@ -68,6 +73,23 @@ class WeaviateVectorDatabase(VectorDatabase):
             raise ConnectionError(
                 f"Failed to connect to Weaviate at {weaviate_url}: {str(e)}"
             ) from e
+
+    def close(self):
+        """Close the Weaviate client connection."""
+        if self.client is not None:
+            try:
+                self.client.close()
+                self.client = None
+            except Exception as e:
+                logger.warning(f"Error closing Weaviate client: {e}")
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with proper cleanup."""
+        self.close()
 
     def setup(self):
         """Set up Weaviate collections if they don't exist."""
@@ -183,35 +205,106 @@ class WeaviateVectorDatabase(VectorDatabase):
             raise ValueError("No image collection configured for this VDB")
 
         collection = self.client.collections.get(self.image_collection.name)
-        with collection.batch.dynamic() as batch:
-            for img in images:
-                # Get image data and metadata
-                image_data = img.get("image_data", "")
-                metadata = img.get("metadata", {})
 
-                # Remove image_data from metadata to avoid duplication
-                if "image_data" in metadata:
-                    del metadata["image_data"]
+        # Process images in smaller batches to avoid Weaviate embed API limits
+        batch_size = 10  # Reduced batch size for large images
+        total_images = len(images)
+        successful_insertions = 0
+        failed_insertions = 0
 
-                # Store image data in metadata for API access, but not in the main image field
-                # This avoids Weaviate cloud UI display issues with large BLOB data
-                metadata["base64_data"] = image_data
+        print(f"Processing {total_images} images in batches of {batch_size}")
 
-                metadata_text = json.dumps(metadata, ensure_ascii=False)
+        for i in range(0, total_images, batch_size):
+            batch_images = images[i : i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_images + batch_size - 1) // batch_size
 
-                print(f"Writing image with data length: {len(image_data)}")
-                print(
-                    f"Image metadata: {metadata.get('filename', 'unknown')} "
-                    f"({metadata.get('size', 'unknown')} bytes)"
-                )
+            print(
+                f"Processing batch {batch_num}/{total_batches} with {len(batch_images)} images"
+            )
 
-                batch.add_object(
-                    properties={
-                        "url": img.get("url", ""),
-                        "image": f"data:image/jpeg;base64,{image_data[:100]}...",  # Store truncated reference
-                        "metadata": metadata_text,
-                    }
-                )
+            try:
+                with collection.batch.dynamic() as batch:
+                    for img in batch_images:
+                        # Get image data and metadata
+                        image_data = img.get("image_data", "")
+                        metadata = img.get("metadata", {})
+
+                        # Remove image_data from metadata to avoid duplication
+                        if "image_data" in metadata:
+                            del metadata["image_data"]
+
+                        # Store image data in metadata for API access, but not in the main image field
+                        # This avoids Weaviate cloud UI display issues with large BLOB data
+                        metadata["base64_data"] = image_data
+
+                        metadata_text = json.dumps(metadata, ensure_ascii=False)
+
+                        print(f"Writing image with data length: {len(image_data)}")
+                        print(
+                            f"Image metadata: {metadata.get('filename', 'unknown')} "
+                            f"({metadata.get('size', 'unknown')} bytes)"
+                        )
+
+                        batch.add_object(
+                            properties={
+                                "url": img.get("url", ""),
+                                "image": f"data:image/jpeg;base64,{image_data[:100]}...",  # Store truncated reference
+                                "metadata": metadata_text,
+                            }
+                        )
+
+                # If we get here, the batch was successful
+                successful_insertions += len(batch_images)
+                print(f"Batch {batch_num} completed successfully")
+
+            except Exception as e:
+                print(f"Batch {batch_num} failed: {str(e)}")
+                failed_insertions += len(batch_images)
+
+                # Try to insert images one by one as fallback
+                print(f"Attempting individual insertions for batch {batch_num}")
+                for img in batch_images:
+                    try:
+                        with collection.batch.dynamic() as single_batch:
+                            image_data = img.get("image_data", "")
+                            metadata = img.get("metadata", {})
+
+                            if "image_data" in metadata:
+                                del metadata["image_data"]
+
+                            metadata["base64_data"] = image_data
+                            metadata_text = json.dumps(metadata, ensure_ascii=False)
+
+                            single_batch.add_object(
+                                properties={
+                                    "url": img.get("url", ""),
+                                    "image": f"data:image/jpeg;base64,{image_data[:100]}...",
+                                    "metadata": metadata_text,
+                                }
+                            )
+
+                        successful_insertions += 1
+                        print(
+                            f"Individual insertion successful for image: {metadata.get('filename', 'unknown')}"
+                        )
+
+                    except Exception as single_error:
+                        failed_insertions += 1
+                        print(
+                            f"Individual insertion failed for image: {metadata.get('filename', 'unknown')} - {str(single_error)}"
+                        )
+
+        print(
+            f"Image insertion completed: {successful_insertions} successful, {failed_insertions} failed out of {total_images} total"
+        )
+
+        if failed_insertions > 0:
+            print(
+                f"Warning: {failed_insertions} images failed to insert due to Weaviate embed API issues"
+            )
+
+        return successful_insertions > 0
 
     def list_documents(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """List documents from the text collection."""
@@ -282,9 +375,41 @@ class WeaviateVectorDatabase(VectorDatabase):
             return []
 
         collection = self.client.collections.get(self.text_collection.name)
-        response = collection.query.near_text(
-            query=query, limit=limit, include_vector=False
-        )
+
+        # Try hybrid search first (provides better scoring)
+        try:
+            response = collection.query.hybrid(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                    score=True,  # Request BM25F score
+                ),
+            )
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception as e:
+            logger.warning(f"Hybrid search failed, falling back to near_text: {e}")
+
+        # Fallback to near_text with metadata
+        try:
+            response = collection.query.near_text(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                ),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Near_text with metadata failed, falling back to basic: {e}"
+            )
+            response = collection.query.near_text(
+                query=query, limit=limit, include_vector=False
+            )
         return self._convert_weaviate_response(response)
 
     def search_image_collection(
@@ -318,28 +443,56 @@ class WeaviateVectorDatabase(VectorDatabase):
         except Exception:
             pass
 
-        # Try hybrid search
+        # Try hybrid search with score
         try:
             response = collection.query.hybrid(
-                query=query, limit=limit, include_vector=False
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                    score=True,  # Request BM25F score
+                ),
             )
-            return self._convert_weaviate_response(response)
-        except Exception:
-            pass
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception as e:
+            logger.warning(f"Hybrid search failed, falling back to BM25: {e}")
 
-        # Fallback to BM25 (general search)
+        # Fallback to BM25 (general search) with score
         try:
             response = collection.query.bm25(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    score=True,  # Request BM25F score
+                ),
+            )
+            results = self._convert_weaviate_response(response)
+            if results:
+                return results
+        except Exception as e:
+            logger.warning(f"BM25 failed, falling back to near_text: {e}")
+
+        # Last resort: near_text with metadata
+        try:
+            response = collection.query.near_text(
+                query=query,
+                limit=limit,
+                include_vector=False,
+                return_metadata=wvc.query.MetadataQuery(
+                    distance=True,  # Request vector distance
+                ),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Near_text with metadata failed, falling back to basic: {e}"
+            )
+            response = collection.query.near_text(
                 query=query, limit=limit, include_vector=False
             )
-            return self._convert_weaviate_response(response)
-        except Exception:
-            pass
-
-        # Last resort: near_text
-        response = collection.query.near_text(
-            query=query, limit=limit, include_vector=False
-        )
         return self._convert_weaviate_response(response)
 
     def create_query_agent(self):
@@ -481,8 +634,26 @@ class WeaviateVectorDatabase(VectorDatabase):
                 else:
                     result["image_data"] = image_value
 
-            # Add score if available
-            if hasattr(obj, "score") and obj.score is not None:
+            # Add similarity score if available (from metadata)
+            if hasattr(obj, "metadata") and obj.metadata:
+                # Try to get certainty first (normalized similarity, higher is better)
+                if (
+                    hasattr(obj.metadata, "certainty")
+                    and obj.metadata.certainty is not None
+                ):
+                    result["score"] = obj.metadata.certainty
+                # Fallback to distance (lower is better, so we invert it for consistency)
+                elif (
+                    hasattr(obj.metadata, "distance")
+                    and obj.metadata.distance is not None
+                ):
+                    # Convert distance to similarity score (1 - distance for cosine)
+                    result["score"] = 1.0 - obj.metadata.distance
+                # Legacy score field
+                elif hasattr(obj.metadata, "score") and obj.metadata.score is not None:
+                    result["score"] = obj.metadata.score
+            # Fallback to direct score attribute
+            elif hasattr(obj, "score") and obj.score is not None:
                 result["score"] = obj.score
 
             results.append(result)
