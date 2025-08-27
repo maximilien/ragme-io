@@ -133,7 +133,7 @@ llm:
 # Query Configuration
 query:
   top_k: 5  # Number of most relevant documents to retrieve for queries
-'s  text_relevance_threshold: 0.8  # Minimum similarity score for text documents (0.0 to 1.0)
+  text_relevance_threshold: 0.8  # Minimum similarity score for text documents (0.0 to 1.0)
   image_relevance_threshold: 0.8  # Minimum similarity score for image documents (0.0 to 1.0)
   text_rerank_top_k: 3  # Number of top text results to rerank for better relevance
 
@@ -142,7 +142,7 @@ agents:
   - name: "ragme-agent"
     type: "ragme"
     llm_model: "gpt-4o-mini"
-    system_prompt: |
+    system_prompt: >-
       You are a helpful assistant that can write the contents of urls to text document
       collections, as well as answering questions about stored documents.
       
