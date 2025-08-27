@@ -500,14 +500,14 @@
                             <h4><i class="fas fa-sync-alt"></i> Auto-Refresh Settings</h4>
                             <div class="setting-item">
                                 <label for="autoRefresh">
-                                    <input type="checkbox" id="autoRefresh" checked>
+                                    <input type="checkbox" id="autoRefresh">
                                     Enable Auto-Refresh
                                 </label>
                                 <small>Automatically refresh document list and updates</small>
                             </div>
                             <div class="setting-item">
                                 <label for="refreshInterval">Refresh Interval (seconds):</label>
-                                <input type="number" id="refreshInterval" value="30" min="5" max="300">
+                                <input type="number" id="refreshInterval" min="5" max="300">
                                 <small>How often to refresh content (5-300 seconds)</small>
                             </div>
                         </div>
@@ -516,15 +516,15 @@
                             <h4><i class="fas fa-eye"></i> Display Settings</h4>
                             <div class="setting-item">
                                 <label for="showVectorDbInfo">
-                                    <input type="checkbox" id="showVectorDbInfo" checked>
+                                    <input type="checkbox" id="showVectorDbInfo">
                                     Show Vector DB Info
                                 </label>
                                 <small>Display vector database type and collections in header</small>
                             </div>
                             <div class="setting-item">
                                 <label for="maxDocuments">Max Documents Display:</label>
-                                <input type="range" id="maxDocuments" value="10" min="5" max="25" step="5">
-                                <span class="range-value" id="maxDocumentsValue">10</span>
+                                <input type="range" id="maxDocuments" min="5" max="25" step="5">
+                                <span class="range-value" id="maxDocumentsValue"></span>
                                 <small>Maximum number of documents to display (5-25)</small>
                             </div>
                         </div>
@@ -536,14 +536,14 @@
                             <h4><i class="fas fa-columns"></i> Layout Settings</h4>
                             <div class="setting-item">
                                 <label for="documentListWidth">Document List Width (%):</label>
-                                <input type="range" id="documentListWidth" value="35" min="20" max="60" step="5">
-                                <span class="range-value" id="documentListWidthValue">35%</span>
+                                <input type="range" id="documentListWidth" min="20" max="60" step="5">
+                                <span class="range-value" id="documentListWidthValue"></span>
                                 <small>Width of the document list pane (20-60%)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="chatHistoryWidth">Chat History Width (%):</label>
-                                <input type="range" id="chatHistoryWidth" value="10" min="5" max="30" step="5">
-                                <span class="range-value" id="chatHistoryWidthValue">10%</span>
+                                <input type="range" id="chatHistoryWidth" min="5" max="30" step="5">
+                                <span class="range-value" id="chatHistoryWidthValue"></span>
                                 <small>Width of the chat history pane (5-30%)</small>
                             </div>
                         </div>
@@ -566,7 +566,7 @@
                             </div>
                             <div class="setting-item">
                                 <label for="documentOverviewVisible">
-                                    <input type="checkbox" id="documentOverviewVisible" checked>
+                                    <input type="checkbox" id="documentOverviewVisible">
                                     Show Document Overview by Default
                                 </label>
                                 <small>Display the document overview visualization</small>
@@ -603,21 +603,21 @@
                             <h4><i class="fas fa-file-upload"></i> Document Processing</h4>
                             <div class="setting-item">
                                 <label for="documentOverviewEnabled">
-                                    <input type="checkbox" id="documentOverviewEnabled" checked>
+                                    <input type="checkbox" id="documentOverviewEnabled">
                                     Enable Document Overview
                                 </label>
                                 <small>Show document overview and visualization features</small>
                             </div>
                             <div class="setting-item">
                                 <label for="maxDisplayDocuments">Max Display Documents:</label>
-                                <input type="range" id="maxDisplayDocuments" value="10" min="5" max="25" step="5">
-                                <span class="range-value" id="maxDisplayDocumentsValue">10</span>
+                                <input type="range" id="maxDisplayDocuments" min="5" max="25" step="5">
+                                <span class="range-value" id="maxDisplayDocumentsValue"></span>
                                 <small>Maximum documents to display in lists (5-25)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="paginationSize">Pagination Size:</label>
-                                <input type="range" id="paginationSize" value="10" min="5" max="25" step="5">
-                                <span class="range-value" id="paginationSizeValue">10</span>
+                                <input type="range" id="paginationSize" min="5" max="25" step="5">
+                                <span class="range-value" id="paginationSizeValue"></span>
                                 <small>Number of documents per page (5-25)</small>
                             </div>
                         </div>
@@ -679,13 +679,13 @@
                             <h4><i class="fas fa-robot"></i> AI Model Settings</h4>
                             <div class="setting-item">
                                 <label for="maxTokens">Max Tokens:</label>
-                                <input type="number" id="maxTokens" value="4000" min="1000" max="16000">
+                                <input type="number" id="maxTokens" min="1000" max="16000">
                                 <small>Maximum tokens for AI responses (1000-16000)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="temperature">Temperature:</label>
-                                <input type="range" id="temperature" value="0.7" min="0" max="2" step="0.1">
-                                <span class="range-value" id="temperatureValue">0.7</span>
+                                <input type="range" id="temperature" min="0" max="2" step="0.1">
+                                <span class="range-value" id="temperatureValue"></span>
                                 <small>AI response creativity (0=deterministic, 2=creative)</small>
                             </div>
                         </div>
@@ -694,12 +694,12 @@
                             <h4><i class="fas fa-history"></i> Chat History</h4>
                             <div class="setting-item">
                                 <label for="chatHistoryLimit">Chat History Limit:</label>
-                                <input type="number" id="chatHistoryLimit" value="50" min="10" max="200">
+                                <input type="number" id="chatHistoryLimit" min="10" max="200">
                                 <small>Maximum number of chat sessions to keep (10-200)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="autoSaveChats">
-                                    <input type="checkbox" id="autoSaveChats" checked>
+                                    <input type="checkbox" id="autoSaveChats">
                                     Auto-Save Chat Sessions
                                 </label>
                                 <small>Automatically save chat sessions to browser storage</small>
@@ -713,12 +713,12 @@
                             <h4><i class="fas fa-search"></i> Search Configuration</h4>
                             <div class="setting-item">
                                 <label for="topK">Top K Results:</label>
-                                <input type="number" id="topK" value="5" min="1" max="20">
+                                <input type="number" id="topK" min="1" max="20">
                                 <small>Number of most relevant documents to retrieve for queries (1-20)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="textRerankTopK">Text Rerank Top K:</label>
-                                <input type="number" id="textRerankTopK" value="3" min="1" max="10">
+                                <input type="number" id="textRerankTopK" min="1" max="10">
                                 <small>Number of top text results to rerank for better relevance (1-10)</small>
                             </div>
                         </div>
@@ -727,14 +727,14 @@
                             <h4><i class="fas fa-percentage"></i> Similarity Thresholds</h4>
                             <div class="setting-item">
                                 <label for="textRelevanceThreshold">Text Relevance Threshold:</label>
-                                <input type="range" id="textRelevanceThreshold" value="0.8" min="0.1" max="1.0" step="0.1">
-                                <span class="range-value" id="textRelevanceThresholdValue">0.8</span>
+                                <input type="range" id="textRelevanceThreshold" min="0.1" max="1.0" step="0.1">
+                                <span class="range-value" id="textRelevanceThresholdValue"></span>
                                 <small>Minimum similarity score for text documents (0.1-1.0). Higher values = more strict filtering.</small>
                             </div>
                             <div class="setting-item">
                                 <label for="imageRelevanceThreshold">Image Relevance Threshold:</label>
-                                <input type="range" id="imageRelevanceThreshold" value="0.8" min="0.1" max="1.0" step="0.1">
-                                <span class="range-value" id="imageRelevanceThresholdValue">0.8</span>
+                                <input type="range" id="imageRelevanceThreshold" min="0.1" max="1.0" step="0.1">
+                                <span class="range-value" id="imageRelevanceThresholdValue"></span>
                                 <small>Minimum similarity score for image documents (0.1-1.0). Higher values = more strict filtering.</small>
                             </div>
                         </div>
