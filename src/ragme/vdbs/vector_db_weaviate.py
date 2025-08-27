@@ -494,6 +494,21 @@ class WeaviateVectorDatabase(VectorDatabase):
         final_results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
         logger.info(f"Combined search found {len(final_results)} unique results")
+
+        # Debug: Log top results with scores
+        logger.info("=== TOP SEARCH RESULTS ===")
+        for i, result in enumerate(final_results[:limit]):
+            doc_id = str(result.get("id", "unknown"))
+            url = result.get("url", "unknown")
+            score = result.get("score", 0)
+            search_methods = result.get(
+                "search_methods", [result.get("search_method", "unknown")]
+            )
+            logger.info(
+                f"#{i + 1}: ID={doc_id[:8]}... URL={url[:50]}... Score={score:.4f} Methods={search_methods}"
+            )
+        logger.info("=== END SEARCH RESULTS ===")
+
         return final_results[:limit]
 
     def search_image_collection(
@@ -720,10 +735,14 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             # Add similarity score if available (from metadata)
             if hasattr(obj, "metadata") and obj.metadata:
+                # Convert UUID to string for logging
+                uuid_str = str(obj.uuid)
+                logger.debug(f"Processing metadata for object {uuid_str[:8]}...")
+
                 # Try to get BM25 score first (best for keyword matching)
                 if hasattr(obj.metadata, "score") and obj.metadata.score is not None:
                     bm25_score = obj.metadata.score
-                    logger.debug(f"BM25 score: {bm25_score}")
+                    logger.debug(f"Raw BM25 score: {bm25_score}")
 
                     # BM25 scores are typically negative for Weaviate
                     # Convert negative BM25 scores to positive similarity scores (0-1 range)
@@ -740,7 +759,9 @@ class WeaviateVectorDatabase(VectorDatabase):
                         )  # This maps -2 to 0.8, -1 to 0.9, 0 to 1.0
                         result["score"] = max(0.1, min(1.0, normalized_score))
 
-                    logger.debug(f"Normalized BM25 score: {result['score']}")
+                    logger.debug(
+                        f"Normalized BM25 score: {result['score']} (from {bm25_score})"
+                    )
 
                 # Try to get certainty next (normalized similarity, higher is better)
                 elif (
@@ -757,7 +778,9 @@ class WeaviateVectorDatabase(VectorDatabase):
                 ):
                     # Convert distance to similarity score (1 - distance for cosine)
                     result["score"] = 1.0 - obj.metadata.distance
-                    logger.debug(f"Distance-based score: {result['score']}")
+                    logger.debug(
+                        f"Distance-based score: {result['score']} (from distance {obj.metadata.distance})"
+                    )
 
             # Fallback to direct score attribute
             elif hasattr(obj, "score") and obj.score is not None:
@@ -767,7 +790,8 @@ class WeaviateVectorDatabase(VectorDatabase):
             # If no score was found, set a default low score
             if "score" not in result:
                 result["score"] = 0.1
-                logger.debug("No score found, using default: 0.1")
+                uuid_str = str(obj.uuid)
+                logger.debug(f"No score found for {uuid_str[:8]}, using default: 0.1")
 
             results.append(result)
 

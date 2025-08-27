@@ -146,12 +146,21 @@ class TestWeaviateVectorDatabase:
                 "text": "content1",
                 "metadata": '{"type": "webpage"}',
             }
+            # Mock metadata object with proper score attribute
+            mock_metadata1 = MagicMock()
+            mock_metadata1.score = None  # No score for list_documents
+            mock_object1.metadata = mock_metadata1
+
             mock_object2.uuid = "uuid2"
             mock_object2.properties = {
                 "url": "http://test2.com",
                 "text": "content2",
                 "metadata": '{"type": "webpage"}',
             }
+            # Mock metadata object with proper score attribute
+            mock_metadata2 = MagicMock()
+            mock_metadata2.score = None  # No score for list_documents
+            mock_object2.metadata = mock_metadata2
 
             mock_result.objects = [mock_object1, mock_object2]
             mock_collection.query.fetch_objects.return_value = mock_result
