@@ -7,7 +7,7 @@ import warnings
 from typing import Any
 
 import weaviate
-from weaviate import classes as wvc
+from weaviate.classes.query import MetadataQuery
 
 from .vector_db_base import CollectionConfig, VectorDatabase
 
@@ -370,47 +370,131 @@ class WeaviateVectorDatabase(VectorDatabase):
     def search_text_collection(
         self, query: str, limit: int = 5
     ) -> list[dict[str, Any]]:
-        """Search only the text collection."""
+        """Search only the text collection using multiple search strategies."""
         if not self.has_text_collection():
             return []
 
         collection = self.client.collections.get(self.text_collection.name)
+        all_results = []
 
-        # Try hybrid search first (provides better scoring)
+        # Strategy 1: BM25 search (best for keyword matching)
+        try:
+            response = collection.query.bm25(
+                query=query,
+                limit=limit * 2,  # Get more results to combine
+                include_vector=False,
+                return_metadata=MetadataQuery(
+                    score=True,  # Request BM25F score
+                    explain_score=True,  # Get detailed score explanation
+                ),
+            )
+            bm25_results = self._convert_weaviate_response(response)
+            if bm25_results:
+                logger.info(
+                    f"BM25 search successful, found {len(bm25_results)} results"
+                )
+                # Tag BM25 results
+                for result in bm25_results:
+                    result["search_method"] = "bm25"
+                all_results.extend(bm25_results)
+        except Exception as e:
+            logger.warning(f"BM25 search failed: {e}")
+
+        # Strategy 2: Hybrid search (combines dense and sparse signals)
         try:
             response = collection.query.hybrid(
                 query=query,
-                limit=limit,
+                limit=limit * 2,  # Get more results to combine
                 include_vector=False,
-                return_metadata=wvc.query.MetadataQuery(
+                return_metadata=MetadataQuery(
                     distance=True,  # Request vector distance
                     score=True,  # Request BM25F score
+                    explain_score=True,  # Get detailed score explanation
                 ),
             )
-            results = self._convert_weaviate_response(response)
-            if results:
-                return results
+            hybrid_results = self._convert_weaviate_response(response)
+            if hybrid_results:
+                logger.info(
+                    f"Hybrid search successful, found {len(hybrid_results)} results"
+                )
+                # Tag hybrid results
+                for result in hybrid_results:
+                    result["search_method"] = "hybrid"
+                all_results.extend(hybrid_results)
         except Exception as e:
-            logger.warning(f"Hybrid search failed, falling back to near_text: {e}")
+            logger.warning(f"Hybrid search failed: {e}")
 
-        # Fallback to near_text with metadata
+        # Strategy 3: Near-text search (vector-based)
         try:
             response = collection.query.near_text(
                 query=query,
-                limit=limit,
+                limit=limit * 2,  # Get more results to combine
                 include_vector=False,
-                return_metadata=wvc.query.MetadataQuery(
+                return_metadata=MetadataQuery(
                     distance=True,  # Request vector distance
                 ),
             )
+            near_text_results = self._convert_weaviate_response(response)
+            if near_text_results:
+                logger.info(
+                    f"Near-text search successful, found {len(near_text_results)} results"
+                )
+                # Tag near-text results
+                for result in near_text_results:
+                    result["search_method"] = "near_text"
+                all_results.extend(near_text_results)
         except Exception as e:
-            logger.warning(
-                f"Near_text with metadata failed, falling back to basic: {e}"
-            )
-            response = collection.query.near_text(
-                query=query, limit=limit, include_vector=False
-            )
-        return self._convert_weaviate_response(response)
+            logger.warning(f"Near-text search failed: {e}")
+
+        # Combine and deduplicate results
+        if not all_results:
+            return []
+
+        # Deduplicate by document ID and combine scores
+        combined_results = {}
+        for result in all_results:
+            doc_id = result.get("id")
+            if doc_id not in combined_results:
+                combined_results[doc_id] = result
+            else:
+                # Combine scores from different search methods
+                existing = combined_results[doc_id]
+                existing_score = existing.get("score", 0)
+                new_score = result.get("score", 0)
+
+                # Take the best score and track search methods
+                if new_score > existing_score:
+                    existing["score"] = new_score
+
+                # Track all search methods that found this document
+                if "search_methods" not in existing:
+                    existing["search_methods"] = [
+                        existing.get("search_method", "unknown")
+                    ]
+                existing["search_methods"].append(
+                    result.get("search_method", "unknown")
+                )
+                existing["search_methods"] = list(
+                    set(existing["search_methods"])
+                )  # Remove duplicates
+
+                # Boost score if multiple search methods found this document
+                if len(existing["search_methods"]) > 1:
+                    # Boost by 10% for each additional search method (up to 50% max)
+                    boost_factor = min(
+                        1.5, 1.0 + (len(existing["search_methods"]) - 1) * 0.1
+                    )
+                    existing["score"] = min(1.0, existing["score"] * boost_factor)
+                    logger.debug(
+                        f"Boosted score for {doc_id} by {boost_factor:.2f}x due to {len(existing['search_methods'])} search methods"
+                    )
+
+        # Convert back to list and sort by score
+        final_results = list(combined_results.values())
+        final_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+        logger.info(f"Combined search found {len(final_results)} unique results")
+        return final_results[:limit]
 
     def search_image_collection(
         self, query: str, limit: int = 5
@@ -449,7 +533,7 @@ class WeaviateVectorDatabase(VectorDatabase):
                 query=query,
                 limit=limit,
                 include_vector=False,
-                return_metadata=wvc.query.MetadataQuery(
+                return_metadata=MetadataQuery(
                     distance=True,  # Request vector distance
                     score=True,  # Request BM25F score
                 ),
@@ -466,7 +550,7 @@ class WeaviateVectorDatabase(VectorDatabase):
                 query=query,
                 limit=limit,
                 include_vector=False,
-                return_metadata=wvc.query.MetadataQuery(
+                return_metadata=MetadataQuery(
                     score=True,  # Request BM25F score
                 ),
             )
@@ -482,7 +566,7 @@ class WeaviateVectorDatabase(VectorDatabase):
                 query=query,
                 limit=limit,
                 include_vector=False,
-                return_metadata=wvc.query.MetadataQuery(
+                return_metadata=MetadataQuery(
                     distance=True,  # Request vector distance
                 ),
             )
@@ -636,12 +720,36 @@ class WeaviateVectorDatabase(VectorDatabase):
 
             # Add similarity score if available (from metadata)
             if hasattr(obj, "metadata") and obj.metadata:
-                # Try to get certainty first (normalized similarity, higher is better)
-                if (
+                # Try to get BM25 score first (best for keyword matching)
+                if hasattr(obj.metadata, "score") and obj.metadata.score is not None:
+                    bm25_score = obj.metadata.score
+                    logger.debug(f"BM25 score: {bm25_score}")
+
+                    # BM25 scores are typically negative for Weaviate
+                    # Convert negative BM25 scores to positive similarity scores (0-1 range)
+                    # We want to map typical BM25 scores to reasonable similarity scores
+                    if bm25_score > 0:
+                        # For positive scores, normalize to 0-1 range
+                        result["score"] = min(bm25_score / 5.0, 1.0)
+                    else:
+                        # For negative scores (most common), convert to positive similarity
+                        # Map -2 to 0.8, -1 to 0.9, 0 to 1.0
+                        # This gives better scores for typical BM25 ranges
+                        normalized_score = 1.0 + (
+                            bm25_score / 10.0
+                        )  # This maps -2 to 0.8, -1 to 0.9, 0 to 1.0
+                        result["score"] = max(0.1, min(1.0, normalized_score))
+
+                    logger.debug(f"Normalized BM25 score: {result['score']}")
+
+                # Try to get certainty next (normalized similarity, higher is better)
+                elif (
                     hasattr(obj.metadata, "certainty")
                     and obj.metadata.certainty is not None
                 ):
                     result["score"] = obj.metadata.certainty
+                    logger.debug(f"Certainty score: {result['score']}")
+
                 # Fallback to distance (lower is better, so we invert it for consistency)
                 elif (
                     hasattr(obj.metadata, "distance")
@@ -649,12 +757,17 @@ class WeaviateVectorDatabase(VectorDatabase):
                 ):
                     # Convert distance to similarity score (1 - distance for cosine)
                     result["score"] = 1.0 - obj.metadata.distance
-                # Legacy score field
-                elif hasattr(obj.metadata, "score") and obj.metadata.score is not None:
-                    result["score"] = obj.metadata.score
+                    logger.debug(f"Distance-based score: {result['score']}")
+
             # Fallback to direct score attribute
             elif hasattr(obj, "score") and obj.score is not None:
                 result["score"] = obj.score
+                logger.debug(f"Direct score: {result['score']}")
+
+            # If no score was found, set a default low score
+            if "score" not in result:
+                result["score"] = 0.1
+                logger.debug("No score found, using default: 0.1")
 
             results.append(result)
 

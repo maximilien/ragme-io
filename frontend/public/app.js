@@ -209,6 +209,39 @@ class RAGmeAssistant {
                     this.settings.chatHistoryWidth = uiConfig.chat_history_width || 10;
                 }
                 
+                // Update query settings from configuration
+                if (this.config.query) {
+                    const queryConfig = this.config.query;
+                    this.settings.topK = queryConfig.top_k || this.settings.topK;
+                    this.settings.textRerankTopK = queryConfig.text_rerank_top_k || this.settings.textRerankTopK;
+                    this.settings.textRelevanceThreshold = queryConfig.text_relevance_threshold || this.settings.textRelevanceThreshold;
+                    this.settings.imageRelevanceThreshold = queryConfig.image_relevance_threshold || this.settings.imageRelevanceThreshold;
+                    
+                    console.log('Loaded query settings from config:', {
+                        topK: this.settings.topK,
+                        textRerankTopK: this.settings.textRerankTopK,
+                        textRelevanceThreshold: this.settings.textRelevanceThreshold,
+                        imageRelevanceThreshold: this.settings.imageRelevanceThreshold
+                    });
+                }
+                
+                // Update storage settings from configuration
+                if (this.config.storage) {
+                    const storageConfig = this.config.storage;
+                    this.settings.copyUploadedDocs = storageConfig.copy_uploaded_docs !== undefined ? storageConfig.copy_uploaded_docs : this.settings.copyUploadedDocs;
+                    this.settings.copyUploadedImages = storageConfig.copy_uploaded_images !== undefined ? storageConfig.copy_uploaded_images : this.settings.copyUploadedImages;
+                }
+                
+                // Update LLM settings from configuration
+                if (this.config.llm) {
+                    const llmConfig = this.config.llm;
+                    this.settings.maxTokens = llmConfig.max_tokens || this.settings.maxTokens;
+                    this.settings.temperature = llmConfig.temperature || this.settings.temperature;
+                }
+                
+                // Populate all form fields with loaded settings
+                this.populateSettingsForm();
+                
                 // Update page title and branding
                 if (this.config.application && this.config.application.title) {
                     document.title = this.config.application.title;
@@ -3003,33 +3036,110 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (savedCopyUploadedImages !== null) {
             this.settings.copyUploadedImages = savedCopyUploadedImages === 'true';
         }
+    }
+
+    populateSettingsForm() {
+        // General Settings
+        const autoRefresh = document.getElementById('autoRefresh');
+        const refreshInterval = document.getElementById('refreshInterval');
+        const showVectorDbInfo = document.getElementById('showVectorDbInfo');
+        const maxDocuments = document.getElementById('maxDocuments');
+        const maxDocumentsValue = document.getElementById('maxDocumentsValue');
         
-        // Load query settings
-        const savedTopK = localStorage.getItem('ragme-top-k');
-        if (savedTopK) {
-            this.settings.topK = parseInt(savedTopK);
+        if (autoRefresh) autoRefresh.checked = this.settings.autoRefresh;
+        if (refreshInterval) refreshInterval.value = this.settings.refreshInterval / 1000; // Convert from ms to seconds
+        if (showVectorDbInfo) showVectorDbInfo.checked = this.settings.showVectorDbInfo;
+        if (maxDocuments) {
+            maxDocuments.value = this.settings.maxDocuments;
+            if (maxDocumentsValue) maxDocumentsValue.textContent = this.settings.maxDocuments;
         }
         
-        const savedTextRerankTopK = localStorage.getItem('ragme-text-rerank-top-k');
-        if (savedTextRerankTopK) {
-            this.settings.textRerankTopK = parseInt(savedTextRerankTopK);
+        // Interface Settings
+        const documentListWidth = document.getElementById('documentListWidth');
+        const documentListWidthValue = document.getElementById('documentListWidthValue');
+        const chatHistoryWidth = document.getElementById('chatHistoryWidth');
+        const chatHistoryWidthValue = document.getElementById('chatHistoryWidthValue');
+        const documentListCollapsed = document.getElementById('documentListCollapsed');
+        const chatHistoryCollapsed = document.getElementById('chatHistoryCollapsed');
+        const documentOverviewVisible = document.getElementById('documentOverviewVisible');
+        const defaultVisualization = document.getElementById('defaultVisualization');
+        const defaultDateFilter = document.getElementById('defaultDateFilter');
+        
+        if (documentListWidth) {
+            documentListWidth.value = this.settings.documentListWidth;
+            if (documentListWidthValue) documentListWidthValue.textContent = this.settings.documentListWidth + '%';
+        }
+        if (chatHistoryWidth) {
+            chatHistoryWidth.value = this.settings.chatHistoryWidth;
+            if (chatHistoryWidthValue) chatHistoryWidthValue.textContent = this.settings.chatHistoryWidth + '%';
+        }
+        if (documentListCollapsed) documentListCollapsed.checked = this.settings.documentListCollapsed;
+        if (chatHistoryCollapsed) chatHistoryCollapsed.checked = this.settings.chatHistoryCollapsed;
+        if (documentOverviewVisible) documentOverviewVisible.checked = this.settings.documentOverviewVisible;
+        if (defaultVisualization) defaultVisualization.value = this.currentVisualizationType;
+        if (defaultDateFilter) defaultDateFilter.value = this.currentDateFilter;
+        
+        // Document Settings
+        const documentOverviewEnabled = document.getElementById('documentOverviewEnabled');
+        const maxDisplayDocuments = document.getElementById('maxDisplayDocuments');
+        const maxDisplayDocumentsValue = document.getElementById('maxDisplayDocumentsValue');
+        const paginationSize = document.getElementById('paginationSize');
+        const paginationSizeValue = document.getElementById('paginationSizeValue');
+        const defaultContentFilter = document.getElementById('defaultContentFilter');
+        
+        if (documentOverviewEnabled) documentOverviewEnabled.checked = this.settings.documentOverviewEnabled;
+        if (maxDisplayDocuments) {
+            maxDisplayDocuments.value = this.settings.maxDocuments;
+            if (maxDisplayDocumentsValue) maxDisplayDocumentsValue.textContent = this.settings.maxDocuments;
+        }
+        if (paginationSize) {
+            paginationSize.value = this.settings.maxDocuments;
+            if (paginationSizeValue) paginationSizeValue.textContent = this.settings.maxDocuments;
+        }
+        if (defaultContentFilter) defaultContentFilter.value = this.currentContentFilter;
+        
+        // Storage Settings
+        const copyUploadedDocs = document.getElementById('copyUploadedDocs');
+        const copyUploadedImages = document.getElementById('copyUploadedImages');
+        
+        if (copyUploadedDocs) copyUploadedDocs.checked = this.settings.copyUploadedDocs;
+        if (copyUploadedImages) copyUploadedImages.checked = this.settings.copyUploadedImages;
+        
+        // Chat Settings
+        const maxTokens = document.getElementById('maxTokens');
+        const temperature = document.getElementById('temperature');
+        const temperatureValue = document.getElementById('temperatureValue');
+        const chatHistoryLimit = document.getElementById('chatHistoryLimit');
+        const autoSaveChats = document.getElementById('autoSaveChats');
+        
+        if (maxTokens) maxTokens.value = this.settings.maxTokens;
+        if (temperature) {
+            temperature.value = this.settings.temperature;
+            if (temperatureValue) temperatureValue.textContent = this.settings.temperature;
+        }
+        if (chatHistoryLimit) chatHistoryLimit.value = this.settings.chatHistoryLimit || 50;
+        if (autoSaveChats) autoSaveChats.checked = this.settings.autoSaveChats !== false; // Default to true
+        
+        // Query Settings
+        const topK = document.getElementById('topK');
+        const textRerankTopK = document.getElementById('textRerankTopK');
+        const textRelevanceThreshold = document.getElementById('textRelevanceThreshold');
+        const textRelevanceThresholdValue = document.getElementById('textRelevanceThresholdValue');
+        const imageRelevanceThreshold = document.getElementById('imageRelevanceThreshold');
+        const imageRelevanceThresholdValue = document.getElementById('imageRelevanceThresholdValue');
+        
+        if (topK) topK.value = this.settings.topK || 5;
+        if (textRerankTopK) textRerankTopK.value = this.settings.textRerankTopK || 3;
+        if (textRelevanceThreshold) {
+            textRelevanceThreshold.value = this.settings.textRelevanceThreshold || 0.4;
+            if (textRelevanceThresholdValue) textRelevanceThresholdValue.textContent = this.settings.textRelevanceThreshold || 0.4;
+        }
+        if (imageRelevanceThreshold) {
+            imageRelevanceThreshold.value = this.settings.imageRelevanceThreshold || 0.5;
+            if (imageRelevanceThresholdValue) imageRelevanceThresholdValue.textContent = this.settings.imageRelevanceThreshold || 0.5;
         }
         
-        const savedTextRelevanceThreshold = localStorage.getItem('ragme-text-relevance-threshold');
-        if (savedTextRelevanceThreshold) {
-            this.settings.textRelevanceThreshold = parseFloat(savedTextRelevanceThreshold);
-        }
-        
-        const savedImageRelevanceThreshold = localStorage.getItem('ragme-image-relevance-threshold');
-        if (savedImageRelevanceThreshold) {
-            this.settings.imageRelevanceThreshold = parseFloat(savedImageRelevanceThreshold);
-        }
-        
-        // Update the visualization type selector to reflect the saved preference
-        const visualizationTypeSelector = document.getElementById('visualizationTypeSelector');
-        if (visualizationTypeSelector) {
-            visualizationTypeSelector.value = this.currentVisualizationType;
-        }
+        console.log('Settings form populated with values from configuration');
     }
 
     loadDocuments() {

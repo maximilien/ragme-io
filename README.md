@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection. Tests multiple query scenarios and automatically updates `config.yaml` with the best performing threshold! ⭐ **NEW!**
 - **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**
 - **📄 Robust PDF Processing**: Enhanced PDF processing with multiple library fallbacks (PyMuPDF, pdfplumber, PyPDF2) to handle corrupted PDFs and "EOF marker not found" errors. Automatic PDF repair and graceful error handling! ⭐ **NEW!**
 - **🖼️ PDF Image Extraction**: Automatically extract and process images from PDF documents using PyMuPDF. Extracted images are processed with AI classification, OCR text extraction, and stored in the image collection with rich metadata including page numbers and PDF source information! ⭐ **NEW!**
@@ -66,6 +67,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **[🤖 Agent Architecture](docs/AGENT_REFACTOR.md)** - Three-agent architecture design and implementation ⭐ **NEW!**
 - **[💾 Storage Service](docs/STORAGE_SERVICE.md)** - S3-compatible file storage service with MinIO ⭐ **NEW!**
 - **[🔧 Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture  
+- **[🎯 Optimization Tools](docs/OPTIMIZER.md)** - Query threshold optimization and performance tuning ⭐ **NEW!**
 - **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
 - **[📖 Documentation Index](docs/README.md)** - Full documentation structure
 
@@ -545,6 +547,11 @@ This will start all services and you can access the **new frontend** at `http://
 ./tools/storage.sh list --all   # List files from all buckets
 ./tools/storage.sh list --bucket <name>  # List files from specific bucket
 ./tools/storage.sh help         # Show all storage management commands
+
+# Performance optimization tools
+./tools/optimize.sh query-threshold     # Find optimal text_relevance_threshold
+./tools/optimize.sh query-threshold 0.3 0.9  # Custom range
+./tools/optimize.sh help                # Show all optimization commands
 ```
 
 For detailed process management, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).

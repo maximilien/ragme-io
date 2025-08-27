@@ -1300,6 +1300,9 @@ async def get_frontend_config():
             "backend_config": config.get_storage_backend_config(),
         }
 
+        # Get query configuration
+        query_config = config.get("query", {})
+
         # Build safe configuration for frontend
         frontend_config_data = {
             "application": {
@@ -1312,6 +1315,7 @@ async def get_frontend_config():
             "frontend": frontend_config,
             "client": client_config,
             "features": features_config,
+            "query": query_config,
             "mcp_servers": safe_mcp_servers,
         }
 
