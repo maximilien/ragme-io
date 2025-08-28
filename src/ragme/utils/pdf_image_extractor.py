@@ -205,6 +205,39 @@ class PDFImageExtractor:
                         }
                     )
 
+                # PyMuPDF extracts as PNG, which is already web-compatible
+                # Just encode to base64 directly
+                import base64
+
+                base64_data = base64.b64encode(img_data).decode("utf-8")
+
+                # Copy image to storage if enabled
+                image_storage_path = None
+                if config.is_copy_uploaded_images_enabled():
+                    try:
+                        from datetime import datetime
+
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                        image_storage_path = f"images/{timestamp}_{pdf_filename}_page_{page_num}_{img_name}.png"
+
+                        # Get storage service and upload the image data
+                        from ..apis.mcp import get_storage_service
+
+                        get_storage_service().upload_data(
+                            data=img_data,
+                            object_name=image_storage_path,
+                            content_type="image/png",
+                        )
+                        self.logger.info(
+                            f"Copied extracted image to storage: {image_storage_path}"
+                        )
+
+                    except Exception as storage_error:
+                        self.logger.warning(
+                            f"Failed to copy extracted image to storage: {storage_error}"
+                        )
+                        image_storage_path = None
+
                 # Create metadata for the extracted image
                 metadata = self._create_image_metadata(
                     img_name,
@@ -213,13 +246,8 @@ class PDFImageExtractor:
                     storage_path,
                     processed_data,
                     format_info,
+                    image_storage_path,
                 )
-
-                # PyMuPDF extracts as PNG, which is already web-compatible
-                # Just encode to base64 directly
-                import base64
-
-                base64_data = base64.b64encode(img_data).decode("utf-8")
 
                 # Update metadata to reflect PNG format
                 metadata["format"] = "png"
@@ -257,6 +285,7 @@ class PDFImageExtractor:
         storage_path: str | None,
         processed_data: dict[str, Any],
         format_info: dict[str, Any] | None = None,
+        image_storage_path: str | None = None,
     ) -> dict[str, Any]:
         """
         Create metadata for an extracted image.
@@ -267,6 +296,8 @@ class PDFImageExtractor:
             pdf_filename: Original PDF filename
             storage_path: Storage path of the PDF file
             processed_data: Data from image processing
+            format_info: Optional format information for the image
+            image_storage_path: Storage path of the extracted image file
 
         Returns:
             Metadata dictionary
@@ -282,6 +313,8 @@ class PDFImageExtractor:
                 "pdf_page_number": page_num,
                 "pdf_image_name": img_name,
                 "extraction_timestamp": datetime.now().isoformat(),
+                "date_added": datetime.now().isoformat(),  # Add date_added for frontend compatibility
+                "filename": f"{pdf_filename}_page_{page_num}_{img_name}.png",  # Add proper filename for AI summary
             }
         )
 
@@ -297,6 +330,10 @@ class PDFImageExtractor:
         # Add PDF storage path if available
         if storage_path:
             metadata["pdf_storage_path"] = storage_path
+
+        # Add image storage path if available
+        if image_storage_path:
+            metadata["storage_path"] = image_storage_path
 
         # Try to extract caption from OCR content if enabled and available
         if config.get("pdf_image_extraction", {}).get("extract_captions", True):

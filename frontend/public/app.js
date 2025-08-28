@@ -3408,6 +3408,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 const docBaseUrl = d.url.split('#')[0];
                 return docBaseUrl === baseUrl;
             });
+        } else if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
+            // For image stacks, use the first image's index
+            const firstImage = doc.images[0];
+            docIndex = this.documents.findIndex(d => d.id === firstImage.id);
         } else {
             // For regular documents, find by ID first, then by URL
             docIndex = this.documents.findIndex(d => d.id === doc.id);
@@ -3422,7 +3426,17 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
         
         console.log('Found document at index:', docIndex, 'in documents array');
-        console.log('Sending document ID for summarization:', doc.id || docIndex.toString());
+        
+        // Determine the document ID to send for summarization
+        let documentIdToSend;
+        if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
+            // For image stacks, send the first image's ID
+            documentIdToSend = doc.images[0].id;
+        } else {
+            documentIdToSend = doc.id || docIndex.toString();
+        }
+        
+        console.log('Sending document ID for summarization:', documentIdToSend);
         
         // Set a timeout to show a message if summarization takes too long
         const timeoutId = setTimeout(() => {
@@ -3431,7 +3445,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         
         // Request summary from backend - send the actual document ID
         this.socket.emit('summarize_document', {
-            documentId: doc.id || docIndex.toString()
+            documentId: documentIdToSend
         });
         
         // Store timeout ID to clear it when summary arrives
@@ -3527,14 +3541,6 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const card = document.createElement('div');
             card.className = 'document-card';
             card.dataset.docIndex = index;
-            
-            // Add click handler for viewing document details
-            card.addEventListener('click', (e) => {
-                console.log('Card clicked', group, e.target);
-                if (!e.target.closest('.document-delete-btn')) {
-                    this.showDocumentDetails(group);
-                }
-            });
 
             const title = group.url || group.metadata?.filename || `Document ${index + 1}`;
             const date = group.metadata?.date_added || 'Unknown date';
@@ -3546,8 +3552,33 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             let chunkInfo = '';
             let newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
             
-            // Handle images
-            if (contentType === 'image') {
+            // Handle image stacks (grouped images from PDFs)
+            if (contentType === 'image_stack' && group.isGroupedImages) {
+                const sourceDocument = group.sourceDocument;
+                const totalImages = group.totalImages;
+                
+                card.innerHTML = `
+                    <div class="document-content">
+                        <div class="document-title">
+                            <span class="document-title-text">${this.escapeHtml(sourceDocument)}</span>
+                            <span class="image-stack-badge"><i class="fas fa-layer-group"></i> ${totalImages} images</span>
+                            ${newBadge}
+                        </div>
+                        <div class="document-meta">
+                            <i class="fas fa-calendar"></i> ${date} | 
+                            <i class="fas fa-database"></i> ${group.metadata?.collection || 'Images'} |
+                            <i class="fas fa-file-pdf"></i> Extracted images
+                        </div>
+                        <div class="document-summary">
+                            <i class="fas fa-images" style="color: #6b7280; margin-right: 0.5rem;"></i>
+                            ${totalImages} image${totalImages > 1 ? 's' : ''} extracted from PDF document
+                        </div>
+                    </div>
+                    <button class="document-delete-btn" data-doc-index="${index}" title="Delete image stack">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+            } else if (contentType === 'image') {
                 const imageTitle = group.metadata?.filename || title;
                 const imageClassification = group.metadata?.classification || 'Unknown';
                 const imageSize = group.metadata?.file_size || 'Unknown size';
@@ -3714,14 +3745,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             displayTitle = doc.metadata.original_filename;
         }
 
+        // Check if this is an image or image stack
+        const isImage = doc.content_type === 'image';
+        const isImageStack = doc.content_type === 'image_stack' && doc.isGroupedImages;
+        
         // Add NEW badge if document is new
         const isNew = this.isDocumentNew(doc.metadata?.date_added);
         const newBadge = isNew ? '<span class="new-badge-modal">NEW</span>' : '';
         
-        title.innerHTML = `${displayTitle}${newBadge}`;
-
-        // Check if this is an image
-        const isImage = doc.content_type === 'image';
+        // Add image stack badge if this is an image stack
+        const imageStackBadge = isImageStack ? `<span class="image-stack-badge-modal"><i class="fas fa-layer-group"></i> ${doc.totalImages} images</span>` : '';
+        
+        title.innerHTML = `${displayTitle} ${imageStackBadge} ${newBadge}`;
         
         // Create metadata tags (including collection and type)
         const metadataTags = this.createMetadataTags(doc.metadata);
@@ -3764,7 +3799,33 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             </div>
             
-            ${isImage ? `
+            ${isImageStack ? `
+                <div class="document-details-section">
+                    <h4><i class="fas fa-images"></i> Image Selection</h4>
+                    <div class="image-stack-selector">
+                        <select id="imageStackSelect" class="image-stack-dropdown">
+                            ${doc.images.map((img, idx) => {
+                                const pageNum = img.metadata?.pdf_page_number || 'Unknown';
+                                const imgName = img.metadata?.pdf_image_name || `Image ${idx + 1}`;
+                                const classification = img.metadata?.classification?.top_prediction?.label || 'Unknown';
+                                return `<option value="${idx}" ${idx === 0 ? 'selected' : ''}>
+                                    Page ${pageNum}: ${imgName} (${classification})
+                                </option>`;
+                            }).join('')}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="document-details-section">
+                    <h4><i class="fas fa-image"></i> Image Preview</h4>
+                    <div class="content-preview" id="imageStackPreview">
+                        <div class="content-loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Loading image preview...</p>
+                        </div>
+                    </div>
+                </div>
+            ` : isImage ? `
                 <div class="document-details-section">
                     <h4><i class="fas fa-image"></i> Image Preview</h4>
                     <div class="content-preview">
@@ -3795,12 +3856,20 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }, 100);
         
         // Check storage availability and update the storage section
-        this.checkAndUpdateStorageSection(docId);
+        if (isImageStack && doc.images && doc.images.length > 0) {
+            // For image stacks, check storage for the first image
+            this.checkAndUpdateStorageSection(doc.images[0].id);
+        } else {
+            this.checkAndUpdateStorageSection(docId);
+        }
         
         // For images, show the image preview
         if (isImage) {
             console.log('Showing image preview for image document');
             this.showImageInModal(doc);
+        } else if (isImageStack) {
+            console.log('Showing image stack preview');
+            this.showImageStackInModal(doc);
         }
         
         // Fetch AI summary for all document types (including images) if not already generated
@@ -4499,6 +4568,155 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             
             // Set up event listeners for collapsible sections
             this.setupCollapsibleSections();
+        }
+    }
+
+    showImageStackInModal(doc) {
+        console.log('showImageStackInModal called with doc:', doc);
+        
+        // Store the document reference for use in dropdown changes
+        this.currentImageStackDoc = doc;
+        
+        // Set up the dropdown change event listener
+        const imageStackSelect = document.getElementById('imageStackSelect');
+        if (imageStackSelect) {
+            imageStackSelect.addEventListener('change', (e) => {
+                const selectedIndex = parseInt(e.target.value);
+                const selectedImage = doc.images[selectedIndex];
+                this.showSelectedImageInStack(selectedImage);
+            });
+        }
+        
+        // Show the first image by default
+        if (doc.images && doc.images.length > 0) {
+            this.showSelectedImageInStack(doc.images[0]);
+        }
+        
+        // Mark summary as generated for image stacks
+        this.documentDetailsModal.summaryGenerated = true;
+        
+        // Set up event listeners for collapsible sections
+        this.setupCollapsibleSections();
+    }
+
+    showSelectedImageInStack(selectedImage) {
+        console.log('showSelectedImageInStack called with image:', selectedImage);
+        
+        const imageStackPreview = document.getElementById('imageStackPreview');
+        if (!imageStackPreview) return;
+        
+        // Get image data from the selected image
+        const imageData = selectedImage.image_data || 
+                         selectedImage.metadata?.image_data || 
+                         selectedImage.metadata?.base64_data ||
+                         selectedImage.metadata?.image ||
+                         selectedImage.image;
+        
+        // Check for image URL
+        const imageUrl = selectedImage.url || 
+                        selectedImage.metadata?.url || 
+                        selectedImage.metadata?.source ||
+                        selectedImage.metadata?.filename;
+        
+        console.log('Selected image data found:', !!imageData);
+        console.log('Selected image URL found:', imageUrl);
+        
+        if (imageData) {
+            // If we have base64 image data, display it
+            const mimeType = selectedImage.metadata?.mime_type || 
+                            selectedImage.metadata?.format || 
+                            selectedImage.metadata?.content_type || 
+                            'image/jpeg';
+            
+            imageStackPreview.innerHTML = `
+                <div class="image-preview">
+                    <img src="data:${mimeType};base64,${imageData}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                </div>
+            `;
+        } else if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:'))) {
+            // If we have a valid URL, display it
+            imageStackPreview.innerHTML = `
+                <div class="image-preview">
+                    <img src="${imageUrl}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                </div>
+            `;
+        } else {
+            // No image data available - try to fetch from backend
+            console.log('No image data found, attempting to fetch from backend...');
+            this.fetchImageFromBackend(selectedImage.id, imageStackPreview);
+        }
+        
+        // Update storage section for the selected image
+        this.checkAndUpdateStorageSection(selectedImage.id);
+        
+        // Update metadata section for the selected image
+        this.updateMetadataSection(selectedImage);
+        
+        // Update AI summary for the selected image
+        this.fetchDocumentSummary(selectedImage);
+    }
+
+    updateMetadataSection(selectedImage) {
+        console.log('updateMetadataSection called with image:', selectedImage);
+        console.log('Selected image metadata keys:', Object.keys(selectedImage.metadata || {}));
+        console.log('Selected image OCR content:', selectedImage.metadata?.ocr_content);
+        console.log('Selected image OCR text:', selectedImage.metadata?.ocr_content?.extracted_text);
+        console.log('Selected image filename:', selectedImage.metadata?.filename);
+        
+        // Update URL/ID section
+        const urlSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-link');
+        if (urlSection) {
+            const urlContainer = urlSection.closest('.document-details-section').querySelector('.detail-value');
+            if (urlContainer) {
+                urlContainer.textContent = selectedImage.url || selectedImage.metadata?.filename || selectedImage.metadata?.source || 'N/A';
+            }
+        }
+        
+        // Update Date Added section
+        const dateSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-calendar');
+        if (dateSection) {
+            const dateContainer = dateSection.closest('.document-details-section').querySelector('.detail-value');
+            if (dateContainer) {
+                dateContainer.textContent = this.formatDate(selectedImage.metadata?.date_added) || 'Unknown';
+            }
+        }
+        
+        // Find the metadata section
+        const metadataSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-tags');
+        if (!metadataSection) return;
+        
+        const metadataContainer = metadataSection.closest('.document-details-section').querySelector('.metadata-tags');
+        if (!metadataContainer) return;
+        
+        // Check if metadata is a JSON string that needs parsing
+        let processedMetadata = selectedImage.metadata;
+        if (typeof selectedImage.metadata === 'string') {
+            try {
+                processedMetadata = JSON.parse(selectedImage.metadata);
+                console.log('Parsed metadata from JSON string:', processedMetadata);
+            } catch (e) {
+                console.log('Failed to parse metadata as JSON:', e);
+                processedMetadata = selectedImage.metadata;
+            }
+        }
+        
+        // Create new metadata tags for the selected image (includes OCR content)
+        const metadataTags = this.createMetadataTags(processedMetadata);
+        console.log('Generated metadata tags length:', metadataTags ? metadataTags.length : 0);
+        
+        if (metadataTags) {
+            metadataContainer.innerHTML = metadataTags;
+            console.log('Metadata section updated with new content');
+            
+            // Check if OCR text is actually in the DOM
+            const ocrTextElement = metadataContainer.querySelector('.ocr-text-content');
+            if (ocrTextElement) {
+                console.log('OCR text in DOM:', ocrTextElement.textContent.substring(0, 100) + '...');
+            } else {
+                console.log('OCR text element not found in DOM');
+            }
+        } else {
+            metadataContainer.innerHTML = '<p class="text-muted">No metadata available for this image</p>';
         }
     }
 
@@ -5437,7 +5655,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
         
         const isImage = groupedDoc.content_type === 'image';
-        const contentType = isImage ? 'image' : 'document';
+        const isImageStack = groupedDoc.content_type === 'image_stack' && groupedDoc.isGroupedImages;
+        const contentType = isImageStack ? 'image stack' : (isImage ? 'image' : 'document');
         
         if (confirm(`Are you sure you want to delete this ${contentType}? This action cannot be undone.`)) {
             console.log('Deleting document:', docIndex, groupedDoc);
@@ -5446,6 +5665,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (groupedDoc.isGroupedChunks && groupedDoc.totalChunks > 1) {
                 // Delete all chunks of this document
                 this.deleteChunkedDocument(groupedDoc);
+            } else if (isImageStack && groupedDoc.images && groupedDoc.images.length > 0) {
+                // Delete all images in the stack
+                this.deleteImageStack(groupedDoc);
             } else {
                 // Delete single document - find the actual document index in the original array
                 const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex : 
@@ -5652,7 +5874,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 // Re-render the documents list immediately
                 this.renderDocuments();
                 
-                // Update visualization to reflect the changes
+                                                    // Update visualization to reflect the changes
                 this.updateVisualization();
                 
                 // Show success notification
@@ -5670,6 +5892,72 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.showNotification('error', `Failed to delete ${contentType}. Please try again.`);
         });
     }
+
+    deleteImageStack(groupedDoc) {
+        console.log('Deleting image stack:', groupedDoc);
+        
+        // Get all images that belong to this stack
+        const imagesToDelete = groupedDoc.images || [];
+        
+        console.log('Found images to delete:', imagesToDelete.length);
+        
+        // Delete all images
+        const deletePromises = imagesToDelete.map(image => {
+            const endpoint = `/delete-image/${image.id}`;
+            return fetch(endpoint, { method: 'DELETE' })
+                .then(response => response.json());
+        });
+        
+        Promise.all(deletePromises)
+            .then(results => {
+                const successCount = results.filter(result => result.status === 'success').length;
+                const totalCount = results.length;
+                
+                if (successCount === totalCount) {
+                    // Remove all images from local array
+                    imagesToDelete.forEach(image => {
+                        const index = this.documents.findIndex(doc => doc.id === image.id);
+                        if (index !== -1) {
+                            this.documents.splice(index, 1);
+                        }
+                    });
+                    
+                    // Also remove any remaining images that might be related to this stack
+                    const remainingRelatedImages = this.documents.filter(doc => {
+                        if (doc.content_type === 'image' && doc.metadata?.pdf_filename) {
+                            return doc.metadata.pdf_filename === groupedDoc.sourceDocument;
+                        }
+                        return false;
+                    });
+                    
+                    remainingRelatedImages.forEach(doc => {
+                        const index = this.documents.findIndex(d => d.id === doc.id);
+                        if (index !== -1) {
+                            this.documents.splice(index, 1);
+                        }
+                    });
+                    
+                    console.log(`Deleted ${successCount} images. New document count:`, this.documents.length);
+                    
+                    // Re-render the documents list
+                    this.renderDocuments();
+                    
+                    // Update visualization to reflect the changes
+                    this.updateVisualization();
+                    
+                    // Show success notification
+                    this.showNotification('success', `Successfully deleted ${successCount} images`);
+                } else {
+                    console.error('Some images failed to delete:', results);
+                    this.showNotification('error', `Failed to delete ${totalCount - successCount} images`);
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting image stack:', error);
+                this.showNotification('error', 'Error deleting image stack');
+            });
+    }
+
 
     scrollToDocumentInList(documentId) {
         console.log('Scrolling to document in list:', documentId);
@@ -5720,13 +6008,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Show a brief notification
         const doc = this.documents[docIndex];
         const docName = doc.url || doc.metadata?.filename || `Document ${docIndex + 1}`;
-                    this.showNotification(`Scrolled to: ${docName}`, 'info');
+        this.showNotification(`Scrolled to: ${docName}`, 'info');
     }
 
     groupDocumentsByBaseUrl(documents) {
         const groups = {};
         
         documents.forEach((doc, index) => {
+            console.log('Processing document:', doc.id, doc.content_type, doc.metadata);
             // Check if this is an existing chunked document (is_chunk) or new chunked document (is_chunked)
             if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) || 
                 (doc.metadata?.is_chunked && doc.metadata?.total_chunks)) {
@@ -5747,25 +6036,97 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         id: doc.id,
                         docIndex: index
                     };
+                    
+                    // Ensure chunked documents use consistent timestamp
+                    // This helps keep them adjacent to related items in the sorted list
+                    if (doc.metadata.date_added) {
+                        groups[baseUrl].metadata.date_added = doc.metadata.date_added;
+                    }
                 }
                 
-                groups[baseUrl].chunks.push({
-                    ...doc,
-                    chunkIndex: doc.metadata.chunk_index
-                });
+                if (groups[baseUrl] && groups[baseUrl].chunks) {
+                    groups[baseUrl].chunks.push({
+                        ...doc,
+                        chunkIndex: doc.metadata.chunk_index
+                    });
+                } else {
+                    console.error('Group or chunks array is undefined for baseUrl:', baseUrl);
+                }
                 
                 // Sort chunks by index
-                groups[baseUrl].chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+                if (groups[baseUrl] && groups[baseUrl].chunks && Array.isArray(groups[baseUrl].chunks)) {
+                    groups[baseUrl].chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+                    
+                    // Combine text from all chunks
+                    groups[baseUrl].combinedText = groups[baseUrl].chunks
+                        .map(chunk => chunk.text)
+                        .join('\n\n--- Chunk ---\n\n');
+                } else {
+                    console.error('Cannot sort chunks - array is undefined for baseUrl:', baseUrl);
+                    groups[baseUrl].combinedText = '';
+                }
                 
-                // Combine text from all chunks
-                groups[baseUrl].combinedText = groups[baseUrl].chunks
-                    .map(chunk => chunk.text)
-                    .join('\n\n--- Chunk ---\n\n');
-                
-                // Use the earliest date
+                // Use the latest date (most recent)
                 if (!groups[baseUrl].metadata.date_added || 
-                    doc.metadata.date_added < groups[baseUrl].metadata.date_added) {
+                    doc.metadata.date_added > groups[baseUrl].metadata.date_added) {
                     groups[baseUrl].metadata.date_added = doc.metadata.date_added;
+                }
+            } else if (doc.content_type === 'image' && doc.metadata?.pdf_filename) {
+                // Group images by their source PDF document
+                const pdfFilename = doc.metadata.pdf_filename;
+                const key = `pdf_images_${pdfFilename}`;
+                
+                if (!groups[key]) {
+                    groups[key] = {
+                        isGroupedImages: true,
+                        sourceDocument: pdfFilename,
+                        totalImages: 0,
+                        images: [],
+                        metadata: { 
+                            ...doc.metadata,
+                            date_added: doc.metadata.date_added,
+                            collection: 'Images'
+                        },
+                        url: `pdf://${pdfFilename}`,
+                        id: `pdf_images_${pdfFilename}`,
+                        docIndex: index,
+                        content_type: 'image_stack'
+                    };
+                }
+                
+                // Ensure image stacks use the same base timestamp as their source PDF
+                // This helps keep them adjacent in the sorted list
+                const baseTimestamp = doc.metadata.date_added;
+                if (baseTimestamp) {
+                    // Use the same base timestamp for all images from the same PDF
+                    groups[key].metadata.date_added = baseTimestamp;
+                }
+                
+                if (groups[key] && groups[key].images) {
+                    groups[key].images.push({
+                        ...doc,
+                        imageIndex: doc.metadata.pdf_page_number || 0
+                    });
+                } else {
+                    console.error('Group or images array is undefined for key:', key);
+                }
+                
+                if (groups[key] && groups[key].images && Array.isArray(groups[key].images)) {
+                    groups[key].totalImages = groups[key].images.length;
+                    
+                    // Sort images by page number
+                    groups[key].images.sort((a, b) => (a.imageIndex || 0) - (b.imageIndex || 0));
+                } else {
+                    console.error('Cannot sort images - array is undefined for key:', key);
+                    if (groups[key]) {
+                        groups[key].totalImages = 0;
+                    }
+                }
+                
+                // Use the latest date (most recent)
+                if (!groups[key].metadata.date_added || 
+                    doc.metadata.date_added > groups[key].metadata.date_added) {
+                    groups[key].metadata.date_added = doc.metadata.date_added;
                 }
             } else {
                 // Regular document - use URL as key, but ensure unique keys for different document types

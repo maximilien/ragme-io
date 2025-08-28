@@ -25,10 +25,12 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🖼️ PDF Image Extraction Bug Fixes**: Fixed three critical bugs with PDF image extraction: missing date/time information, storage integration issues, and "Unknown Image" display in AI summaries. Extracted images now have proper metadata, are stored correctly, and show meaningful filenames! ⭐ **FIXED!**
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection. Tests multiple query scenarios and automatically updates `config.yaml` with the best performing threshold! ⭐ **NEW!**
 - **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**
 - **📄 Robust PDF Processing**: Enhanced PDF processing with multiple library fallbacks (PyMuPDF, pdfplumber, PyPDF2) to handle corrupted PDFs and "EOF marker not found" errors. Automatic PDF repair and graceful error handling! ⭐ **NEW!**
 - **🖼️ PDF Image Extraction**: Automatically extract and process images from PDF documents using PyMuPDF. Extracted images are processed with AI classification, OCR text extraction, and stored in the image collection with rich metadata including page numbers and PDF source information! ⭐ **NEW!**
+- **📚 Image Stacking in Document List**: Group extracted images from the same PDF into a single stack item for better user experience. Features include stack badges showing image count, dropdown selection for individual images, and dynamic content updates for all sections (OCR text, AI summary, metadata). Perfect for PDFs with many images! ⭐ **NEW!**
 - **🎨 UI Height and Notification Fixes**: Fixed pagination container height and corrected notification system for better user experience. Load More button now shows proper loading messages! ⭐ **FIXED!**
 - **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
 - **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
@@ -475,6 +477,26 @@ RAGme: Lists 3 images classified as "diagram" from architecture.pdf
 
 User: "Find images with 'API' in the text"
 RAGme: Searches OCR content and finds 2 images containing "API" text
+
+**📚 Image Stacking Interface:**
+When PDFs contain many images, RAGme groups them into a single stack item in the document list for better user experience:
+
+- **Stack Badge**: Purple badge showing total image count (e.g., "4 images")
+- **Dropdown Selection**: Easy navigation between individual images with page numbers and classifications
+- **Dynamic Updates**: All content updates when selecting different images:
+  - Image preview
+  - File download details
+  - OCR text content
+  - AI summary
+  - All metadata
+- **Bulk Operations**: Delete entire image stacks with one action
+
+**Example Stack Interface:**
+```
+Document List: "ragme-io.pdf [4 images] NEW"
+Modal Title: "ragme-io.pdf [4 images] NEW"
+Dropdown: "Page 3: image_1 (diagram)", "Page 4: image_1 (web site)", etc.
+```
 ```
 
 ## 🏃‍♂️ Run RAGme.io
@@ -794,6 +816,20 @@ uv run --active python -m pytest --cov=src/ragme tests/
 # Show test help
 ./test.sh help
 ```
+
+**Safe Integration Testing** (Recommended for integration tests):
+```bash
+# Run integration tests with automatic environment backup/restore
+./tools/test-with-backup.sh integration-fast  # Fast integration tests (recommended)
+./tools/test-with-backup.sh integration       # Full integration tests
+./tools/test-with-backup.sh agents           # Agent integration tests
+```
+
+The safe testing approach automatically:
+- Backs up your current `.env` and `config.yaml`
+- Sets collections to `test_integration` and `test_integration_images`
+- Runs the specified tests
+- Restores your original configuration (regardless of test outcome)
 
 **Test Categories**:
 - **Unit Tests**: Core functionality, vector databases, agents, utilities
