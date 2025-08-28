@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **⏳ Frontend Progress Indicator**: Added a spinning wheel progress indicator next to the "Add Content" button that shows during document and image processing. Provides visual feedback for upload, text extraction, AI analysis, and OCR stages. The "Add Content" button is disabled during processing with automatic timeout protection! ⭐ **NEW!**
 - **🖼️ PDF Image Extraction Bug Fixes**: Fixed three critical bugs with PDF image extraction: missing date/time information, storage integration issues, and "Unknown Image" display in AI summaries. Extracted images now have proper metadata, are stored correctly, and show meaningful filenames! ⭐ **FIXED!**
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection. Tests multiple query scenarios and automatically updates `config.yaml` with the best performing threshold! ⭐ **NEW!**
 - **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**

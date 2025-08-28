@@ -301,7 +301,6 @@ health_check:
 # Feature Flags
 features:
   document_summarization: true
-  mcp_integration: true
   real_time_updates: true
   file_upload: true
   url_crawling: true
@@ -310,6 +309,8 @@ features:
   bypass_delete_confirmation: false  # Skip confirmation for delete operations (useful for testing)
   authentication: false  # Future feature
   multi_tenant: false    # Future feature
+  mcp_integration: true
+  mcp_tools: true       # Enable/disable MCP Tools UI features and backend service
 
 # PDF Image Extraction Configuration
 pdf_image_extraction:

@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <title>🤖 RAGme.io Assistant</title>
+    <script>
+        // Debug script to check MCP Tools elements
+
+    </script>
     
     <!-- Immediate redirect if on HTTPS -->
     <script>
@@ -80,10 +84,15 @@
                 </div>
             </div>
             <div class="header-right">
+                <div class="progress-indicator" id="progressIndicator">
+                    <div class="progress-spinner"></div>
+                    <span class="progress-text" id="progressText">Processing...</span>
+                </div>
                 <button class="add-content-btn" id="addContentBtn">
                     <i class="fas fa-plus"></i>
                     Add Content
                 </button>
+
             </div>
         </header>
 

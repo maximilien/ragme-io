@@ -15,9 +15,11 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### UI/UX Documentation
+- **[Frontend Progress Indicator](FRONTEND_PROGRESS_INDICATOR.md)** ⭐ **NEW!** - Visual progress indicator for document and image processing operations
 - **[Settings UI Improvements](SETTINGS_UI_IMPROVEMENTS.md)** ⭐ **NEW!** - Enhanced Settings interface with tabbed organization and comprehensive configuration options
 
 ### 🆕 Latest Features Documentation
+- **⏳ Frontend Progress Indicator**: Visual progress indicator for document and image processing with multi-stage feedback ⭐ **NEW!**
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection ⭐ **NEW!**
 - **💾 S3-Compatible File Storage**: MinIO-based storage service for document and image persistence with support for multiple storage backends ⭐ **NEW!**
 - **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
