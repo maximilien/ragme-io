@@ -25,7 +25,8 @@ class RAGmeAssistant {
             chatHistoryLimit: 50,
             autoSaveChats: true,
             copyUploadedDocs: false,
-            copyUploadedImages: false
+            copyUploadedImages: false,
+            mcpToolsEnabled: false // Default to disabled, will be overridden by configuration
         };
         
         // Pagination state
@@ -80,8 +81,19 @@ class RAGmeAssistant {
         this.isRecording = false;
         this.speechSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
         
+        // Progress indicator state
+        this.progressState = {
+            isProcessing: false,
+            currentOperation: null,
+            startTime: null
+        };
+        
+
+        
         this.init();
     }
+
+
 
     async init() {
         try {
@@ -239,6 +251,14 @@ class RAGmeAssistant {
                     this.settings.temperature = llmConfig.temperature || this.settings.temperature;
                 }
                 
+                // Check MCP Tools feature flag
+                this.settings.mcpToolsEnabled = this.config.config && this.config.config.features && this.config.config.features.mcp_tools === true;
+                
+                // Apply MCP Tools UI configuration with a small delay to ensure DOM is ready
+                setTimeout(() => {
+                    this.applyMcpToolsConfiguration();
+                }, 100);
+                
                 // Populate all form fields with loaded settings
                 this.populateSettingsForm();
                 
@@ -276,6 +296,34 @@ class RAGmeAssistant {
         
         // Apply document overview settings
         this.applyDocumentOverviewSettings();
+        
+        // Apply MCP Tools configuration with a small delay to ensure DOM is ready
+        setTimeout(() => {
+            this.applyMcpToolsConfiguration();
+        }, 100);
+    }
+
+    applyMcpToolsConfiguration() {
+        const mcpToolsBtn = document.getElementById('mcpToolsBtn');
+        const mcpServersMenuItem = document.getElementById('mcpServers');
+        
+        if (this.settings.mcpToolsEnabled) {
+            // MCP Tools is enabled - show MCP Tools button, hide MCP Servers menu
+            if (mcpToolsBtn) {
+                mcpToolsBtn.style.display = 'block';
+            }
+            if (mcpServersMenuItem) {
+                mcpServersMenuItem.style.display = 'none';
+            }
+        } else {
+            // MCP Tools is disabled - hide MCP Tools button, hide MCP Servers menu
+            if (mcpToolsBtn) {
+                mcpToolsBtn.style.display = 'none';
+            }
+            if (mcpServersMenuItem) {
+                mcpServersMenuItem.style.display = 'none';
+            }
+        }
     }
 
     applyDocumentListSettings() {
@@ -503,6 +551,7 @@ class RAGmeAssistant {
         });
 
         this.socket.on('urls_added', (result) => {
+            this.hideProgressIndicator();
             this.showNotification(result.success ? 'success' : 'error', result.message);
             if (result.success) {
                 this.loadDocuments();
@@ -510,6 +559,7 @@ class RAGmeAssistant {
         });
 
         this.socket.on('json_added', (result) => {
+            this.hideProgressIndicator();
             this.showNotification(result.success ? 'success' : 'error', result.message);
             if (result.success) {
                 this.loadDocuments();
@@ -853,6 +903,8 @@ class RAGmeAssistant {
         document.getElementById('addContentBtn').addEventListener('click', () => {
             this.showAddContentModal();
         });
+
+
 
         // Modal close buttons
         document.getElementById('closeAddContent').addEventListener('click', () => {
@@ -2414,6 +2466,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 return;
             }
 
+            this.showProgressIndicator('URLs', `Processing ${urls.length} URL(s)...`);
             this.socket.emit('add_urls', { urls });
             urlsInput.value = '';
         } else if (activeTab === 'filesTab') {
@@ -2446,6 +2499,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 const jsonData = JSON.parse(jsonInput.value.trim());
                 const metadata = metadataInput.value.trim() ? JSON.parse(metadataInput.value.trim()) : null;
                 
+                this.showProgressIndicator('JSON', 'Processing JSON data...');
                 this.socket.emit('add_json', { jsonData, metadata });
                 jsonInput.value = '';
                 metadataInput.value = '';
@@ -2465,8 +2519,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             formData.append('files', files[i]);
         }
 
-        // Show initial upload notification
-        this.showNotification(`📤 Uploading ${files.length} document(s) to server...`, 'info');
+        // Show progress indicator
+        this.showProgressIndicator('documents', `Uploading ${files.length} document(s)...`);
 
         // Send files to backend
         fetch('/upload-files', {
@@ -2474,30 +2528,33 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             body: formData
         })
         .then(response => {
-            // Show processing notification when upload completes and processing starts
+            // Update progress text when upload completes and processing starts
             setTimeout(() => {
-                this.showNotification(`📄 Extracting text from ${files.length} document(s)...`, 'info');
+                this.updateProgressText(`Extracting text from ${files.length} document(s)...`);
             }, 300);
             return response.json();
         })
         .then(data => {
             if (data.status === 'success') {
-                // Show AI analysis notification
+                // Update progress text for AI analysis
                 setTimeout(() => {
-                    this.showNotification(`🤖 Analyzing ${files.length} document(s) with AI...`, 'info');
+                    this.updateProgressText(`Analyzing ${files.length} document(s) with AI...`);
                 }, 600);
                 
                 setTimeout(() => {
+                    this.hideProgressIndicator();
                     this.showNotification(`✅ Successfully processed ${files.length} document(s) - text extraction and AI analysis complete`, 'success');
                     // Refresh documents list
                     this.loadDocuments();
                 }, 1200);
             } else {
+                this.hideProgressIndicator();
                 this.showNotification(data.message || 'Upload failed', 'error');
             }
         })
         .catch(error => {
             console.error('Upload error:', error);
+            this.hideProgressIndicator();
             this.showNotification('Upload failed. Please try again.', 'error');
         });
     }
@@ -2511,8 +2568,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             formData.append('files', files[i]);
         }
 
-        // Show initial upload notification
-        this.showNotification(`📤 Uploading ${files.length} image(s) to server...`, 'info');
+        // Show progress indicator
+        this.showProgressIndicator('images', `Uploading ${files.length} image(s)...`);
 
         // Send images to backend via API
         console.log('Sending request to /upload-images');
@@ -2521,31 +2578,34 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             body: formData
         })
         .then(response => {
-            // Show processing notification when upload completes and processing starts
+            // Update progress text when upload completes and processing starts
             setTimeout(() => {
-                this.showNotification(`🔍 Analyzing ${files.length} image(s) with AI classification...`, 'info');
+                this.updateProgressText(`Analyzing ${files.length} image(s) with AI classification...`);
             }, 300);
             return response.json();
         })
         .then(data => {
             if (data.status === 'success') {
-                // Show OCR processing notification
+                // Update progress text for OCR processing
                 setTimeout(() => {
-                    this.showNotification(`📝 Extracting text from ${files.length} image(s) with OCR...`, 'info');
+                    this.updateProgressText(`Extracting text from ${files.length} image(s) with OCR...`);
                 }, 600);
                 
                 // Add a small delay to make the processing notification visible
                 setTimeout(() => {
+                    this.hideProgressIndicator();
                     this.showNotification(`✅ Successfully processed ${files.length} image(s) - AI classification and OCR text extraction complete`, 'success');
                     // Refresh documents list to show images
                     this.loadDocuments();
                 }, 1200);
             } else {
+                this.hideProgressIndicator();
                 this.showNotification(data.message || 'Image upload failed', 'error');
             }
         })
         .catch(error => {
             console.error('Image upload error:', error);
+            this.hideProgressIndicator();
             this.showNotification('Image upload failed. Please try again.', 'error');
         });
     }
@@ -6557,6 +6617,73 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             icon.className = 'fas fa-microphone';
             microphoneBtn.title = 'Voice input';
         }
+    }
+
+    showProgressIndicator(operation, text = null) {
+        this.progressState.isProcessing = true;
+        this.progressState.currentOperation = operation;
+        this.progressState.startTime = Date.now();
+        
+        const progressIndicator = document.getElementById('progressIndicator');
+        const progressText = document.getElementById('progressText');
+        
+        if (progressIndicator && progressText) {
+            progressText.textContent = text || `Processing ${operation}...`;
+            progressIndicator.classList.add('show');
+            
+            // Disable the Add Content button during processing
+            const addContentBtn = document.getElementById('addContentBtn');
+            if (addContentBtn) {
+                addContentBtn.disabled = true;
+                addContentBtn.style.opacity = '0.6';
+                addContentBtn.style.cursor = 'not-allowed';
+            }
+            
+            // Set a timeout to automatically hide the progress indicator after 5 minutes
+            // This prevents the indicator from getting stuck if something goes wrong
+            setTimeout(() => {
+                if (this.progressState.isProcessing && this.progressState.currentOperation === operation) {
+                    console.warn('Progress indicator timeout - hiding automatically');
+                    this.hideProgressIndicator();
+                    this.showNotification('Processing timeout - please try again', 'warning');
+                }
+            }, 300000); // 5 minutes
+        }
+    }
+
+    hideProgressIndicator() {
+        this.progressState.isProcessing = false;
+        this.progressState.currentOperation = null;
+        this.progressState.startTime = null;
+        
+        const progressIndicator = document.getElementById('progressIndicator');
+        if (progressIndicator) {
+            progressIndicator.classList.remove('show');
+        }
+        
+        // Re-enable the Add Content button after processing
+        const addContentBtn = document.getElementById('addContentBtn');
+        if (addContentBtn) {
+            addContentBtn.disabled = false;
+            addContentBtn.style.opacity = '1';
+            addContentBtn.style.cursor = 'pointer';
+        }
+    }
+
+    updateProgressText(text) {
+        const progressText = document.getElementById('progressText');
+        if (progressText) {
+            progressText.textContent = text;
+        }
+    }
+
+    getProgressStatus() {
+        return {
+            isProcessing: this.progressState.isProcessing,
+            operation: this.progressState.currentOperation,
+            startTime: this.progressState.startTime,
+            duration: this.progressState.startTime ? Date.now() - this.progressState.startTime : 0
+        };
     }
 
     showNotification(message, type = 'info') {

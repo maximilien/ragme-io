@@ -163,6 +163,63 @@ body {
     transform: translateY(-1px);
 }
 
+/* Progress indicator styles */
+.progress-indicator {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #374151;
+    animation: progressPulse 2s ease-in-out infinite;
+    /* Fixed width to prevent layout shifts */
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+}
+
+.progress-indicator.show {
+    display: flex !important;
+}
+
+.progress-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-top: 2px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.progress-text {
+    font-weight: 500;
+    color: #667eea;
+    /* Ensure text fits within the fixed width */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes progressPulse {
+    0%, 100% {
+        background: rgba(102, 126, 234, 0.1);
+        border-color: rgba(102, 126, 234, 0.2);
+    }
+    50% {
+        background: rgba(102, 126, 234, 0.15);
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+}
+
 /* Menu dropdown */
 .menu-dropdown {
     position: absolute;
