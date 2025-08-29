@@ -514,29 +514,31 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
               processed_count += 1;
             }
           } else {
-            // Multiple chunks - create a single document with all chunks
-            const combinedText = chunks.join('\n\n--- Chunk ---\n\n');
-            const chunkedMetadata = {
-              ...metadata,
-              total_chunks: chunks.length,
-              is_chunked: true,
-              chunk_sizes: chunks.map(chunk => chunk.length),
-              original_filename: file.originalname,
-            };
+            // Multiple chunks - store each chunk as a separate document
+            const documents = chunks.map((chunk, index) => {
+              const chunkMetadata = {
+                ...metadata,
+                total_chunks: chunks.length,
+                is_chunked: true,
+                chunk_index: index,
+                chunk_sizes: chunks.map(chunk => chunk.length),
+                original_filename: file.originalname,
+              };
 
-            const document = {
-              text: combinedText,
-              url: `file://${file.originalname}`,
-              metadata: chunkedMetadata,
-            };
+              return {
+                text: chunk,
+                url: `file://${file.originalname}#chunk-${index}`,
+                metadata: chunkMetadata,
+              };
+            });
 
             logger.info(
-              `Adding chunked document (${chunks.length} chunks) to RAG system for file: ${file.originalname}`
+              `Adding ${chunks.length} separate chunks to RAG system for file: ${file.originalname}`
             );
 
             const apiResult = await callRAGmeAPI('/add-json', {
               data: {
-                documents: [document],
+                documents: documents,
               },
             });
 

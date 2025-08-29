@@ -3469,9 +3469,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 return docBaseUrl === baseUrl;
             });
         } else if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
-            // For image stacks, use the first image's index
-            const firstImage = doc.images[0];
-            docIndex = this.documents.findIndex(d => d.id === firstImage.id);
+            // For image stacks, skip index lookup since individual images are not in documents array
+            docIndex = 0; // Set a dummy index to avoid the error
         } else {
             // For regular documents, find by ID first, then by URL
             docIndex = this.documents.findIndex(d => d.id === doc.id);
@@ -3480,23 +3479,37 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             }
         }
         
-        if (docIndex === -1) {
-            this.updateDocumentSummary('Document not found for summarization.');
-            return;
-        }
-        
-        console.log('Found document at index:', docIndex, 'in documents array');
-        
         // Determine the document ID to send for summarization
         let documentIdToSend;
         if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
-            // For image stacks, send the first image's ID
-            documentIdToSend = doc.images[0].id;
+            // For image stacks, send the image stack ID and indicate it's a stack
+            documentIdToSend = {
+                type: "image_stack",
+                stackId: doc.id,
+                firstImageId: doc.images[0].id,
+                pdfFilename: doc.sourceDocument
+            };
+            console.log('Sending image stack summary request for:', doc.sourceDocument);
         } else {
+            // For regular documents, check if we found the document
+            if (docIndex === -1) {
+                this.updateDocumentSummary('Document not found for summarization.');
+                return;
+            }
             documentIdToSend = doc.id || docIndex.toString();
+            console.log('Found document at index:', docIndex, 'in documents array');
         }
         
         console.log('Sending document ID for summarization:', documentIdToSend);
+        console.log('Socket connected:', this.socket?.connected);
+        
+        // Check if WebSocket is connected
+        if (!this.socket || !this.socket.connected) {
+            console.error('WebSocket not connected, cannot send summary request');
+            this.updateDocumentSummary('WebSocket connection not available. Please refresh the page and try again.');
+            this.documentDetailsModal.summaryInProgress = false;
+            return;
+        }
         
         // Set a timeout to show a message if summarization takes too long
         const timeoutId = setTimeout(() => {
@@ -3504,6 +3517,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }, 10000); // 10 seconds
         
         // Request summary from backend - send the actual document ID
+        console.log('Emitting summarize_document with:', { documentId: documentIdToSend });
         this.socket.emit('summarize_document', {
             documentId: documentIdToSend
         });
@@ -3665,40 +3679,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <i class="fas fa-trash"></i>
                     </button>
                 `;
-            } else
-            
-            if (group.metadata?.is_chunked && group.metadata?.total_chunks) {
-                // New chunked document format
-                const totalChunks = group.metadata.total_chunks;
-                const originalFilename = group.metadata.original_filename || title;
-                
-                summary = group.text ? group.text.substring(0, 200) + '...' : 'No content available';
-                chunkInfo = `<span class="chunk-badge"><i class="fas fa-layer-group"></i> ${totalChunks} chunks</span>`;
-                
-                card.innerHTML = `
-                    <div class="document-content">
-                        <div class="document-title">
-                            <span class="document-title-text">${this.escapeHtml(originalFilename)}</span>
-                            ${chunkInfo}
-                            ${newBadge}
-                        </div>
-                        <div class="document-meta">
-                            <i class="fas fa-calendar"></i> ${date} | 
-                            <i class="fas fa-database"></i> ${group.metadata?.collection || 'Default'} |
-                            <i class="fas fa-file-alt"></i> Chunked document
-                        </div>
-                        <div class="document-summary">${this.escapeHtml(summary)}</div>
-                    </div>
-                    <button class="document-delete-btn" data-doc-index="${index}" title="Delete document">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                `;
-            } else if (group.isGroupedChunks && group.totalChunks > 1) {
-                // Existing chunked documents that were grouped
+            } else if (group.isGroupedChunks) {
+                // Chunked documents (both single and multiple chunks)
                 const originalFilename = group.originalFilename || title;
                 
                 summary = group.combinedText ? group.combinedText.substring(0, 200) + '...' : 'No content available';
-                chunkInfo = `<span class="chunk-badge"><i class="fas fa-layer-group"></i> ${group.totalChunks} chunks</span>`;
+                chunkInfo = group.totalChunks > 1 ? `<span class="chunk-badge"><i class="fas fa-layer-group"></i> ${group.totalChunks} chunks</span>` : '';
                 
                 card.innerHTML = `
                     <div class="document-content">
@@ -3710,7 +3696,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
                             <i class="fas fa-database"></i> ${group.metadata?.collection || 'Default'} |
-                            <i class="fas fa-file-alt"></i> Chunked document
+                            <i class="fas fa-file-alt"></i> ${group.totalChunks > 1 ? 'Chunked document' : 'Document'}
                         </div>
                         <div class="document-summary">${this.escapeHtml(summary)}</div>
                     </div>
@@ -4647,6 +4633,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             });
         }
         
+        // Store the image stack object for later use
+        this.documentDetailsModal.currentImageStack = doc;
+        console.log('Stored image stack:', doc.id, doc.sourceDocument);
+        
         // Show the first image by default
         if (doc.images && doc.images.length > 0) {
             this.showSelectedImageInStack(doc.images[0]);
@@ -4712,8 +4702,16 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Update metadata section for the selected image
         this.updateMetadataSection(selectedImage);
         
-        // Update AI summary for the selected image
-        this.fetchDocumentSummary(selectedImage);
+        // Update AI summary for the image stack (not the individual image)
+        console.log('currentImageStack:', this.documentDetailsModal.currentImageStack);
+        if (this.documentDetailsModal.currentImageStack) {
+            console.log('Using image stack for summary');
+            this.fetchDocumentSummary(this.documentDetailsModal.currentImageStack);
+        } else {
+            console.log('No image stack found, using individual image');
+            // Fallback to individual image if no stack is available
+            this.fetchDocumentSummary(selectedImage);
+        }
     }
 
     updateMetadataSection(selectedImage) {
@@ -5749,7 +5747,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } else {
             // Fallback: find chunks in the original documents array
             chunksToDelete = this.documents.filter(doc => {
-                if (doc.metadata?.is_chunk && doc.metadata?.total_chunks) {
+                if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) || 
+                    (doc.metadata?.is_chunked && doc.metadata?.total_chunks)) {
                     // Extract base URL from chunk URL
                     const chunkBaseUrl = doc.url.split('#')[0];
                     const groupBaseUrl = groupedDoc.baseUrl;
@@ -5785,7 +5784,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     // Also remove any remaining documents that might be related to this grouped document
                     // This handles cases where the grouping might not have captured all related documents
                     const remainingRelatedDocs = this.documents.filter(doc => {
-                        if (doc.metadata?.is_chunk && doc.metadata?.total_chunks) {
+                        if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) || 
+                            (doc.metadata?.is_chunked && doc.metadata?.total_chunks)) {
                             const chunkBaseUrl = doc.url.split('#')[0];
                             const groupBaseUrl = groupedDoc.baseUrl;
                             return chunkBaseUrl === groupBaseUrl;

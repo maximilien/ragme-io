@@ -57,32 +57,19 @@ class QueryAgent:
         )  # Default to 5 most relevant documents
 
         # Get relevance thresholds
-        self.text_relevance_threshold = query_config.get(
-            "text_relevance_threshold", 0.8
-        )
-        self.image_relevance_threshold = query_config.get(
-            "image_relevance_threshold", 0.8
-        )
+        relevance_thresholds = query_config.get("relevance_thresholds", {})
+        self.text_relevance_threshold = relevance_thresholds.get("text", 0.5)
+        self.image_relevance_threshold = relevance_thresholds.get("image", 0.5)
+
+        # Get rerank settings
         self.text_rerank_top_k = query_config.get("text_rerank_top_k", 3)
-
-        # Legacy support for old configuration structure
-        if "relevance_thresholds" in query_config:
-            relevance_thresholds = query_config.get("relevance_thresholds", {})
-            self.text_relevance_threshold = relevance_thresholds.get(
-                "text", self.text_relevance_threshold
-            )
-            self.image_relevance_threshold = relevance_thresholds.get(
-                "image", self.image_relevance_threshold
-            )
-
-        # Get rerank settings (legacy support)
+        self.text_rerank_with_llm: bool = query_config.get(
+            "text_rerank_with_llm", False
+        )
         self.image_rerank_with_llm: bool = query_config.get(
             "image_rerank_with_llm", False
         )
         self.image_rerank_top_k: int = query_config.get("image_rerank_top_k", 10)
-        self.text_rerank_with_llm: bool = query_config.get(
-            "text_rerank_with_llm", False
-        )
 
         # Get language settings
         llm_config = config.get_llm_config()
@@ -226,6 +213,256 @@ class QueryAgent:
         except Exception as e:
             logger.error(f"Error handling summarize images by date: {str(e)}")
             return f"Error processing summarize images query: {str(e)}"
+
+    async def _generate_intelligent_query_expansions(self, query: str) -> list[str]:
+        """
+        Generate intelligent query expansions using LLM for better search coverage.
+
+        This method uses the LLM to understand the query intent and generate
+        semantically related queries that might find relevant documents.
+
+        Args:
+            query (str): The original user query
+
+        Returns:
+            list[str]: List of expanded queries including the original
+        """
+        try:
+            # Build language instruction based on configuration
+            language_instruction = ""
+            if self.force_english:
+                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
+            elif self.default_language != "en":
+                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+
+            prompt = f"""You are an expert at understanding search queries and generating related search terms.{language_instruction}
+
+Given a user query, generate 3-5 additional search queries that would help find relevant documents. Focus on:
+
+1. **Core concepts**: Extract the main topic/entity being asked about
+2. **Synonyms and variations**: Use different ways to express the same concept
+3. **Related terms**: Include terms that are semantically related
+4. **Context expansion**: Add terms that provide context around the main topic
+
+For example:
+- "who is maximilien" → ["maximilien", "maximilien.org", "about maximilien", "maximilien background", "maximilien profile"]
+- "what is vectras" → ["vectras", "vectras system", "vectras AI", "vectras software", "vectras features"]
+- "tell me about ragme" → ["ragme", "ragme.io", "ragme system", "ragme features", "ragme documentation"]
+
+Respond with ONLY a JSON array of strings, no other text. For example:
+["query1", "query2", "query3"]
+
+User query: "{query}"
+"""
+
+            response = await self.llm.acomplete(prompt)
+            response_text = str(response).strip()
+
+            # Try to parse as JSON
+            try:
+                import json
+
+                expanded_queries = json.loads(response_text)
+                if isinstance(expanded_queries, list):
+                    # Add the original query at the beginning
+                    expanded_queries.insert(0, query)
+                    # Remove duplicates while preserving order
+                    seen = set()
+                    unique_queries = []
+                    for q in expanded_queries:
+                        if q not in seen:
+                            seen.add(q)
+                            unique_queries.append(q)
+                    return unique_queries[:6]  # Limit to 6 queries total
+            except (json.JSONDecodeError, ValueError):
+                logger.warning(f"Failed to parse LLM response as JSON: {response_text}")
+
+            # Fallback: return original query only
+            return [query]
+
+        except Exception as e:
+            logger.error(f"Error generating intelligent query expansions: {str(e)}")
+            return [query]
+
+    async def _search_with_expanded_queries(
+        self, expanded_queries: list[str], limit: int
+    ) -> list[dict]:
+        """
+        Search using multiple expanded queries and combine results.
+
+        Args:
+            expanded_queries (list[str]): List of queries to search with
+            limit (int): Maximum number of results per query
+
+        Returns:
+            list[dict]: Combined and deduplicated search results
+        """
+        all_results = []
+
+        for i, expanded_query in enumerate(
+            expanded_queries[:3]
+        ):  # Limit to first 3 queries
+            try:
+                results = self.vector_db.search_text_collection(
+                    expanded_query, limit=limit
+                )
+                if results:
+                    # Tag results with the query used
+                    for result in results:
+                        result["query_used"] = expanded_query
+                        result["query_rank"] = i  # Lower rank = more important query
+                    all_results.extend(results)
+                    logger.debug(
+                        f"Search with '{expanded_query}' found {len(results)} results"
+                    )
+            except Exception as e:
+                logger.warning(f"Search with '{expanded_query}' failed: {e}")
+
+        # Deduplicate by document ID and combine scores
+        combined_results = {}
+        for result in all_results:
+            doc_id = result.get("id")
+            if doc_id not in combined_results:
+                combined_results[doc_id] = result
+            else:
+                # Combine scores from different queries
+                existing = combined_results[doc_id]
+                existing_score = existing.get("score", 0)
+                new_score = result.get("score", 0)
+
+                # Take the best score and track queries
+                if new_score > existing_score:
+                    existing["score"] = new_score
+
+                # Track all queries that found this document
+                if "queries_used" not in existing:
+                    existing["queries_used"] = [existing.get("query_used", "unknown")]
+                existing["queries_used"].append(result.get("query_used", "unknown"))
+                existing["queries_used"] = list(set(existing["queries_used"]))
+
+                # Boost score if multiple queries found this document
+                if len(existing["queries_used"]) > 1:
+                    boost_factor = min(
+                        1.2, 1.0 + (len(existing["queries_used"]) - 1) * 0.1
+                    )
+                    existing["score"] = min(1.0, existing["score"] * boost_factor)
+
+        return list(combined_results.values())
+
+    async def _apply_intelligent_semantic_scoring(
+        self, original_query: str, results: list[dict]
+    ) -> list[dict]:
+        """
+        Apply intelligent semantic relevance scoring using LLM.
+
+        This method uses the LLM to evaluate how semantically relevant each document
+        is to the original query, providing more nuanced scoring than simple keyword matching.
+
+        Args:
+            original_query (str): The original user query
+            results (list[dict]): Search results to score
+
+        Returns:
+            list[dict]: Results with enhanced semantic scores
+        """
+        if not results:
+            return results
+
+        try:
+            # Build language instruction based on configuration
+            language_instruction = ""
+            if self.force_english:
+                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
+            elif self.default_language != "en":
+                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+
+            # Create a batch scoring prompt for efficiency
+            documents_info = []
+            for i, result in enumerate(results):
+                doc_text = result.get("text", "")[
+                    :1500
+                ]  # Increased limit to see more content for better scoring
+                doc_url = result.get("url", "")
+
+                documents_info.append(
+                    {
+                        "id": i,
+                        "text": doc_text,
+                        "url": doc_url,
+                        "original_score": result.get("score", 0),
+                    }
+                )
+
+            prompt = f"""You are an expert at evaluating document relevance to search queries.{language_instruction}
+
+Given a user query and a list of documents, rate each document's relevance on a scale of 0.0 to 1.0, where:
+- 1.0 = Perfectly relevant, directly answers the query
+- 0.8-0.9 = Very relevant, contains important information
+- 0.6-0.7 = Moderately relevant, some useful information
+- 0.4-0.5 = Slightly relevant, minimal useful information
+- 0.0-0.3 = Not relevant
+
+Consider:
+1. **Semantic relevance**: Does the document content match the query intent?
+2. **Information completeness**: Does it provide comprehensive information about the topic?
+3. **Query type matching**: For "who is" queries, prefer biographical/descriptive content
+4. **Domain relevance**: For specific entities, prefer authoritative sources
+5. **Title matching**: If the query mentions a specific title, article, or work, give higher scores to documents that contain that title
+
+User query: "{original_query}"
+
+Documents to evaluate:
+{chr(10).join([f"Document {doc['id']}: URL={doc['url']}, Text={doc['text'][:1000]}..., Original Score={doc['original_score']:.3f}" for doc in documents_info])}
+
+Respond with ONLY a JSON array of scores (0.0-1.0), one for each document, in order. You must return exactly {len(documents_info)} scores.
+"""
+
+            logger.debug(f"Semantic scoring prompt: {prompt}")
+
+            response = await self.llm.acomplete(prompt)
+            response_text = str(response).strip()
+
+            logger.info(f"Semantic scoring LLM response: {response_text}")
+
+            # Try to parse scores
+            try:
+                import json
+                import re
+
+                # Clean up the response text - remove markdown code blocks if present
+                cleaned_response = response_text.strip()
+                if cleaned_response.startswith("```"):
+                    # Remove markdown code blocks
+                    cleaned_response = re.sub(r"^```(?:json)?\s*", "", cleaned_response)
+                    cleaned_response = re.sub(r"\s*```$", "", cleaned_response)
+
+                scores = json.loads(cleaned_response)
+                if isinstance(scores, list) and len(scores) == len(results):
+                    # Apply the semantic scores
+                    for i, result in enumerate(results):
+                        semantic_score = scores[i]
+                        original_score = result.get("score", 0)
+
+                        # Combine semantic score with original score (weighted average)
+                        # Give more weight to semantic score for better relevance
+                        combined_score = (semantic_score * 0.7) + (original_score * 0.3)
+                        result["score"] = min(1.0, combined_score)
+                        result["semantic_score"] = semantic_score
+
+                        logger.debug(
+                            f"Document {i}: original={original_score:.3f}, semantic={semantic_score:.3f}, combined={result['score']:.3f}"
+                        )
+
+                    return results
+            except (json.JSONDecodeError, ValueError, IndexError):
+                logger.warning(f"Failed to parse semantic scores: {response_text}")
+
+            # Fallback: return results unchanged
+            return results
+
+        except Exception as e:
+            logger.error(f"Error applying intelligent semantic scoring: {str(e)}")
+            return results
 
     async def _extract_date_query_from_summarize_request(self, query: str) -> str:
         """
@@ -451,6 +688,11 @@ Please provide a clear, well-structured summary:"""
                 f"QueryAgent searching vector database with query: '{query}' (top_k={self.top_k})"
             )
 
+            # Generate intelligent query expansions using LLM
+            logger.info("Starting intelligent query expansion...")
+            expanded_queries = await self._generate_intelligent_query_expansions(query)
+            logger.info(f"Generated expanded queries: {expanded_queries}")
+
             # Check what collections are available
             has_text = self.vector_db.has_text_collection()
             has_image = self.vector_db.has_image_collection()
@@ -463,9 +705,18 @@ Please provide a clear, well-structured summary:"""
             image_results = []
 
             if has_text:
-                text_results = self.vector_db.search_text_collection(
-                    query, limit=self.top_k
+                # Search with expanded queries for better coverage
+                text_results = await self._search_with_expanded_queries(
+                    expanded_queries, limit=self.top_k
                 )
+
+                # Apply intelligent semantic relevance scoring using LLM
+                logger.info("Starting intelligent semantic scoring...")
+                text_results = await self._apply_intelligent_semantic_scoring(
+                    query, text_results
+                )
+                logger.info(f"Applied semantic scoring to {len(text_results)} results")
+
                 # Apply LLM reranking to text results for better relevance scoring
                 if self.text_rerank_with_llm and text_results:
                     text_results = self._rerank_text_with_llm(
@@ -879,7 +1130,8 @@ Instructions:
 - If the question asks about images, describe what you see in the images
 - If the question asks about specific information, find and present that information
 - Be concise but thorough
-- If you cannot answer the question with the provided content, say so clearly
+- IMPORTANT: If the provided content contains information relevant to the question, you MUST answer the question using that information
+- Only say "no information" if the content truly contains nothing relevant to the question
 - If the content includes images, mention them in your response
 - IMPORTANT: When listing images, use the format [IMAGE:imageId:filename] for each image instead of markdown image syntax"""
 

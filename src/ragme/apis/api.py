@@ -119,7 +119,7 @@ class JSONInput(BaseModel):
 class SummarizeInput(BaseModel):
     """Input model for document summarization."""
 
-    document_id: str
+    document_id: str | dict
 
 
 class McpServerConfig(BaseModel):
@@ -206,29 +206,9 @@ async def add_json(json_input: JSONInput):
                 # Check if a document with the same URL already exists
                 existing_doc = get_ragme().vector_db.find_document_by_url(unique_url)
                 if existing_doc:
-                    # Only replace if it's not a chunked document or if the new one
-                    # is chunked. This prevents chunked documents from replacing
-                    # regular documents
-                    existing_is_chunked = existing_doc.get("metadata", {}).get(
-                        "is_chunked"
-                    ) or existing_doc.get("metadata", {}).get("is_chunk")
-                    new_is_chunked = doc_metadata.get("is_chunked") or doc_metadata.get(
-                        "is_chunk"
-                    )
-
-                    # If both are chunked documents with the same URL, replace
-                    # If existing is chunked but new is not, don't replace
-                    # If existing is not chunked but new is, replace
-                    if (existing_is_chunked and new_is_chunked) or (
-                        not existing_is_chunked and new_is_chunked
-                    ):
-                        # Delete the existing document
-                        get_ragme().vector_db.delete_document(existing_doc["id"])
-                        replaced_count += 1
-                    elif existing_is_chunked and not new_is_chunked:
-                        # Skip adding this document to avoid replacing chunked
-                        # document with regular document
-                        continue
+                    # Delete the existing document to replace it
+                    get_ragme().vector_db.delete_document(existing_doc["id"])
+                    replaced_count += 1
 
                 # Add the new document with unique URL
                 get_ragme().vector_db.write_documents(
@@ -281,80 +261,179 @@ def filter_documents_by_date(
     documents: list[dict[str, Any]], date_filter: str
 ) -> list[dict[str, Any]]:
     """
-    Filter documents by date based on the date_filter parameter.
+    Filter documents by date.
 
     Args:
         documents: List of documents to filter
         date_filter: Date filter to apply ('today', 'week', 'month', 'year', 'all')
 
     Returns:
-        Filtered list of documents
+        List of filtered documents
     """
     if date_filter == "all":
         return documents
 
+    filtered_documents = []
     now = datetime.now()
 
-    if date_filter == "today":
-        # Current = today
-        cutoff_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif date_filter == "week":
-        # This week (last 7 days)
-        cutoff_date = now - timedelta(days=7)
-    elif date_filter == "month":
-        # This month (current month)
-        cutoff_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif date_filter == "year":
-        # This year (current year)
-        cutoff_date = now.replace(
-            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
-        )
-    else:
-        # Invalid filter, return all documents
-        return documents
-
-    filtered_documents = []
-
     for doc in documents:
-        # Extract date_added from metadata
-        metadata = doc.get("metadata", {})
-        if isinstance(metadata, str):
-            # Handle case where metadata is a JSON string
-            try:
-                import json
-
-                metadata = json.loads(metadata)
-            except (json.JSONDecodeError, TypeError):
-                metadata = {}
-
-        date_added_str = metadata.get("date_added")
-        if not date_added_str:
-            # If no date_added, include the document (could be old documents without date)
-            filtered_documents.append(doc)
+        date_added = doc.get("metadata", {}).get("date_added", "")
+        if not date_added:
             continue
 
         try:
-            # Parse the date_added string
-            if date_added_str.endswith("Z"):
-                # Handle UTC time (with Z suffix)
-                date_added = datetime.fromisoformat(
-                    date_added_str.replace("Z", "+00:00")
-                )
-                # Convert to local time for consistent comparison
-                date_added_local = date_added.astimezone()
-            else:
-                # Handle local time (no timezone suffix)
-                date_added_local = datetime.fromisoformat(date_added_str)
+            doc_date = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
+        except ValueError:
+            continue
 
-            # Make date_added_local naive for comparison with cutoff_date (which is also naive)
-            date_added_naive = date_added_local.replace(tzinfo=None)
-            if date_added_naive >= cutoff_date:
+        if date_filter == "today":
+            if doc_date.date() == now.date():
                 filtered_documents.append(doc)
-        except (ValueError, TypeError):
-            # If date parsing fails, include the document
-            filtered_documents.append(doc)
+        elif date_filter == "week":
+            start_of_week = now - timedelta(days=now.weekday())
+            if doc_date >= start_of_week:
+                filtered_documents.append(doc)
+        elif date_filter == "month":
+            start_of_month = now.replace(day=1)
+            if doc_date >= start_of_month:
+                filtered_documents.append(doc)
+        elif date_filter == "year":
+            start_of_year = now.replace(month=1, day=1)
+            if doc_date >= start_of_year:
+                filtered_documents.append(doc)
 
     return filtered_documents
+
+
+def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Group chunked documents by their base URL/filename to avoid duplication in the UI.
+
+    Args:
+        documents: List of documents that may contain chunks
+
+    Returns:
+        List of grouped documents where chunks are combined into single documents
+    """
+    groups = {}
+
+    for doc in documents:
+        # Check if this is a chunked document
+        if (
+            doc.get("metadata", {}).get("is_chunk")
+            and doc.get("metadata", {}).get("total_chunks")
+        ) or (
+            doc.get("metadata", {}).get("is_chunked")
+            and doc.get("metadata", {}).get("total_chunks")
+        ):
+            # Extract base filename from URL like "file://ragme-io.pdf#chunk-4"
+            url = doc.get("url", "")
+            base_url = url.split("#")[0]  # Remove chunk suffix
+
+            if base_url not in groups:
+                groups[base_url] = {
+                    "isGroupedChunks": True,
+                    "totalChunks": doc["metadata"]["total_chunks"],
+                    "originalFilename": doc["metadata"].get("filename", "Unknown"),
+                    "baseUrl": base_url,
+                    "chunks": [],
+                    "metadata": {**doc["metadata"]},
+                    "url": base_url,
+                    "id": doc["id"],
+                    "content_type": doc.get("content_type", "document"),
+                }
+
+                # Use consistent timestamp for chunked documents
+                if doc["metadata"].get("date_added"):
+                    groups[base_url]["metadata"]["date_added"] = doc["metadata"][
+                        "date_added"
+                    ]
+
+            # Add chunk to the group
+            if groups[base_url]["chunks"] is not None:
+                groups[base_url]["chunks"].append(
+                    {**doc, "chunk_index": doc["metadata"].get("chunk_index", 0)}
+                )
+
+                # Sort chunks by index
+                groups[base_url]["chunks"].sort(key=lambda x: x["chunk_index"])
+
+                # Combine text from all chunks
+                groups[base_url]["combinedText"] = "\n\n--- Chunk ---\n\n".join(
+                    chunk.get("text", "") for chunk in groups[base_url]["chunks"]
+                )
+
+                # Use the latest date
+                if not groups[base_url]["metadata"].get("date_added") or doc[
+                    "metadata"
+                ].get("date_added", "") > groups[base_url]["metadata"].get(
+                    "date_added", ""
+                ):
+                    groups[base_url]["metadata"]["date_added"] = doc["metadata"].get(
+                        "date_added", ""
+                    )
+
+        elif doc.get("content_type") == "image" and doc.get("metadata", {}).get(
+            "pdf_filename"
+        ):
+            # Group images by their source PDF document
+            pdf_filename = doc["metadata"]["pdf_filename"]
+            key = f"pdf_images_{pdf_filename}"
+
+            if key not in groups:
+                groups[key] = {
+                    "isGroupedImages": True,
+                    "sourceDocument": pdf_filename,
+                    "totalImages": 0,
+                    "images": [],
+                    "metadata": {
+                        **doc["metadata"],
+                        "date_added": doc["metadata"].get("date_added", ""),
+                        "collection": "Images",
+                    },
+                    "url": f"pdf://{pdf_filename}",
+                    "id": f"pdf_images_{pdf_filename}",
+                    "content_type": "image_stack",
+                }
+
+            # Add image to the group
+            if groups[key]["images"] is not None:
+                groups[key]["images"].append(
+                    {**doc, "image_index": doc["metadata"].get("pdf_page_number", 0)}
+                )
+
+                # Sort images by page number
+                groups[key]["images"].sort(key=lambda x: x["image_index"])
+                groups[key]["totalImages"] = len(groups[key]["images"])
+
+                # Use the latest date
+                if not groups[key]["metadata"].get("date_added") or doc["metadata"].get(
+                    "date_added", ""
+                ) > groups[key]["metadata"].get("date_added", ""):
+                    groups[key]["metadata"]["date_added"] = doc["metadata"].get(
+                        "date_added", ""
+                    )
+
+        else:
+            # Regular document - use URL as key
+            key = doc.get("url") or f"doc_{len(groups)}"
+
+            # For URLs, use the full URL as key
+            if doc.get("url") and (
+                doc["url"].startswith("http://") or doc["url"].startswith("https://")
+            ):
+                key = doc["url"]
+            # For file documents, use the filename as key
+            elif doc.get("metadata", {}).get("filename"):
+                key = f"file://{doc['metadata']['filename']}"
+            # For other documents, use a unique key
+            else:
+                key = f"doc_{len(groups)}_{id(doc)}"
+
+            groups[key] = doc
+
+    # Convert groups to list
+    return list(groups.values())
 
 
 @app.get("/count-documents")
@@ -377,14 +456,11 @@ async def count_documents(
         dict: Document count information
     """
     try:
-        # Use efficient count method if available
-        if hasattr(get_ragme().vector_db, "count_documents"):
-            count = get_ragme().vector_db.count_documents(date_filter)
-        else:
-            # Fallback to old method for backward compatibility
-            all_documents = get_ragme().list_documents(limit=1000, offset=0)
-            filtered_documents = filter_documents_by_date(all_documents, date_filter)
-            count = len(filtered_documents)
+        # Get all documents and apply grouping to get accurate count
+        all_documents = get_ragme().list_documents(limit=1000, offset=0)
+        filtered_documents = filter_documents_by_date(all_documents, date_filter)
+        grouped_documents = group_chunked_documents(filtered_documents)
+        count = len(grouped_documents)
 
         return {
             "status": "success",
@@ -424,9 +500,17 @@ async def list_documents(
         # Apply date filtering
         filtered_documents = filter_documents_by_date(all_documents, date_filter)
 
-        # Apply pagination to filtered results
-        total_count = len(filtered_documents)
-        paginated_documents = filtered_documents[offset : offset + limit]
+        # Group chunked documents
+        grouped_documents = group_chunked_documents(filtered_documents)
+
+        # Sort by date (most recent first)
+        grouped_documents.sort(
+            key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
+        )
+
+        # Apply pagination to grouped results
+        total_count = len(grouped_documents)
+        paginated_documents = grouped_documents[offset : offset + limit]
 
         return {
             "status": "success",
@@ -500,14 +584,17 @@ async def list_content(
         # Apply date filtering
         filtered_items = filter_documents_by_date(all_items, date_filter)
 
+        # Group chunked documents
+        grouped_items = group_chunked_documents(filtered_items)
+
         # Sort by date (most recent first)
-        filtered_items.sort(
+        grouped_items.sort(
             key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
         )
 
         # Apply pagination to filtered results
-        total_count = len(filtered_items)
-        paginated_items = filtered_items[offset : offset + limit]
+        total_count = len(grouped_items)
+        paginated_items = grouped_items[offset : offset + limit]
 
         return {
             "status": "success",
@@ -614,37 +701,109 @@ async def summarize_document(input_data: SummarizeInput):
             print(f"Error listing images: {e}")
             # Continue without images if there's an error
 
+        # Group chunked documents to ensure we get complete documents
+        grouped_items = group_chunked_documents(all_items)
+
         # Find the document by ID
         document = None
         document_id = input_data.document_id
-        print(f"Looking for document with ID: {document_id}")
-        print(f"Number of documents: {len(documents)}")
-        print(f"Number of images: {len(images)}")
+        print(
+            f"REST API - Looking for document with ID: {document_id}, type: {type(document_id)}"
+        )
 
-        # First try to find by ID in documents
-        for doc in documents:
-            doc_id = doc.get("id")
-            # Convert Weaviate UUID to string for comparison
-            doc_id_str = str(doc_id) if doc_id else None
-            if doc_id_str == document_id:
-                document = doc
-                document["content_type"] = "document"
-                print(f"Found document: {doc.get('url', 'No URL')}")
-                break
+        # Check if this is an image stack request
+        if isinstance(document_id, dict) and document_id.get("type") == "image_stack":
+            print(f"REST API - Processing image stack request: {document_id}")
+            # Handle image stack summarization
+            pdf_filename = document_id.get("pdfFilename")
+            if pdf_filename:
+                try:
+                    from ..utils.config_manager import config
+                    from ..vdbs.vector_db_factory import create_vector_database
 
-        # If not found in documents, try to find in images
-        if not document:
-            for img in images:
-                img_id = img.get("id")
-                # Convert Weaviate UUID to string for comparison
-                img_id_str = str(img_id) if img_id else None
-                if img_id_str == document_id:
-                    document = img
-                    document["content_type"] = "image"
-                    print(
-                        f"Found image: {img.get('metadata', {}).get('filename', 'No filename')}"
+                    # Get image collection name
+                    image_collection_name = config.get_image_collection_name()
+
+                    # Create image vector database
+                    image_vdb = create_vector_database(
+                        collection_name=image_collection_name
                     )
-                    break
+
+                    # List all images and filter by PDF filename
+                    all_images = image_vdb.list_images(limit=1000, offset=0)
+                    pdf_images = [
+                        img
+                        for img in all_images
+                        if img.get("metadata", {}).get("pdf_filename") == pdf_filename
+                    ]
+
+                    if pdf_images:
+                        # Create comprehensive summary for the image stack
+                        summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
+
+                        # Analyze classifications across all images
+                        classifications = []
+                        for img in pdf_images:
+                            img_metadata = img.get("metadata", {})
+                            img_classification = img_metadata.get("classification", {})
+                            top_pred = img_classification.get("top_prediction", {})
+                            if top_pred.get("label"):
+                                classifications.append(top_pred["label"])
+
+                        if classifications:
+                            # Count unique classifications
+                            from collections import Counter
+
+                            class_counts = Counter(classifications)
+                            unique_classes = len(class_counts)
+
+                            summary_text += "**Image Analysis Summary:**\n"
+                            summary_text += f"- Total images: {len(pdf_images)}\n"
+                            summary_text += (
+                                f"- Unique content types: {unique_classes}\n"
+                            )
+
+                            # Show top classifications
+                            top_classes = class_counts.most_common(3)
+                            summary_text += "- Most common content types:\n"
+                            for label, count in top_classes:
+                                summary_text += f"  • {label}: {count} images\n"
+
+                        # Add metadata about the source PDF
+                        summary_text += f"\n**Source Document:** {pdf_filename}"
+
+                        if pdf_images[0].get("metadata", {}).get("date_added"):
+                            summary_text += f"\n**Extracted:** {pdf_images[0]['metadata']['date_added']}"
+
+                        return {
+                            "status": "success",
+                            "summary": summary_text,
+                        }
+                    else:
+                        return {
+                            "status": "error",
+                            "summary": f"No images found for PDF: {pdf_filename}",
+                        }
+                except Exception as e:
+                    print(f"REST API - Error summarizing image stack: {e}")
+                    return {
+                        "status": "error",
+                        "summary": f"Error summarizing image stack: {str(e)}",
+                    }
+
+        print(f"Number of grouped items: {len(grouped_items)}")
+
+        # Search for the document in grouped items
+        for item in grouped_items:
+            item_id = item.get("id")
+            # Convert Weaviate UUID to string for comparison
+            item_id_str = str(item_id) if item_id else None
+            if item_id_str == document_id:
+                document = item
+                print(
+                    f"Found item: {item.get('url', 'No URL')} (type: {item.get('content_type', 'unknown')})"
+                )
+                break
 
         if not document:
             print(f"Document not found with ID: {document_id}")
@@ -654,8 +813,74 @@ async def summarize_document(input_data: SummarizeInput):
         content_type = document.get("content_type", "document")
 
         if content_type == "image":
-            # For images, create a summary based on metadata and classification
+            # Check if this image is part of a PDF image stack
             metadata = document.get("metadata", {})
+            pdf_filename = metadata.get("pdf_filename")
+
+            if pdf_filename:
+                # This is part of an image stack - summarize the entire stack
+                try:
+                    # Get all images from the same PDF
+                    image_vdb = create_vector_database(
+                        collection_name=image_collection_name
+                    )
+                    all_images = image_vdb.list_images(limit=1000, offset=0)
+
+                    # Filter images from the same PDF
+                    pdf_images = [
+                        img
+                        for img in all_images
+                        if img.get("metadata", {}).get("pdf_filename") == pdf_filename
+                    ]
+
+                    if len(pdf_images) > 1:
+                        # Create comprehensive summary for the image stack
+                        summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
+
+                        # Analyze classifications across all images
+                        classifications = []
+                        for img in pdf_images:
+                            img_metadata = img.get("metadata", {})
+                            img_classification = img_metadata.get("classification", {})
+                            top_pred = img_classification.get("top_prediction", {})
+                            if top_pred.get("label"):
+                                classifications.append(top_pred["label"])
+
+                        if classifications:
+                            # Count unique classifications
+                            from collections import Counter
+
+                            class_counts = Counter(classifications)
+                            unique_classes = len(class_counts)
+
+                            summary_text += "**Image Analysis Summary:**\n"
+                            summary_text += f"- Total images: {len(pdf_images)}\n"
+                            summary_text += (
+                                f"- Unique content types: {unique_classes}\n"
+                            )
+
+                            # Show top classifications
+                            top_classes = class_counts.most_common(3)
+                            summary_text += "- Most common content types:\n"
+                            for label, count in top_classes:
+                                summary_text += f"  • {label}: {count} images\n"
+
+                        # Add metadata about the source PDF
+                        summary_text += f"\n**Source Document:** {pdf_filename}"
+
+                        if metadata.get("date_added"):
+                            summary_text += f"\n**Extracted:** {metadata['date_added']}"
+
+                        return {
+                            "status": "success",
+                            "summary": summary_text,
+                        }
+
+                except Exception as e:
+                    print(f"Error summarizing image stack: {e}")
+                    # Fall back to single image summary
+
+            # Single image summary (fallback or for non-stack images)
             classification = metadata.get("classification", {})
             top_prediction = classification.get("top_prediction", {})
 
@@ -679,19 +904,38 @@ async def summarize_document(input_data: SummarizeInput):
 
         else:
             # For text documents, use the existing summarization logic
-            content = document.get("text", "")
+            # Check if this is a grouped chunked document
+            if document.get("isGroupedChunks") and document.get("combinedText"):
+                # Use the combined text from all chunks
+                content = document.get("combinedText", "")
+                print(
+                    f"Using combined text from {document.get('totalChunks', 0)} chunks"
+                )
+            else:
+                # Use regular text content
+                content = document.get("text", "")
+
             if not content:
                 return {
                     "status": "success",
                     "summary": "No content available to summarize",
                 }
 
-            # Limit content more aggressively for faster processing
-            limited_content = content[
-                :500
-            ]  # Reduced from 1000 to 500 characters for faster processing
-            if len(content) > 500:
-                limited_content += "..."
+            # For chunked documents, use more content since we have the full document
+            if document.get("isGroupedChunks"):
+                # Use more content for chunked documents to get better summaries
+                limited_content = content[
+                    :2000
+                ]  # Increased limit for chunked documents
+                if len(content) > 2000:
+                    limited_content += "..."
+            else:
+                # Limit content more aggressively for faster processing of single documents
+                limited_content = content[
+                    :500
+                ]  # Reduced from 1000 to 500 characters for faster processing
+                if len(content) > 500:
+                    limited_content += "..."
 
             # Use a direct LLM call for faster summarization
             from llama_index.llms.openai import OpenAI
@@ -705,11 +949,19 @@ async def summarize_document(input_data: SummarizeInput):
                 temperature=summarization_config.get("temperature", 0.1),
             )
 
-            summary_prompt = f"""Please provide a brief summary of the following document content in 1-2 sentences maximum.
-            Focus on the main topic and key points.
+            # Adjust prompt based on whether this is a chunked document
+            if document.get("isGroupedChunks"):
+                summary_prompt = f"""Please provide a comprehensive summary of the following document content in 2-3 sentences.
+                This document contains multiple sections/chunks. Focus on the main topics, key points, and overall document structure.
 
-            Document content:
-            {limited_content}"""
+                Document content:
+                {limited_content}"""
+            else:
+                summary_prompt = f"""Please provide a brief summary of the following document content in 1-2 sentences maximum.
+                Focus on the main topic and key points.
+
+                Document content:
+                {limited_content}"""
 
             # Add timeout for faster response
             import asyncio
@@ -1446,8 +1698,8 @@ async def update_query_settings(request: dict):
         # Extract query settings from request
         top_k = request.get("top_k", 5)
         text_rerank_top_k = request.get("text_rerank_top_k", 3)
-        text_relevance_threshold = request.get("text_relevance_threshold", 0.8)
-        image_relevance_threshold = request.get("image_relevance_threshold", 0.8)
+        text_relevance_threshold = request.get("text_relevance_threshold", 0.5)
+        image_relevance_threshold = request.get("image_relevance_threshold", 0.5)
 
         # Validate settings
         if not (1 <= top_k <= 20):
@@ -1474,8 +1726,22 @@ async def update_query_settings(request: dict):
                 "message": "Image relevance threshold must be between 0.1 and 1.0",
             }
 
-        # Note: In a real implementation, this would update the config.yaml file
-        # For now, we'll just validate the settings
+        # Update the config.yaml file with new settings
+        try:
+            from src.ragme.utils.config_manager import config
+
+            config.update_query_settings(
+                {
+                    "top_k": top_k,
+                    "text_rerank_top_k": text_rerank_top_k,
+                    "relevance_thresholds": {
+                        "text": text_relevance_threshold,
+                        "image": image_relevance_threshold,
+                    },
+                }
+            )
+        except Exception as config_error:
+            print(f"Could not update config file: {config_error}")
 
         return {
             "status": "success",
@@ -1483,8 +1749,10 @@ async def update_query_settings(request: dict):
             "settings": {
                 "top_k": top_k,
                 "text_rerank_top_k": text_rerank_top_k,
-                "text_relevance_threshold": text_relevance_threshold,
-                "image_relevance_threshold": image_relevance_threshold,
+                "relevance_thresholds": {
+                    "text": text_relevance_threshold,
+                    "image": image_relevance_threshold,
+                },
             },
         }
     except Exception as e:
@@ -1527,6 +1795,7 @@ try:
         """Handle document summarization requests from frontend."""
         try:
             document_id = data.get("documentId")
+            print(f"Received document_id: {document_id}, type: {type(document_id)}")
             if not document_id:
                 await sio.emit(
                     "document_summarized",
@@ -1534,6 +1803,104 @@ try:
                     room=sid,
                 )
                 return
+
+            # Check if this is an image stack request
+            if (
+                isinstance(document_id, dict)
+                and document_id.get("type") == "image_stack"
+            ):
+                print(f"Processing image stack request: {document_id}")
+                # Handle image stack summarization
+                pdf_filename = document_id.get("pdfFilename")
+                if pdf_filename:
+                    try:
+                        from ..utils.config_manager import config
+                        from ..vdbs.vector_db_factory import create_vector_database
+
+                        # Get image collection name
+                        image_collection_name = config.get_image_collection_name()
+
+                        # Create image vector database
+                        image_vdb = create_vector_database(
+                            collection_name=image_collection_name
+                        )
+
+                        # List all images and filter by PDF filename
+                        all_images = image_vdb.list_images(limit=1000, offset=0)
+                        pdf_images = [
+                            img
+                            for img in all_images
+                            if img.get("metadata", {}).get("pdf_filename")
+                            == pdf_filename
+                        ]
+
+                        if pdf_images:
+                            # Create comprehensive summary for the image stack
+                            summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
+
+                            # Analyze classifications across all images
+                            classifications = []
+                            for img in pdf_images:
+                                img_metadata = img.get("metadata", {})
+                                img_classification = img_metadata.get(
+                                    "classification", {}
+                                )
+                                top_pred = img_classification.get("top_prediction", {})
+                                if top_pred.get("label"):
+                                    classifications.append(top_pred["label"])
+
+                            if classifications:
+                                # Count unique classifications
+                                from collections import Counter
+
+                                class_counts = Counter(classifications)
+                                unique_classes = len(class_counts)
+
+                                summary_text += "**Image Analysis Summary:**\n"
+                                summary_text += f"- Total images: {len(pdf_images)}\n"
+                                summary_text += (
+                                    f"- Unique content types: {unique_classes}\n"
+                                )
+
+                                # Show top classifications
+                                top_classes = class_counts.most_common(3)
+                                summary_text += "- Most common content types:\n"
+                                for label, count in top_classes:
+                                    summary_text += f"  • {label}: {count} images\n"
+
+                            # Add metadata about the source PDF
+                            summary_text += f"\n**Source Document:** {pdf_filename}"
+
+                            if pdf_images[0].get("metadata", {}).get("date_added"):
+                                summary_text += f"\n**Extracted:** {pdf_images[0]['metadata']['date_added']}"
+
+                            await sio.emit(
+                                "document_summarized",
+                                {"success": True, "summary": summary_text},
+                                room=sid,
+                            )
+                            return
+                        else:
+                            await sio.emit(
+                                "document_summarized",
+                                {
+                                    "success": False,
+                                    "message": f"No images found for PDF: {pdf_filename}",
+                                },
+                                room=sid,
+                            )
+                            return
+                    except Exception as e:
+                        print(f"Error summarizing image stack: {e}")
+                        await sio.emit(
+                            "document_summarized",
+                            {
+                                "success": False,
+                                "message": f"Error summarizing image stack: {str(e)}",
+                            },
+                            room=sid,
+                        )
+                        return
 
             # Use the existing summarize_document endpoint logic
             # Note: We don't need to import SummarizeInput here since we're not using it
@@ -1702,52 +2069,20 @@ try:
                 except Exception as e:
                     print(f"Error listing images: {e}")
 
-            # Apply date filtering if specified
-            if date_filter != "all":
-                filtered_items = []
-                current_time = datetime.now()
+            # Apply date filtering
+            filtered_items = filter_documents_by_date(all_items, date_filter)
 
-                for item in all_items:
-                    date_added = item.get("metadata", {}).get("date_added")
-                    if date_added:
-                        try:
-                            item_date = datetime.fromisoformat(
-                                date_added.replace("Z", "+00:00")
-                            )
+            # Group chunked documents
+            grouped_items = group_chunked_documents(filtered_items)
 
-                            if date_filter == "today":
-                                # Today
-                                if item_date.date() == current_time.date():
-                                    filtered_items.append(item)
-                            elif date_filter == "week":
-                                # Current week (last 7 days)
-                                week_ago = current_time - timedelta(days=7)
-                                if item_date >= week_ago:
-                                    filtered_items.append(item)
-                            elif date_filter == "month":
-                                # Current month
-                                if (
-                                    item_date.year == current_time.year
-                                    and item_date.month == current_time.month
-                                ):
-                                    filtered_items.append(item)
-                            elif date_filter == "year":
-                                # Current year
-                                if item_date.year == current_time.year:
-                                    filtered_items.append(item)
-                        except Exception as e:
-                            print(f"Error parsing date {date_added}: {e}")
-                            # Include items with invalid dates
-                            filtered_items.append(item)
-                    else:
-                        # Include items without date_added
-                        filtered_items.append(item)
+            # Sort by date (most recent first)
+            grouped_items.sort(
+                key=lambda x: x.get("metadata", {}).get("date_added", ""), reverse=True
+            )
 
-                all_items = filtered_items
-
-            # Apply pagination
-            total_count = len(all_items)
-            paginated_items = all_items[offset : offset + limit]
+            # Apply pagination to grouped results
+            total_count = len(grouped_items)
+            paginated_items = grouped_items[offset : offset + limit]
 
             print(f"Returning {len(paginated_items)} items out of {total_count} total")
 
@@ -1759,8 +2094,7 @@ try:
                     "pagination": {
                         "limit": limit,
                         "offset": offset,
-                        "count": len(paginated_items),
-                        "total": total_count,
+                        "count": total_count,
                     },
                 },
                 room=sid,

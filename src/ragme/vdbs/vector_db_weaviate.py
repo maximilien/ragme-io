@@ -429,7 +429,7 @@ class WeaviateVectorDatabase(VectorDatabase):
             response = collection.query.near_text(
                 query=query,
                 limit=limit * 2,  # Get more results to combine
-                include_vector=False,
+                include_vector=True,  # Include vectors for better scoring
                 return_metadata=MetadataQuery(
                     distance=True,  # Request vector distance
                 ),
@@ -744,20 +744,29 @@ class WeaviateVectorDatabase(VectorDatabase):
                     bm25_score = obj.metadata.score
                     logger.debug(f"Raw BM25 score: {bm25_score}")
 
-                    # BM25 scores are typically negative for Weaviate
-                    # Convert negative BM25 scores to positive similarity scores (0-1 range)
-                    # We want to map typical BM25 scores to reasonable similarity scores
+                    # Fixed BM25 score normalization
+                    # BM25 scores can be negative or positive depending on the query and document
+                    # We want to map them to a 0-1 similarity scale where higher is better
+                    # IMPORTANT: For BM25, more negative scores often indicate HIGHER relevance
+                    # because they represent better matches to the query terms
                     if bm25_score > 0:
-                        # For positive scores, normalize to 0-1 range
-                        result["score"] = min(bm25_score / 5.0, 1.0)
+                        # For positive scores, use normalization
+                        # Map 0-10 to 0.3-1.0 range for better discrimination
+                        result["score"] = min(0.3 + (bm25_score / 10.0) * 0.7, 1.0)
                     else:
-                        # For negative scores (most common), convert to positive similarity
-                        # Map -2 to 0.8, -1 to 0.9, 0 to 1.0
-                        # This gives better scores for typical BM25 ranges
-                        normalized_score = 1.0 + (
-                            bm25_score / 10.0
-                        )  # This maps -2 to 0.8, -1 to 0.9, 0 to 1.0
-                        result["score"] = max(0.1, min(1.0, normalized_score))
+                        # For negative scores, invert the logic - more negative = higher relevance
+                        # Map -10 to 1.0, -5 to 0.8, -2 to 0.6, -1 to 0.5, 0 to 0.4
+                        # This correctly reflects that negative BM25 scores often indicate good matches
+                        if bm25_score <= -10:
+                            result["score"] = 1.0
+                        elif bm25_score <= -5:
+                            result["score"] = 0.8
+                        elif bm25_score <= -2:
+                            result["score"] = 0.6
+                        elif bm25_score <= -1:
+                            result["score"] = 0.5
+                        else:
+                            result["score"] = 0.4
 
                     logger.debug(
                         f"Normalized BM25 score: {result['score']} (from {bm25_score})"
