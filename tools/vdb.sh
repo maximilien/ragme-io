@@ -60,8 +60,8 @@ main() {
     # Change to project root for consistent execution
     cd "$PROJECT_ROOT"
     
-    # Execute the Python script as a module with the correct Python path
-    PYTHONPATH=src python3 -m ragme.vdbs.vdb_management "$@"
+    # Execute the Python script as a module using uv run
+    uv run python3 -m ragme.vdbs.vdb_management "$@"
 }
 
 # Handle help command specially for better formatting
@@ -73,6 +73,10 @@ if [[ "$1" == "help" ]] || [[ $# -eq 0 ]]; then
     echo "  ./tools/vdb.sh help                         # shows help for this script"
     echo "  ./tools/vdb.sh --show                       # shows currently configured VDB"
     echo "  ./tools/vdb.sh health                       # attempts to connect to VDB and collections"
+    echo "  ./tools/vdb.sh virtual-structure            # shows virtual structure (chunks, grouped images, documents, individual images)"
+    echo "  ./tools/vdb.sh document-groups              # shows how documents are grouped into chunks"
+    echo "  ./tools/vdb.sh image-groups                 # shows how images are grouped by PDF source"
+    echo "  ./tools/vdb.sh delete-document <filename>   # delete document and all its chunks and extracted images"
     echo "  ./tools/vdb.sh collections --list           # shows collection names"
     echo "  ./tools/vdb.sh collections --text --list    # list docs in text collection (shows source, type, text preview)"
     echo "  ./tools/vdb.sh collections --image --list   # list docs in image collection (shows source, classification, image data)"
@@ -82,6 +86,10 @@ if [[ "$1" == "help" ]] || [[ $# -eq 0 ]]; then
     print_status $YELLOW "EXAMPLES:"
     echo "  ./tools/vdb.sh --show                       # Check current VDB configuration"
     echo "  ./tools/vdb.sh health                       # Test VDB connectivity"
+    echo "  ./tools/vdb.sh virtual-structure            # View virtual structure overview"
+    echo "  ./tools/vdb.sh document-groups              # See how documents are chunked"
+    echo "  ./tools/vdb.sh image-groups                 # See how images are grouped by PDF"
+    echo "  ./tools/vdb.sh delete-document ragme-io.pdf # Delete document and all its chunks/images"
     echo "  ./tools/vdb.sh collections --text --list    # List all text documents"
     echo "  ./tools/vdb.sh collections --image --delete # Clear all image documents"
     echo

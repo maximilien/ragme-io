@@ -66,6 +66,28 @@ ConnectionError: Failed to connect to vector database
 
 **Automatic Fallback**: If vector database connection fails, the system will show helpful error messages and guide you to the correct configuration.
 
+**Debugging with VDB Management Tool**: Use the VDB management tool to diagnose vector database issues:
+
+```bash
+# Check VDB health and connectivity
+./tools/vdb.sh health
+
+# Show current VDB configuration
+./tools/vdb.sh --show
+
+# View virtual structure to understand data organization
+./tools/vdb.sh virtual-structure
+
+# List collections and their status
+./tools/vdb.sh collections --list
+```
+
+This tool provides detailed information about:
+- Vector database connectivity and health
+- Collection status and configuration
+- Data structure and organization
+- Document and image counts
+
 ### Frontend Not Loading
 
 **Problem**: New frontend (default port 8020) is not accessible.

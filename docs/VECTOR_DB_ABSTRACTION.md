@@ -417,6 +417,77 @@ VECTOR_DB_TYPE=weaviate-local
 WEAVIATE_LOCAL_URL=http://localhost:8080
 ```
 
+## VDB Management Tools
+
+RAGme includes a comprehensive VDB management tool (`tools/vdb.sh`) for administrative tasks and system monitoring:
+
+### Virtual Structure Commands
+
+The tool provides insights into the virtual structure of your data:
+
+```bash
+# Show virtual structure overview
+./tools/vdb.sh virtual-structure
+
+# List document groups and chunks
+./tools/vdb.sh document-groups
+
+# List image groups by PDF source
+./tools/vdb.sh image-groups
+```
+
+### Document Management
+
+```bash
+# Delete a document and all its chunks/images
+./tools/vdb.sh delete-document <filename>
+
+# List all documents in text collection
+./tools/vdb.sh collections --text --list
+
+# List all images in image collection
+./tools/vdb.sh collections --image --list
+
+# Delete all content from collections
+./tools/vdb.sh collections --text --delete
+./tools/vdb.sh collections --image --delete
+```
+
+### System Health
+
+```bash
+# Check VDB health and connectivity
+./tools/vdb.sh health
+
+# Show current VDB configuration
+./tools/vdb.sh --show
+```
+
+### Key Features
+
+- **Virtual Structure Awareness**: Distinguishes between total chunks, grouped images, individual documents, and individual images
+- **Safe Deletion**: Comprehensive document deletion that removes all chunks and extracted images
+- **Storage Integration**: Automatically cleans up associated storage files
+- **Preview Mode**: Shows what will be deleted before confirmation
+- **Cross-Collection Operations**: Handles both text and image collections seamlessly
+
+### Examples
+
+```bash
+# View virtual structure
+./tools/vdb.sh virtual-structure
+# Output: Shows total chunks, grouped images, individual documents, etc.
+
+# Delete a document safely
+./tools/vdb.sh delete-document ragme-io.pdf
+# Shows preview: "Chunks to delete: 7, Extracted images to delete: 0"
+# Requires confirmation before deletion
+
+# Check system health
+./tools/vdb.sh health
+# Shows collection status and virtual structure summary
+```
+
 ### Examples
 
 See the `examples/` directory for complete usage examples:

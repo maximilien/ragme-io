@@ -317,6 +317,32 @@ def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, A
     """
     groups = {}
 
+    # Debug: Count chunked documents by base URL
+    chunked_by_base = {}
+    for doc in documents:
+        if (
+            doc.get("metadata", {}).get("is_chunk")
+            and doc.get("metadata", {}).get("total_chunks")
+        ) or (
+            doc.get("metadata", {}).get("is_chunked")
+            and doc.get("metadata", {}).get("total_chunks")
+        ):
+            url = doc.get("url", "")
+            base_url = url.split("#")[0]
+            if base_url not in chunked_by_base:
+                chunked_by_base[base_url] = []
+            chunked_by_base[base_url].append(doc)
+
+    # Debug: Print chunk counts
+    for base_url, chunks in chunked_by_base.items():
+        print(
+            f"Backend grouping: {base_url} has {len(chunks)} chunks (expected: {chunks[0]['metadata']['total_chunks']})"
+        )
+        for chunk in chunks:
+            print(
+                f"  - chunk_index: {chunk['metadata'].get('chunk_index')}, id: {chunk['id']}"
+            )
+
     for doc in documents:
         # Check if this is a chunked document
         if (
@@ -433,7 +459,39 @@ def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, A
             groups[key] = doc
 
     # Convert groups to list
-    return list(groups.values())
+    grouped_documents = list(groups.values())
+
+    # Debug: Print final grouped documents
+    print(f"Backend: Final grouped documents count: {len(grouped_documents)}")
+    for i, doc in enumerate(grouped_documents):
+        if doc.get("isGroupedChunks"):
+            print(
+                f"Backend: Grouped doc {i}: {doc.get('originalFilename')} has {len(doc.get('chunks', []))} chunks"
+            )
+            for chunk in doc.get("chunks", []):
+                print(
+                    f"  - chunk_id: {chunk.get('id')}, chunk_index: {chunk.get('chunk_index')}"
+                )
+
+    # Debug: Print what's actually being returned
+    print(f"Backend: Returning {len(grouped_documents)} grouped documents to frontend")
+    for i, doc in enumerate(grouped_documents):
+        if doc.get("isGroupedChunks"):
+            print(
+                f"Backend: Returning grouped doc {i}: {doc.get('originalFilename')} with {len(doc.get('chunks', []))} chunks"
+            )
+            print(
+                f"Backend: Chunks array type: {type(doc.get('chunks'))}, length: {len(doc.get('chunks', []))}"
+            )
+            if doc.get("chunks"):
+                print(
+                    f"Backend: First chunk: {doc['chunks'][0].get('id') if doc['chunks'] else 'None'}"
+                )
+                print(
+                    f"Backend: Last chunk: {doc['chunks'][-1].get('id') if doc['chunks'] else 'None'}"
+                )
+
+    return grouped_documents
 
 
 @app.get("/count-documents")
@@ -554,6 +612,22 @@ async def list_content(
         # Get documents if requested
         if content_type in ["document", "documents", "both"]:
             documents = get_ragme().list_documents(limit=1000, offset=0)
+            print(f"Backend: Retrieved {len(documents)} documents from vector database")
+
+            # Log chunked documents for debugging
+            chunked_docs = [
+                doc
+                for doc in documents
+                if doc.get("metadata", {}).get("is_chunk")
+                or doc.get("metadata", {}).get("is_chunked")
+            ]
+            if chunked_docs:
+                print(f"Backend: Found {len(chunked_docs)} chunked documents:")
+                for doc in chunked_docs:
+                    print(
+                        f"  - ID: {doc.get('id')}, URL: {doc.get('url')}, chunk_index: {doc.get('metadata', {}).get('chunk_index')}, total_chunks: {doc.get('metadata', {}).get('total_chunks')}"
+                    )
+
             for doc in documents:
                 doc["content_type"] = "document"
             all_items.extend(documents)
@@ -738,6 +812,20 @@ async def summarize_document(input_data: SummarizeInput):
                     ]
 
                     if pdf_images:
+                        # Check if summary already exists in the first image's metadata
+                        first_image_metadata = pdf_images[0].get("metadata", {})
+                        existing_summary = first_image_metadata.get("ai_summary")
+
+                        if existing_summary:
+                            print(
+                                f"Using cached summary for image stack: {pdf_filename}"
+                            )
+                            return {
+                                "status": "success",
+                                "summary": existing_summary,
+                                "cached": True,
+                            }
+
                         # Create comprehensive summary for the image stack
                         summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
 
@@ -775,6 +863,21 @@ async def summarize_document(input_data: SummarizeInput):
                         if pdf_images[0].get("metadata", {}).get("date_added"):
                             summary_text += f"\n**Extracted:** {pdf_images[0]['metadata']['date_added']}"
 
+                        # Store the generated summary in the first image's metadata
+                        try:
+                            first_image_id = pdf_images[0].get("id")
+                            if first_image_id:
+                                image_vdb.update_image_metadata(
+                                    first_image_id, {"ai_summary": summary_text}
+                                )
+                                print(
+                                    f"Stored AI summary in image stack metadata for PDF: {pdf_filename}"
+                                )
+                        except Exception as e:
+                            print(
+                                f"Warning: Failed to store AI summary in image stack metadata: {e}"
+                            )
+
                         return {
                             "status": "success",
                             "summary": summary_text,
@@ -809,6 +912,19 @@ async def summarize_document(input_data: SummarizeInput):
             print(f"Document not found with ID: {document_id}")
             raise HTTPException(status_code=404, detail="Document not found")
 
+        # Check if summary already exists in metadata
+        metadata = document.get("metadata", {})
+        existing_summary = metadata.get("ai_summary")
+
+        if existing_summary:
+            print(f"Using cached summary for document: {document_id}")
+            return {
+                "status": "success",
+                "summary": existing_summary,
+                "document_id": input_data.document_id,
+                "cached": True,
+            }
+
         # Handle different content types
         content_type = document.get("content_type", "document")
 
@@ -834,6 +950,20 @@ async def summarize_document(input_data: SummarizeInput):
                     ]
 
                     if len(pdf_images) > 1:
+                        # Check if summary already exists in the first image's metadata
+                        first_image_metadata = pdf_images[0].get("metadata", {})
+                        existing_summary = first_image_metadata.get("ai_summary")
+
+                        if existing_summary:
+                            print(
+                                f"Using cached summary for image stack: {pdf_filename}"
+                            )
+                            return {
+                                "status": "success",
+                                "summary": existing_summary,
+                                "cached": True,
+                            }
+
                         # Create comprehensive summary for the image stack
                         summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
 
@@ -871,6 +1001,21 @@ async def summarize_document(input_data: SummarizeInput):
                         if metadata.get("date_added"):
                             summary_text += f"\n**Extracted:** {metadata['date_added']}"
 
+                        # Store the generated summary in the first image's metadata
+                        try:
+                            first_image_id = pdf_images[0].get("id")
+                            if first_image_id:
+                                image_vdb.update_image_metadata(
+                                    first_image_id, {"ai_summary": summary_text}
+                                )
+                                print(
+                                    f"Stored AI summary in image stack metadata for PDF: {pdf_filename}"
+                                )
+                        except Exception as e:
+                            print(
+                                f"Warning: Failed to store AI summary in image stack metadata: {e}"
+                            )
+
                         return {
                             "status": "success",
                             "summary": summary_text,
@@ -894,6 +1039,22 @@ async def summarize_document(input_data: SummarizeInput):
 
             # Create image summary
             summary_text = f"This is an image file named '{filename}'. AI classification identifies it as '{label}' with {confidence_percent} confidence."
+
+            # Store the generated summary in the image metadata
+            try:
+                image_vdb = create_vector_database(
+                    collection_name=image_collection_name
+                )
+                image_vdb.update_image_metadata(
+                    document_id, {"ai_summary": summary_text}
+                )
+                print(
+                    f"Stored AI summary in single image metadata for document: {document_id}"
+                )
+            except Exception as e:
+                print(
+                    f"Warning: Failed to store AI summary in single image metadata: {e}"
+                )
 
             # Add additional metadata if available
             if metadata.get("file_size"):
@@ -972,6 +1133,34 @@ async def summarize_document(input_data: SummarizeInput):
                     timeout=10.0,  # Reduced from 15 to 10 seconds
                 )
                 summary_text = summary.text
+
+                # Store the generated summary in the document metadata
+                try:
+                    # Update the document metadata with the new summary
+                    if document.get("content_type") == "image":
+                        # For images, update in image collection
+                        image_vdb = create_vector_database(
+                            collection_name=image_collection_name
+                        )
+                        image_vdb.update_image_metadata(
+                            document_id, {"ai_summary": summary_text}
+                        )
+                        print(
+                            f"Stored AI summary in image metadata for document: {document_id}"
+                        )
+                    else:
+                        # For documents, update in document collection
+                        ragme = get_ragme()
+                        ragme.update_document_metadata(
+                            document_id, {"ai_summary": summary_text}
+                        )
+                        print(
+                            f"Stored AI summary in document metadata for document: {document_id}"
+                        )
+                except Exception as e:
+                    print(f"Warning: Failed to store AI summary in metadata: {e}")
+                    # Continue without storing if there's an error
+
             except asyncio.TimeoutError:
                 summary_text = "Summary generation timed out. The document may be too large or complex."
 
@@ -1440,6 +1629,104 @@ async def delete_document(document_id: str):
         raise
     except Exception as e:
         print(f"Error deleting document {document_id}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.delete("/delete-document-group/{base_url:path}")
+async def delete_document_group(base_url: str):
+    """
+    Delete all chunks for a document by its base URL.
+    This is more efficient than deleting chunks one by one from the frontend.
+
+    Args:
+        base_url: Base URL of the document (e.g., "file://ragme-io.pdf")
+
+    Returns:
+        dict: Status message with deletion count
+    """
+    try:
+        # Decode URL if needed
+        import urllib.parse
+
+        base_url = urllib.parse.unquote(base_url)
+
+        print(f"Backend: Deleting document group for base URL: {base_url}")
+
+        # Get all documents
+        documents = get_ragme().list_documents(limit=1000, offset=0)
+
+        # Find all chunks that belong to this document
+        chunks_to_delete = []
+        storage_paths_to_delete = []
+
+        for doc in documents:
+            doc_url = doc.get("url", "")
+            # Check if this document's URL starts with the base URL
+            if doc_url.startswith(base_url):
+                chunks_to_delete.append(doc)
+
+                # Collect storage paths for deletion
+                storage_path = doc.get("metadata", {}).get("storage_path")
+                if storage_path and storage_path not in storage_paths_to_delete:
+                    storage_paths_to_delete.append(storage_path)
+
+        print(f"Backend: Found {len(chunks_to_delete)} chunks to delete for {base_url}")
+
+        if not chunks_to_delete:
+            return {
+                "status": "success",
+                "message": f"No chunks found for document {base_url}",
+                "deleted_count": 0,
+            }
+
+        # Delete chunks from vector database
+        deleted_count = 0
+        failed_count = 0
+
+        for chunk in chunks_to_delete:
+            try:
+                chunk_id = str(chunk.get("id"))
+                success = get_ragme().delete_document(chunk_id)
+                if success:
+                    deleted_count += 1
+                    print(f"Backend: Successfully deleted chunk {chunk_id}")
+                else:
+                    failed_count += 1
+                    print(f"Backend: Failed to delete chunk {chunk_id}")
+            except Exception as e:
+                failed_count += 1
+                print(f"Backend: Error deleting chunk {chunk.get('id')}: {e}")
+
+        # Delete storage files
+        storage_deleted_count = 0
+        for storage_path in storage_paths_to_delete:
+            try:
+                storage_service = get_storage_service()
+                if storage_service.delete_file(storage_path):
+                    storage_deleted_count += 1
+                    print(f"Backend: Deleted storage file: {storage_path}")
+                else:
+                    print(f"Backend: Failed to delete storage file: {storage_path}")
+            except Exception as e:
+                print(f"Backend: Error deleting storage file {storage_path}: {e}")
+
+        message = f"Deleted {deleted_count} chunks for document {base_url}"
+        if storage_deleted_count > 0:
+            message += f" (and {storage_deleted_count} storage files)"
+        if failed_count > 0:
+            message += f" ({failed_count} chunks failed to delete)"
+
+        return {
+            "status": "success",
+            "message": message,
+            "deleted_count": deleted_count,
+            "failed_count": failed_count,
+            "storage_deleted_count": storage_deleted_count,
+        }
+
+    except Exception as e:
+        print(f"Backend: Error in delete_document_group: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) from e
 

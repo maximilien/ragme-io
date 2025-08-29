@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🧠 AI Summary Caching**: Intelligent caching system that stores AI-generated summaries in document metadata to prevent redundant generation. Features include automatic cache checking, visual "Cached Summary" indicators, and seamless integration with both document and image collections! ⭐ **NEW!**
 - **⏳ Frontend Progress Indicator**: Added a spinning wheel progress indicator next to the "Add Content" button that shows during document and image processing. Provides visual feedback for upload, text extraction, AI analysis, and OCR stages. The "Add Content" button is disabled during processing with automatic timeout protection! ⭐ **NEW!**
 - **🖼️ PDF Image Extraction Bug Fixes**: Fixed three critical bugs with PDF image extraction: missing date/time information, storage integration issues, and "Unknown Image" display in AI summaries. Extracted images now have proper metadata, are stored correctly, and show meaningful filenames! ⭐ **FIXED!**
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection. Tests multiple query scenarios and automatically updates `config.yaml` with the best performing threshold! ⭐ **NEW!**
@@ -39,7 +40,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **💾 S3-Compatible File Storage**: MinIO-based storage service for document and image persistence with support for multiple storage backends (MinIO, S3, Local). Automatic bucket management, presigned URLs, and comprehensive file operations! ⭐ **NEW!**
 - **🎯 Enhanced AI Image Summaries**: Fixed image summary generation to show rich classification data with confidence scores and file information. Images now display meaningful summaries like "Yorkshire terrier with 95.1% confidence" ⭐ **FIXED!**
 - **🧹 Clean PyTorch Codebase**: Removed all TensorFlow dependencies and updated to PyTorch-only implementation with proper dependency management ⭐ **CLEANED!**
-- **🔧 Enhanced VDB Management**: Improved `vdb.sh` tool to show source information, AI classifications, and better metadata for image documents ⭐ **ENHANCED!**
+- **🔧 Enhanced VDB Management**: Improved `vdb.sh` tool with virtual structure commands (`virtual-structure`, `document-groups`, `image-groups`) and comprehensive document deletion (`delete-document`) that removes all chunks and extracted images ⭐ **ENHANCED!**
 - **🔄 Environment Switching Fix**: Fixed critical bug where changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) wasn't taking effect after restart. Now seamlessly switch between different application environments (e.g., RAGme ↔ Viewfinder.ai) ⭐ **FIXED!**
 - **🤖 Three-Agent Architecture**: Sophisticated agent system with intelligent query routing and specialized processing ⭐ **NEW!**
 - **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment
@@ -575,6 +576,15 @@ This will start all services and you can access the **new frontend** at `http://
 ./tools/optimize.sh query-threshold     # Find optimal text_relevance_threshold
 ./tools/optimize.sh query-threshold 0.3 0.9  # Custom range
 ./tools/optimize.sh help                # Show all optimization commands
+
+# Vector database management tools
+./tools/vdb.sh virtual-structure       # Show virtual structure (chunks, grouped images, documents)
+./tools/vdb.sh document-groups         # Show how documents are grouped into chunks
+./tools/vdb.sh image-groups            # Show how images are grouped by PDF source
+./tools/vdb.sh delete-document <file>  # Delete document and all its chunks/images
+./tools/vdb.sh health                  # Check VDB health and connectivity
+./tools/vdb.sh --show                  # Show current VDB configuration
+./tools/vdb.sh help                    # Show all VDB management commands
 ```
 
 For detailed process management, see [Process Management Guide](docs/PROCESS_MANAGEMENT.md).

@@ -107,6 +107,22 @@ class VectorDatabase(ABC):
         pass
 
     @abstractmethod
+    def update_document_metadata(
+        self, document_id: str, metadata: dict[str, Any]
+    ) -> bool:
+        """
+        Update metadata for a document in the text collection of the vector database.
+
+        Args:
+            document_id: ID of the document to update
+            metadata: Dictionary of metadata fields to update
+
+        Returns:
+            bool: True if document was updated successfully, False if not found
+        """
+        pass
+
+    @abstractmethod
     def find_document_by_url(self, url: str) -> dict[str, Any] | None:
         """
         Find a document by its URL in the text collection.
@@ -241,6 +257,20 @@ class VectorDatabase(ABC):
 
         Returns:
             bool: True if image was deleted successfully, False if not found
+        """
+        pass
+
+    @abstractmethod
+    def update_image_metadata(self, image_id: str, metadata: dict[str, Any]) -> bool:
+        """
+        Update metadata for an image in the image collection of the vector database.
+
+        Args:
+            image_id: ID of the image to update
+            metadata: Dictionary of metadata fields to update
+
+        Returns:
+            bool: True if image was updated successfully, False if not found
         """
         pass
 

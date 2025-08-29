@@ -448,6 +448,98 @@ class MilvusVectorDatabase(VectorDatabase):
         except Exception:
             return None
 
+    def update_document_metadata(
+        self, document_id: str, metadata: dict[str, Any]
+    ) -> bool:
+        """Update metadata for a document in the text collection."""
+        if not self.has_text_collection():
+            return False
+
+        if self.client is None:
+            return False
+
+        try:
+            # Get the existing document to preserve other fields
+            response = self.client.query(
+                collection_name=self.text_collection.name,
+                filter=f'id == "{document_id}"',
+                output_fields=["id", "url", "text", "metadata"],
+                limit=1,
+            )
+
+            if not response:
+                return False
+
+            existing_doc = response[0]
+            existing_metadata = {}
+
+            # Parse existing metadata if it exists
+            if "metadata" in existing_doc:
+                try:
+                    existing_metadata = json.loads(existing_doc["metadata"])
+                except (json.JSONDecodeError, TypeError):
+                    existing_metadata = {}
+
+            # Update the metadata with new values
+            existing_metadata.update(metadata)
+
+            # Update the document with new metadata
+            self.client.update(
+                collection_name=self.text_collection.name,
+                filter=f'id == "{document_id}"',
+                data={"metadata": json.dumps(existing_metadata)},
+            )
+
+            return True
+
+        except Exception:
+            return False
+
+    def update_image_metadata(self, image_id: str, metadata: dict[str, Any]) -> bool:
+        """Update metadata for an image in the image collection."""
+        if not self.has_image_collection():
+            return False
+
+        if self.client is None:
+            return False
+
+        try:
+            # Get the existing image to preserve other fields
+            response = self.client.query(
+                collection_name=self.image_collection.name,
+                filter=f'id == "{image_id}"',
+                output_fields=["id", "url", "text", "metadata"],
+                limit=1,
+            )
+
+            if not response:
+                return False
+
+            existing_image = response[0]
+            existing_metadata = {}
+
+            # Parse existing metadata if it exists
+            if "metadata" in existing_image:
+                try:
+                    existing_metadata = json.loads(existing_image["metadata"])
+                except (json.JSONDecodeError, TypeError):
+                    existing_metadata = {}
+
+            # Update the metadata with new values
+            existing_metadata.update(metadata)
+
+            # Update the image with new metadata
+            self.client.update(
+                collection_name=self.image_collection.name,
+                filter=f'id == "{image_id}"',
+                data={"metadata": json.dumps(existing_metadata)},
+            )
+
+            return True
+
+        except Exception:
+            return False
+
     def cleanup(self):
         """Clean up resources and close connections."""
         if self.client:
