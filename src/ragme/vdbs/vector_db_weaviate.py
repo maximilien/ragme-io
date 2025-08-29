@@ -338,11 +338,13 @@ class WeaviateVectorDatabase(VectorDatabase):
 
         collection = self.client.collections.get(self.text_collection.name)
         try:
-            # First, get the existing document to preserve other fields
+            # Use the correct Weaviate filter syntax to get the object by ID
+            import weaviate.classes as wvc
+
             response = collection.query.fetch_objects(
                 limit=1,
                 include_vector=False,
-                where=collection.query.filter.by_id().equal(document_id),
+                filters=wvc.query.Filter.by_id().equal(document_id),
             )
 
             if not response.objects:
@@ -352,12 +354,23 @@ class WeaviateVectorDatabase(VectorDatabase):
             existing_doc = response.objects[0]
             existing_metadata = existing_doc.properties.get("metadata", {})
 
+            # Parse existing metadata if it's a string
+            if isinstance(existing_metadata, str):
+                try:
+                    import json
+
+                    existing_metadata = json.loads(existing_metadata)
+                except (json.JSONDecodeError, TypeError):
+                    existing_metadata = {}
+
             # Update the metadata with new values
             existing_metadata.update(metadata)
 
             # Update the document with new metadata
+            import json
+
             collection.data.update(
-                uuid=document_id, properties={"metadata": existing_metadata}
+                uuid=document_id, properties={"metadata": json.dumps(existing_metadata)}
             )
 
             logger.info(f"Successfully updated metadata for document: {document_id}")
@@ -696,11 +709,13 @@ class WeaviateVectorDatabase(VectorDatabase):
 
         collection = self.client.collections.get(self.image_collection.name)
         try:
-            # First, get the existing image to preserve other fields
+            # Use the correct Weaviate filter syntax to get the object by ID
+            import weaviate.classes as wvc
+
             response = collection.query.fetch_objects(
                 limit=1,
                 include_vector=False,
-                where=collection.query.filter.by_id().equal(image_id),
+                filters=wvc.query.Filter.by_id().equal(image_id),
             )
 
             if not response.objects:
@@ -710,12 +725,23 @@ class WeaviateVectorDatabase(VectorDatabase):
             existing_image = response.objects[0]
             existing_metadata = existing_image.properties.get("metadata", {})
 
+            # Parse existing metadata if it's a string
+            if isinstance(existing_metadata, str):
+                try:
+                    import json
+
+                    existing_metadata = json.loads(existing_metadata)
+                except (json.JSONDecodeError, TypeError):
+                    existing_metadata = {}
+
             # Update the metadata with new values
             existing_metadata.update(metadata)
 
             # Update the image with new metadata
+            import json
+
             collection.data.update(
-                uuid=image_id, properties={"metadata": existing_metadata}
+                uuid=image_id, properties={"metadata": json.dumps(existing_metadata)}
             )
 
             logger.info(f"Successfully updated metadata for image: {image_id}")

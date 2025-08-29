@@ -30,7 +30,7 @@ class RAGmeAssistant {
             copyUploadedImages: false,
             mcpToolsEnabled: false // Default to disabled, will be overridden by configuration
         };
-        
+
         // Pagination state
         this.pagination = {
             currentPage: 1,
@@ -45,6 +45,7 @@ class RAGmeAssistant {
         this.isVisualizationVisible = true; // Default to visible
         this.vectorDbInfo = null;
         this.autoRefreshInterval = null;
+        this.healthCheckInterval = null;
         this.lastDocumentCount = 0;
         this.connectionStatus = {
             isConnected: true,
@@ -58,7 +59,7 @@ class RAGmeAssistant {
             summaryGenerated: false,
             summaryInProgress: false
         };
-        
+
         // Default MCP Tools configuration - will be overridden by configuration
         this.mcpServers = [
             { name: 'Google GDrive', icon: 'fab fa-google-drive', enabled: false, authenticated: false },
@@ -67,31 +68,44 @@ class RAGmeAssistant {
             { name: 'Twilio', icon: 'fas fa-phone', enabled: false, authenticated: false },
             { name: 'RAGme Test', icon: 'fas fa-flask', enabled: false, authenticated: false }
         ];
-        
+
         // Configuration loaded from backend
         this.config = null;
-        
+
+        // API configuration
+        this.apiConfig = {
+            baseUrl: 'http://localhost:8021', // Default API base URL
+            endpoints: {
+                config: '/config',
+                health: '/health',
+                storage: '/storage/status',
+                mcpConfig: '/mcp-server-config',
+                updateStorageSettings: '/update-storage-settings',
+                updateQuerySettings: '/update-query-settings'
+            }
+        };
+
         // Track pending MCP server changes for batching
         this.pendingMcpChanges = [];
         this.mcpChangeTimeout = null;
-        
+
         // Vector DB info retry timeout
         this.vectorDbInfoRetryTimeout = null;
-        
+
         // Voice-to-text functionality
         this.speechRecognition = null;
         this.isRecording = false;
         this.speechSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-        
+
         // Progress indicator state
         this.progressState = {
             isProcessing: false,
             currentOperation: null,
             startTime: null
         };
-        
 
-        
+
+
         this.init();
     }
 
@@ -100,44 +114,48 @@ class RAGmeAssistant {
     async init() {
         try {
             console.log('RAGmeAssistant: Starting initialization...');
-            
+
             // Load configuration first
             await this.loadConfiguration();
             console.log('RAGmeAssistant: Configuration loaded');
-            
+
+            // Update API configuration from loaded config if available
+            this.updateApiConfig();
+
             this.connectSocket();
             console.log('RAGmeAssistant: Socket connected');
-            
+
             this.setupEventListeners();
             console.log('RAGmeAssistant: Event listeners setup');
-            
+
             this.setupResizeDivider();
             this.setupVisualizationResize();
             this.loadSettings();
             console.log('RAGmeAssistant: Settings loaded');
-            
+
             // Apply UI configuration after loading both config and localStorage settings
             // Use a small delay to ensure DOM elements are ready
             setTimeout(() => {
                 console.log('RAGmeAssistant: Applying UI configuration...');
                 this.applyUIConfiguration();
             }, 50);
-            
+
             this.loadChatSessions();
             this.renderChatHistory(); // Render chat history after loading
             console.log('RAGmeAssistant: Chat history rendered');
-            
+
             this.loadVectorDbInfo();
             this.startAutoRefresh();
-            
+            this.startHealthChecks();
+
             // Initialize visualization after settings are loaded
             // This ensures the visualization type selector reflects the saved preference
             setTimeout(() => {
                 this.updateVisualization();
             }, 100);
-            
+
             console.log('RAGmeAssistant: Initialization completed successfully');
-            
+
             // Update loading indicator to success
             const loadingDiv = document.getElementById('ragme-loading');
             if (loadingDiv) {
@@ -149,26 +167,49 @@ class RAGmeAssistant {
             }
         } catch (error) {
             console.error('RAGmeAssistant: Initialization failed:', error);
-            
+
             // Update loading indicator to error
             const loadingDiv = document.getElementById('ragme-loading');
             if (loadingDiv) {
                 loadingDiv.style.background = '#f44336';
                 loadingDiv.textContent = 'RAGme: Error!';
             }
-            
+
             // Show error notification to user
             this.showNotification('error', 'Failed to initialize application. Please refresh the page.');
         }
     }
 
+    updateApiConfig() {
+        // Update API configuration from loaded config if available
+        if (this.config && this.config.network && this.config.network.api) {
+            const apiConfig = this.config.network.api;
+            if (apiConfig.host && apiConfig.port) {
+                const protocol = apiConfig.ssl ? 'https' : 'http';
+                this.apiConfig.baseUrl = `${protocol}://${apiConfig.host}:${apiConfig.port}`;
+                console.log('API base URL updated from config:', this.apiConfig.baseUrl);
+            }
+        }
+    }
+
+    buildApiUrl(endpoint) {
+        // Build full API URL for a given endpoint
+        if (this.apiConfig.endpoints[endpoint]) {
+            return `${this.apiConfig.baseUrl}${this.apiConfig.endpoints[endpoint]}`;
+        }
+        // Fallback for custom endpoints - ensure proper slash handling
+        const baseUrl = this.apiConfig.baseUrl.endsWith('/') ? this.apiConfig.baseUrl.slice(0, -1) : this.apiConfig.baseUrl;
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        return `${baseUrl}${cleanEndpoint}`;
+    }
+
     async loadConfiguration() {
         try {
-            const response = await fetch('http://localhost:8021/config');
+            const response = await fetch(this.buildApiUrl('config'));
             if (response.ok) {
                 this.config = await response.json();
                 console.log('Configuration loaded:', this.config);
-                
+
                 // Update settings from configuration
                 if (this.config.frontend && this.config.frontend.settings) {
                     const configSettings = this.config.frontend.settings;
@@ -180,7 +221,7 @@ class RAGmeAssistant {
                         temperature: configSettings.temperature || this.settings.temperature
                     };
                 }
-                
+
                 // Update MCP servers from configuration
                 if (this.config.mcp_servers && this.config.mcp_servers.length > 0) {
                     this.mcpServers = this.config.mcp_servers.map(server => ({
@@ -190,26 +231,26 @@ class RAGmeAssistant {
                         authenticated: false // Will be updated based on actual status
                     }));
                 }
-                
+
                 // Update UI settings
                 if (this.config.frontend && this.config.frontend.ui) {
                     const uiConfig = this.config.frontend.ui;
-                    
+
                     // Basic UI settings
                     this.currentDateFilter = uiConfig.default_date_filter || this.currentDateFilter;
                     this.currentVisualizationType = uiConfig.default_visualization || this.currentVisualizationType;
                     this.isVisualizationVisible = uiConfig.visualization_visible !== undefined ? uiConfig.visualization_visible : this.isVisualizationVisible;
-                    
+
                     // Vector DB info display
                     this.settings.showVectorDbInfo = uiConfig.show_vector_db_info !== undefined ? uiConfig.show_vector_db_info : this.settings.showVectorDbInfo;
-                    
+
                     // Document list settings
                     this.settings.maxDocuments = uiConfig.max_documents || 10;
                     this.settings.documentOverviewEnabled = uiConfig.document_overview_enabled !== undefined ? uiConfig.document_overview_enabled : true;
                     this.settings.documentOverviewVisible = uiConfig.document_overview_visible !== undefined ? uiConfig.document_overview_visible : true;
                     this.settings.documentListCollapsed = uiConfig.document_list_collapsed !== undefined ? uiConfig.document_list_collapsed : false;
                     this.settings.documentListWidth = uiConfig.document_list_width || 35;
-                    
+
                     console.log('Loaded UI settings from config:', {
                         maxDocuments: this.settings.maxDocuments,
                         documentOverviewEnabled: this.settings.documentOverviewEnabled,
@@ -217,12 +258,12 @@ class RAGmeAssistant {
                         documentListCollapsed: this.settings.documentListCollapsed,
                         chatHistoryCollapsed: this.settings.chatHistoryCollapsed
                     });
-                    
+
                     // Chat History settings
                     this.settings.chatHistoryCollapsed = uiConfig.chat_history_collapsed !== undefined ? uiConfig.chat_history_collapsed : false;
                     this.settings.chatHistoryWidth = uiConfig.chat_history_width || 10;
                 }
-                
+
                 // Update query settings from configuration
                 if (this.config.query) {
                     const queryConfig = this.config.query;
@@ -230,7 +271,7 @@ class RAGmeAssistant {
                     this.settings.textRerankTopK = queryConfig.text_rerank_top_k || this.settings.textRerankTopK;
                     this.settings.textRelevanceThreshold = queryConfig.text_relevance_threshold || this.settings.textRelevanceThreshold;
                     this.settings.imageRelevanceThreshold = queryConfig.image_relevance_threshold || this.settings.imageRelevanceThreshold;
-                    
+
                     console.log('Loaded query settings from config:', {
                         topK: this.settings.topK,
                         textRerankTopK: this.settings.textRerankTopK,
@@ -238,46 +279,46 @@ class RAGmeAssistant {
                         imageRelevanceThreshold: this.settings.imageRelevanceThreshold
                     });
                 }
-                
+
                 // Update storage settings from configuration
                 if (this.config.storage) {
                     const storageConfig = this.config.storage;
                     this.settings.copyUploadedDocs = storageConfig.copy_uploaded_docs !== undefined ? storageConfig.copy_uploaded_docs : this.settings.copyUploadedDocs;
                     this.settings.copyUploadedImages = storageConfig.copy_uploaded_images !== undefined ? storageConfig.copy_uploaded_images : this.settings.copyUploadedImages;
                 }
-                
+
                 // Update LLM settings from configuration
                 if (this.config.llm) {
                     const llmConfig = this.config.llm;
                     this.settings.maxTokens = llmConfig.max_tokens || this.settings.maxTokens;
                     this.settings.temperature = llmConfig.temperature || this.settings.temperature;
                 }
-                
+
                 // Check MCP Tools feature flag
                 this.settings.mcpToolsEnabled = this.config.config && this.config.config.features && this.config.config.features.mcp_tools === true;
-                
+
                 // Apply MCP Tools UI configuration with a small delay to ensure DOM is ready
                 setTimeout(() => {
                     this.applyMcpToolsConfiguration();
                 }, 100);
-                
+
                 // Populate all form fields with loaded settings
                 this.populateSettingsForm();
-                
+
                 // Update page title and branding
                 if (this.config.application && this.config.application.title) {
                     document.title = this.config.application.title;
-                    
+
                     // Update header title as well
                     const headerTitle = document.querySelector('.header .title');
                     if (headerTitle) {
                         headerTitle.textContent = this.config.application.title;
                     }
                 }
-                
+
                 // Load vector DB info from backend
                 this.loadVectorDbInfoFromBackend();
-                
+
             } else {
                 console.warn('Could not load configuration from server, using defaults');
             }
@@ -289,16 +330,16 @@ class RAGmeAssistant {
     applyUIConfiguration() {
         // Apply Vector DB info display setting
         this.updateVectorDbInfoDisplay();
-        
+
         // Apply document list settings
         this.applyDocumentListSettings();
-        
+
         // Apply chat history settings
         this.applyChatHistorySettings();
-        
+
         // Apply document overview settings
         this.applyDocumentOverviewSettings();
-        
+
         // Apply MCP Tools configuration with a small delay to ensure DOM is ready
         setTimeout(() => {
             this.applyMcpToolsConfiguration();
@@ -308,7 +349,7 @@ class RAGmeAssistant {
     applyMcpToolsConfiguration() {
         const mcpToolsBtn = document.getElementById('mcpToolsBtn');
         const mcpServersMenuItem = document.getElementById('mcpServers');
-        
+
         if (this.settings.mcpToolsEnabled) {
             // MCP Tools is enabled - show MCP Tools button, hide MCP Servers menu
             if (mcpToolsBtn) {
@@ -334,16 +375,16 @@ class RAGmeAssistant {
             console.warn('Documents sidebar element not found');
             return;
         }
-        
+
         console.log('Applying document list settings:', {
             width: this.settings.documentListWidth,
             collapsed: this.settings.documentListCollapsed
         });
-        
+
         // Apply width
         documentsSidebar.style.width = `${this.settings.documentListWidth}%`;
         console.log('Set documents sidebar width to:', `${this.settings.documentListWidth}%`);
-        
+
         // Apply collapsed state
         if (this.settings.documentListCollapsed) {
             documentsSidebar.classList.add('collapsed');
@@ -362,7 +403,7 @@ class RAGmeAssistant {
                 restoreBtn.style.display = 'none';
             }
         }
-        
+
         // Ensure main content area fills the space when documents sidebar is collapsed
         const chatMainArea = document.querySelector('.chat-main-area');
         if (chatMainArea) {
@@ -380,16 +421,16 @@ class RAGmeAssistant {
             console.warn('Chat history sidebar element not found');
             return;
         }
-        
+
         console.log('Applying chat history settings:', {
             width: this.settings.chatHistoryWidth,
             collapsed: this.settings.chatHistoryCollapsed
         });
-        
+
         // Apply width
         chatHistorySidebar.style.width = `${this.settings.chatHistoryWidth}%`;
         console.log('Set chat history sidebar width to:', `${this.settings.chatHistoryWidth}%`);
-        
+
         // Apply collapsed state
         if (this.settings.chatHistoryCollapsed) {
             chatHistorySidebar.classList.add('collapsed');
@@ -408,7 +449,7 @@ class RAGmeAssistant {
                 restoreBtn.style.display = 'none';
             }
         }
-        
+
         // Ensure chat main area fills the space when sidebar is collapsed
         const chatMainArea = document.querySelector('.chat-main-area');
         if (chatMainArea) {
@@ -426,21 +467,21 @@ class RAGmeAssistant {
             console.warn('Document visualization element not found');
             return;
         }
-        
+
         console.log('Applying document overview settings:', {
             enabled: this.settings.documentOverviewEnabled,
             visible: this.settings.documentOverviewVisible
         });
-        
+
         // Apply enabled/disabled state
         if (!this.settings.documentOverviewEnabled) {
             visualization.style.display = 'none';
             console.log('Document overview disabled - hiding completely');
             return;
         }
-        
+
         visualization.style.display = 'block';
-        
+
         // Apply visible/hidden state
         if (!this.settings.documentOverviewVisible) {
             visualization.classList.add('hidden');
@@ -478,7 +519,7 @@ class RAGmeAssistant {
 
     connectSocket() {
         console.log('Connecting to RAGme.io Assistant server...');
-        
+
         // Safari-specific debugging
         console.log('Browser info:', {
             userAgent: navigator.userAgent,
@@ -486,7 +527,7 @@ class RAGmeAssistant {
             webkit: 'webkit' in window,
             io: typeof io !== 'undefined' ? 'available' : 'not available'
         });
-        
+
         try {
             // Safari-specific socket.io configuration
             const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -496,14 +537,14 @@ class RAGmeAssistant {
                 rememberUpgrade: true,
                 timeout: 20000
             } : {};
-            
+
             this.socket = io(socketOptions);
             console.log('Socket.io connection created with options:', socketOptions);
         } catch (error) {
             console.error('Failed to create socket connection:', error);
             this.showNotification('error', 'Failed to connect to server. Please check your connection.');
         }
-        
+
         this.socket.on('connect', () => {
             console.log('Connected to RAGme.io Assistant server');
             // Update connection status
@@ -512,7 +553,7 @@ class RAGmeAssistant {
             this.connectionStatus.failureCount = 0;
             this.connectionStatus.lastFailure = null;
             this.updateVectorDbInfoDisplay();
-            
+
             // Load documents after connection is established
             this.loadDocuments();
             // Start auto-refresh every 30 seconds
@@ -525,7 +566,7 @@ class RAGmeAssistant {
             this.connectionStatus.isConnected = false;
             this.connectionStatus.lastFailure = Date.now();
             this.updateVectorDbInfoDisplay();
-            
+
             // Stop auto-refresh when disconnected
             this.stopAutoRefresh();
         });
@@ -535,7 +576,7 @@ class RAGmeAssistant {
             const thinkingStartTime = this.thinkingStartTime || 0;
             const minThinkingTime = 500;
             const elapsed = Date.now() - thinkingStartTime;
-            
+
             if (elapsed < minThinkingTime) {
                 setTimeout(() => {
                     this.removeThinkingMessage();
@@ -545,7 +586,7 @@ class RAGmeAssistant {
                 this.removeThinkingMessage();
                 this.addMessage('ai', response.content, response.id);
             }
-            
+
             // Re-enable send button
             const sendButton = document.getElementById('sendButton');
             sendButton.disabled = false;
@@ -576,7 +617,7 @@ class RAGmeAssistant {
                 console.log('Loaded documents:', this.documents.length);
                 this.renderDocuments();
                 this.updateVisualization();
-                
+
                 // Update connection status on success
                 this.connectionStatus.isConnected = true;
                 this.connectionStatus.lastSuccess = Date.now();
@@ -585,7 +626,7 @@ class RAGmeAssistant {
                 this.updateVectorDbInfoDisplay();
             } else {
                 console.error('Failed to list documents:', result.message);
-                
+
                 // Update connection status on failure
                 this.connectionStatus.isConnected = false;
                 this.connectionStatus.failureCount++;
@@ -599,7 +640,7 @@ class RAGmeAssistant {
             console.log('Current filters - date:', this.currentDateFilter, 'content:', this.currentContentFilter);
             if (result.success) {
                 console.log('Previous documents count:', this.documents.length);
-                
+
                 // Store all documents for client-side pagination
                 if (result.pagination?.offset > 0) {
                     // Append new documents when loading more
@@ -611,22 +652,22 @@ class RAGmeAssistant {
                 this.pagination.totalDocuments = result.pagination?.count || result.items.length;
                 this.pagination.documentsPerPage = this.settings.maxDocuments;
                 this.pagination.totalPages = Math.ceil(this.pagination.totalDocuments / this.pagination.documentsPerPage);
-                
+
                 // Display first page
                 this.displayCurrentPage();
-                
+
                 console.log('Total documents loaded:', this.pagination.allDocuments.length);
                 console.log('Total documents available:', this.pagination.totalDocuments);
                 console.log('Total pages:', this.pagination.totalPages);
                 console.log('Current page:', this.pagination.currentPage);
                 console.log('Documents on current page:', this.documents.map(d => ({ id: d.id, url: d.url, content_type: d.content_type })));
-                
+
                 // Hide loading indicator
                 this.showPaginationLoading(false);
-                
+
                 this.updatePagination();
                 this.updateVisualization();
-                
+
                 // Update connection status on success
                 this.connectionStatus.isConnected = true;
                 this.connectionStatus.lastSuccess = Date.now();
@@ -635,10 +676,10 @@ class RAGmeAssistant {
                 this.updateVectorDbInfoDisplay();
             } else {
                 console.error('Failed to list content:', result.message);
-                
+
                 // Hide loading indicator on error
                 this.showPaginationLoading(false);
-                
+
                 // Update connection status on failure
                 this.connectionStatus.isConnected = false;
                 this.connectionStatus.failureCount++;
@@ -655,6 +696,17 @@ class RAGmeAssistant {
                     clearTimeout(this.vectorDbInfoRetryTimeout);
                     this.vectorDbInfoRetryTimeout = null;
                 }
+                // Update connection status on successful vector DB info
+                this.connectionStatus.isConnected = true;
+                this.connectionStatus.lastSuccess = Date.now();
+                this.connectionStatus.failureCount = 0;
+                this.connectionStatus.lastFailure = null;
+                this.updateVectorDbInfoDisplay();
+            } else {
+                // Update connection status on vector DB info failure
+                this.connectionStatus.isConnected = false;
+                this.connectionStatus.failureCount++;
+                this.connectionStatus.lastFailure = Date.now();
                 this.updateVectorDbInfoDisplay();
             }
         });
@@ -685,7 +737,7 @@ class RAGmeAssistant {
         // Hamburger menu
         const hamburgerMenu = document.getElementById('hamburgerMenu');
         const menuDropdown = document.getElementById('menuDropdown');
-        
+
         hamburgerMenu.addEventListener('click', (e) => {
             e.stopPropagation();
             menuDropdown.classList.toggle('show');
@@ -708,7 +760,7 @@ class RAGmeAssistant {
         // Menu items
         const manageChatsTrigger = document.getElementById('manageChatsTrigger');
         const manageChatsSubmenu = document.getElementById('manageChatsSubmenu');
-        
+
         // Show/hide submenu on click
         manageChatsTrigger.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -766,12 +818,12 @@ class RAGmeAssistant {
         // Document search input
         const documentSearchInput = document.getElementById('documentSearchInput');
         const clearSearchBtn = document.getElementById('clearSearchBtn');
-        
+
         documentSearchInput.addEventListener('input', (e) => {
             this.filterDocuments(e.target.value);
             this.toggleClearSearchButton(e.target.value);
         });
-        
+
         // Clear search button
         clearSearchBtn.addEventListener('click', () => {
             documentSearchInput.value = '';
@@ -797,11 +849,11 @@ class RAGmeAssistant {
         // Document settings popup close handlers
         const documentSettingsBackdrop = document.getElementById('documentSettingsBackdrop');
         const documentSettingsClose = document.getElementById('documentSettingsClose');
-        
+
         documentSettingsBackdrop.addEventListener('click', () => {
             this.hideDocumentSettingsPopup();
         });
-        
+
         documentSettingsClose.addEventListener('click', () => {
             this.hideDocumentSettingsPopup();
         });
@@ -849,24 +901,24 @@ class RAGmeAssistant {
 
         // MCP Tools button
         const mcpToolsBtn = document.getElementById('mcpToolsBtn');
-        
+
         mcpToolsBtn.addEventListener('click', (e) => {
             console.log('MCP Tools button clicked!');
-            
+
             // Prevent the click from bubbling up to the document
             e.stopPropagation();
-            
+
             this.toggleMcpToolsPopup();
         });
 
         // MCP Tools popup close handlers
         const mcpBackdrop = document.getElementById('mcpToolsBackdrop');
         const mcpCloseBtn = document.getElementById('mcpToolsClose');
-        
+
         mcpBackdrop.addEventListener('click', () => {
             this.hideMcpToolsPopup();
         });
-        
+
         mcpCloseBtn.addEventListener('click', () => {
             this.hideMcpToolsPopup();
         });
@@ -874,27 +926,27 @@ class RAGmeAssistant {
         // Recent prompts button
         const recentPromptsBtn = document.getElementById('recentPromptsBtn');
         const recentPromptsPopup = document.getElementById('recentPromptsPopup');
-        
+
         recentPromptsBtn.addEventListener('click', (e) => {
             console.log('Recent prompts button clicked!');
             console.log('Button element:', recentPromptsBtn);
             console.log('Button visible:', recentPromptsBtn.offsetParent !== null);
             console.log('Button disabled:', recentPromptsBtn.disabled);
-            
+
             // Prevent the click from bubbling up to the document
             e.stopPropagation();
-            
+
             this.toggleRecentPromptsPopup();
         });
 
         // Close popup when clicking backdrop or close button
         const backdrop = document.getElementById('recentPromptsBackdrop');
         const closeBtn = document.getElementById('recentPromptsClose');
-        
+
         backdrop.addEventListener('click', () => {
             this.hideRecentPromptsPopup();
         });
-        
+
         closeBtn.addEventListener('click', () => {
             this.hideRecentPromptsPopup();
         });
@@ -1014,12 +1066,12 @@ class RAGmeAssistant {
         document.getElementById('paginationSize').addEventListener('input', (e) => {
             document.getElementById('paginationSizeValue').textContent = e.target.value;
         });
-        
+
         // Query settings range input updates
         document.getElementById('textRelevanceThreshold').addEventListener('input', (e) => {
             document.getElementById('textRelevanceThresholdValue').textContent = e.target.value;
         });
-        
+
         document.getElementById('imageRelevanceThreshold').addEventListener('input', (e) => {
             document.getElementById('imageRelevanceThresholdValue').textContent = e.target.value;
         });
@@ -1094,7 +1146,7 @@ class RAGmeAssistant {
                 if (e.target === overlay) {
                     const modalId = overlay.id;
                     this.hideModal(modalId);
-                    
+
                     // Reset document details modal state if it was closed
                     if (modalId === 'documentDetailsModal') {
                         this.documentDetailsModal.isOpen = false;
@@ -1106,17 +1158,27 @@ class RAGmeAssistant {
             });
         });
 
+        // Event delegation for force refresh icon
+        document.addEventListener('click', (e) => {
+            const forceRefreshIcon = e.target.closest('[data-action="force-refresh-summary"]');
+            if (forceRefreshIcon) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.forceRefreshSummary();
+            }
+        });
+
     }
 
     sendMessage() {
         const chatInput = document.getElementById('chatInput');
         const message = chatInput.value.trim();
-        
+
         if (!message) return;
 
         // Add user message
         this.addMessage('user', message);
-        
+
         // Clear input
         chatInput.value = '';
         chatInput.style.height = 'auto';
@@ -1149,7 +1211,7 @@ class RAGmeAssistant {
     addThinkingMessage() {
         const messagesContainer = document.getElementById('chatMessages');
         const thinkingId = 'thinking-' + Date.now();
-        
+
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message ai thinking';
         messageDiv.dataset.messageId = thinkingId;
@@ -1177,7 +1239,7 @@ class RAGmeAssistant {
 
         // Scroll to bottom
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
+
         return thinkingId;
     }
 
@@ -1195,13 +1257,13 @@ class RAGmeAssistant {
         console.log('toggleRecentPromptsPopup called');
         const popup = document.getElementById('recentPromptsPopup');
         const button = document.getElementById('recentPromptsBtn');
-        
+
         console.log('Popup element:', popup);
         console.log('Popup has show class:', popup.classList.contains('show'));
         console.log('Popup display style before toggle:', window.getComputedStyle(popup).display);
         console.log('Popup visibility before toggle:', window.getComputedStyle(popup).visibility);
         console.log('Popup opacity before toggle:', window.getComputedStyle(popup).opacity);
-        
+
         if (popup.classList.contains('show')) {
             console.log('Hiding popup...');
             this.hideRecentPromptsPopup();
@@ -1216,21 +1278,21 @@ class RAGmeAssistant {
         const backdrop = document.getElementById('recentPromptsBackdrop');
         const button = document.getElementById('recentPromptsBtn');
         const list = document.getElementById('recentPromptsList');
-        
+
         // Check if list element exists
         if (!list) {
             console.error('recentPromptsList element not found!');
             return;
         }
-        
+
         // Clear previous content
         list.innerHTML = '';
-        
+
         // Get current chat messages to determine if it's a new chat or ongoing
         const chatMessages = document.getElementById('chatMessages');
         const userMessages = chatMessages.querySelectorAll('.message.user .message-content');
         const isNewChat = userMessages.length === 0;
-        
+
         if (isNewChat) {
             // Show sample prompts for new chat
             this.addSamplePrompts(list);
@@ -1239,12 +1301,12 @@ class RAGmeAssistant {
             this.addRecentPrompts(list, userMessages);
             this.addSamplePrompts(list);
         }
-        
+
         // Show backdrop and popup
         backdrop.classList.add('show');
         popup.classList.add('show');
         button.classList.add('active');
-        
+
         // Prevent body scroll
         document.body.style.overflow = 'hidden';
     }
@@ -1253,12 +1315,12 @@ class RAGmeAssistant {
         const popup = document.getElementById('recentPromptsPopup');
         const backdrop = document.getElementById('recentPromptsBackdrop');
         const button = document.getElementById('recentPromptsBtn');
-        
+
         // Hide backdrop and popup
         backdrop.classList.remove('show');
         popup.classList.remove('show');
         button.classList.remove('active');
-        
+
         // Restore body scroll
         document.body.style.overflow = '';
     }
@@ -1271,7 +1333,7 @@ class RAGmeAssistant {
             { text: 'what do you know about [document title]', icon: 'fas fa-question-circle' },
             { text: 'tell me about [document title]', icon: 'fas fa-info-circle' }
         ];
-        
+
         samplePrompts.forEach(prompt => {
             const item = document.createElement('div');
             item.className = 'recent-prompts-item sample';
@@ -1292,7 +1354,7 @@ class RAGmeAssistant {
                 recentPrompts.unshift(prompt);
             }
         }
-        
+
         recentPrompts.forEach(prompt => {
             const item = document.createElement('div');
             item.className = 'recent-prompts-item recent';
@@ -1309,67 +1371,67 @@ class RAGmeAssistant {
         const popup = document.getElementById('documentSettingsPopup');
         const backdrop = document.getElementById('documentSettingsBackdrop');
         const button = document.getElementById('documentSettingsBtn');
-        
+
         console.log('Opening document settings popup...');
         console.log('Popup element:', popup);
         console.log('Backdrop element:', backdrop);
         console.log('Button element:', button);
-        
+
         if (!popup) {
             console.error('Document settings popup not found!');
             return;
         }
-        
+
         if (!backdrop) {
             console.error('Document settings backdrop not found!');
             return;
         }
-        
+
         // Debug popup positioning
         console.log('Popup position before:', popup.style.position);
         console.log('Popup top before:', popup.style.top);
         console.log('Popup right before:', popup.style.right);
-        
+
         // Set current values in the popup
         const contentFilterSelector = document.getElementById('contentFilterSelector');
         const dateFilterSelector = document.getElementById('dateFilterSelector');
-        
+
         if (contentFilterSelector && dateFilterSelector) {
             contentFilterSelector.value = this.currentContentFilter;
             dateFilterSelector.value = this.currentDateFilter;
         }
-        
+
         // Show backdrop and popup first
         backdrop.classList.add('show');
         popup.classList.add('show');
         button.classList.add('active');
-        
+
         // Prevent body scroll
         document.body.style.overflow = 'hidden';
-        
+
         console.log('Document settings popup should be visible now');
         console.log('Popup classes:', popup.className);
         console.log('Backdrop classes:', backdrop.className);
         console.log('Popup position after:', popup.style.position);
         console.log('Popup top after:', popup.style.top);
         console.log('Popup right after:', popup.style.right);
-        
+
         // Position popup correctly below the sidebar header
         const documentsSidebar = document.querySelector('.documents-sidebar');
         const sidebarRect = documentsSidebar.getBoundingClientRect();
-        
+
         console.log('Sidebar rect:', sidebarRect);
-        
+
         // Calculate position - use sidebar top + header height + margin
         const headerHeight = 80; // Approximate header height
         const topPosition = sidebarRect.top + headerHeight + 8;
         const leftPosition = sidebarRect.left + (sidebarRect.width / 2) - 150;
-        
+
         console.log('Calculated top:', topPosition, 'left:', leftPosition);
-        
+
         // Clear any existing inline styles and set new ones
         popup.removeAttribute('style');
-        
+
         // Position popup in center of screen
         popup.style.position = 'fixed';
         popup.style.top = '50%';
@@ -1381,7 +1443,7 @@ class RAGmeAssistant {
         popup.style.width = '300px';
         popup.style.maxHeight = '400px';
         popup.style.overflow = 'auto';
-        
+
         console.log('Popup positioned in center of screen');
     }
 
@@ -1389,12 +1451,12 @@ class RAGmeAssistant {
         const popup = document.getElementById('documentSettingsPopup');
         const backdrop = document.getElementById('documentSettingsBackdrop');
         const button = document.getElementById('documentSettingsBtn');
-        
+
         // Hide backdrop and popup
         backdrop.classList.remove('show');
         popup.classList.remove('show');
         button.classList.remove('active');
-        
+
         // Restore body scroll
         document.body.style.overflow = '';
     }
@@ -1403,22 +1465,22 @@ class RAGmeAssistant {
     filterDocuments(searchTerm) {
         const documentCards = document.querySelectorAll('.document-card');
         const searchLower = searchTerm.toLowerCase();
-        
+
         documentCards.forEach(card => {
             const title = card.querySelector('.document-title')?.textContent || '';
             const url = card.querySelector('.document-url')?.textContent || '';
             const date = card.querySelector('.document-date')?.textContent || '';
             const content = card.querySelector('.document-content')?.textContent || '';
-            
+
             const searchableText = `${title} ${url} ${date} ${content}`.toLowerCase();
-            
+
             if (searchableText.includes(searchLower)) {
                 card.style.display = 'block';
             } else {
                 card.style.display = 'none';
             }
         });
-        
+
         // Update document count
         const visibleCards = document.querySelectorAll('.document-card[style*="display: block"], .document-card:not([style*="display: none"])');
         console.log(`Showing ${visibleCards.length} documents matching "${searchTerm}"`);
@@ -1436,9 +1498,9 @@ class RAGmeAssistant {
     updateFilterIndicator() {
         const filterIcon = document.getElementById('filterIcon');
         const filterIndicator = document.getElementById('filterIndicator');
-        
+
         if (!filterIcon || !filterIndicator) return;
-        
+
         switch (this.currentContentFilter) {
             case 'documents':
                 filterIcon.className = 'fas fa-file-alt';
@@ -1460,9 +1522,9 @@ class RAGmeAssistant {
     updateDateFilterIndicator() {
         const dateFilterIcon = document.getElementById('dateFilterIcon');
         const dateFilterIndicator = document.getElementById('dateFilterIndicator');
-        
+
         if (!dateFilterIcon || !dateFilterIndicator) return;
-        
+
         switch (this.currentDateFilter) {
             case 'today':
                 dateFilterIcon.className = 'fas fa-calendar-day';
@@ -1492,7 +1554,7 @@ class RAGmeAssistant {
     toggleMcpToolsPopup() {
         console.log('toggleMcpToolsPopup called');
         const popup = document.getElementById('mcpToolsPopup');
-        
+
         if (popup.classList.contains('show')) {
             console.log('Hiding MCP tools popup...');
             this.hideMcpToolsPopup();
@@ -1507,24 +1569,24 @@ class RAGmeAssistant {
         const backdrop = document.getElementById('mcpToolsBackdrop');
         const button = document.getElementById('mcpToolsBtn');
         const list = document.getElementById('mcpToolsList');
-        
+
         // Check if list element exists
         if (!list) {
             console.error('mcpToolsList element not found!');
             return;
         }
-        
+
         // Clear previous content
         list.innerHTML = '';
-        
+
         // Populate MCP servers list
         this.renderMcpServers(list);
-        
+
         // Show backdrop and popup
         backdrop.classList.add('show');
         popup.classList.add('show');
         button.classList.add('active');
-        
+
         // Prevent body scroll
         document.body.style.overflow = 'hidden';
     }
@@ -1533,12 +1595,12 @@ class RAGmeAssistant {
         const popup = document.getElementById('mcpToolsPopup');
         const backdrop = document.getElementById('mcpToolsBackdrop');
         const button = document.getElementById('mcpToolsBtn');
-        
+
         // Hide backdrop and popup
         backdrop.classList.remove('show');
         popup.classList.remove('show');
         button.classList.remove('active');
-        
+
         // Restore body scroll
         document.body.style.overflow = '';
     }
@@ -1547,11 +1609,11 @@ class RAGmeAssistant {
         this.mcpServers.forEach(server => {
             const item = document.createElement('div');
             item.className = 'mcp-tools-item';
-            
+
             // Disable non-authenticated servers
             const isDisabled = !server.authenticated;
             const disabledClass = isDisabled ? 'disabled' : '';
-            
+
             item.innerHTML = `
                 <div class="mcp-tools-item-info" title="${isDisabled ? 'Authenticate with MCP Servers menu to enable this server' : ''}">
                     <div class="mcp-tools-item-icon">
@@ -1564,7 +1626,7 @@ class RAGmeAssistant {
                 </div>
                 <div class="mcp-tools-toggle ${server.enabled ? 'enabled' : ''} ${disabledClass}" data-server="${server.name}" title="${isDisabled ? 'Authenticate with MCP Servers menu to enable this server' : ''}"></div>
             `;
-            
+
             // Add click handler for toggle (only for authenticated servers)
             const toggle = item.querySelector('.mcp-tools-toggle');
             if (!isDisabled) {
@@ -1572,7 +1634,7 @@ class RAGmeAssistant {
                     this.toggleMcpServer(server.name);
                 });
             }
-            
+
             list.appendChild(item);
         });
     }
@@ -1583,67 +1645,67 @@ class RAGmeAssistant {
             console.error('Server not found:', serverName);
             return;
         }
-        
+
         // Prevent toggling non-authenticated servers
         if (!server.authenticated) {
             this.showNotification('warning', `${serverName} must be authenticated before it can be enabled/disabled`);
             return;
         }
-        
+
         // Toggle the enabled state
         server.enabled = !server.enabled;
-        
+
         // Update the UI
         const toggle = document.querySelector(`[data-server="${serverName}"]`);
         if (toggle) {
             toggle.classList.toggle('enabled', server.enabled);
         }
-        
+
         // Log the change
         console.log(`MCP Server ${serverName} ${server.enabled ? 'enabled' : 'disabled'}`);
-        
+
         // Add to pending changes for batching
         this.addToPendingChanges(serverName, server.enabled);
     }
 
     addToPendingChanges(serverName, enabled) {
         console.log('Adding to pending changes:', serverName, enabled);
-        
+
         // Remove any existing change for this server
         this.pendingMcpChanges = this.pendingMcpChanges.filter(change => change.server !== serverName);
-        
+
         // Add the new change
         this.pendingMcpChanges.push({
             server: serverName,
             enabled: enabled
         });
-        
+
         console.log('Current pending changes:', this.pendingMcpChanges);
-        
+
         // Clear existing timeout and set new one
         if (this.mcpChangeTimeout) {
             clearTimeout(this.mcpChangeTimeout);
         }
-        
+
         // Send changes after a short delay (batching)
         this.mcpChangeTimeout = setTimeout(() => {
             console.log('Timeout triggered, sending changes...');
             this.sendPendingMcpChanges();
         }, 500); // 500ms delay for batching
     }
-    
+
     sendPendingMcpChanges() {
         if (this.pendingMcpChanges.length === 0) {
             return;
         }
-        
+
         const changes = [...this.pendingMcpChanges];
         this.pendingMcpChanges = []; // Clear pending changes
-        
+
         console.log('Sending MCP server changes:', changes);
-        
+
         // Call the backend API to update MCP server configurations
-        fetch('http://localhost:8021/mcp-server-config', {
+        fetch(this.buildApiUrl('mcpConfig'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1667,7 +1729,7 @@ class RAGmeAssistant {
             console.error('Error updating MCP server configurations:', error);
             // Show error notification
             this.showNotification(`Failed to update MCP server configurations: ${error.message}`, 'error');
-            
+
             // Revert all changes on error
             changes.forEach(change => {
                 const server = this.mcpServers.find(s => s.name === change.server);
@@ -1681,7 +1743,7 @@ class RAGmeAssistant {
             });
         });
     }
-    
+
     updateMcpServerStatus(serverName, enabled) {
         // Legacy method - now uses batching instead
         this.addToPendingChanges(serverName, enabled);
@@ -1698,11 +1760,11 @@ class RAGmeAssistant {
         if (!list) return;
 
         list.innerHTML = '';
-        
+
         this.mcpServers.forEach(server => {
             const item = document.createElement('div');
             item.className = 'mcp-server-item';
-            
+
             item.innerHTML = `
                 <div class="mcp-server-info">
                     <div class="mcp-server-icon">
@@ -1722,7 +1784,7 @@ class RAGmeAssistant {
                     </button>
                 </div>
             `;
-            
+
             // Add click handler for authenticate button
             const authBtn = item.querySelector('.authenticate-btn');
             if (!server.authenticated) {
@@ -1730,7 +1792,7 @@ class RAGmeAssistant {
                     this.showAuthenticationModal(server.name);
                 });
             }
-            
+
             list.appendChild(item);
         });
     }
@@ -1738,44 +1800,44 @@ class RAGmeAssistant {
     showAuthenticationModal(serverName) {
         const title = document.getElementById('authModalTitle');
         const message = document.getElementById('authModalMessage');
-        
+
         title.textContent = 'Authenticate';
         message.textContent = `Authenticate with ${serverName}`;
-        
+
         // Store the server name for the confirmation
         this.currentAuthServer = serverName;
-        
+
         this.showModal('authModal');
     }
 
     confirmAuthentication() {
         if (!this.currentAuthServer) return;
-        
+
         const server = this.mcpServers.find(s => s.name === this.currentAuthServer);
         if (!server) return;
-        
+
         // Mark as authenticated and enabled
         server.authenticated = true;
         server.enabled = true;
-        
+
         // Update the API
         this.updateMcpServerWithAuth(this.currentAuthServer, true, true);
-        
+
         // Hide the auth modal
         this.hideModal('authModal');
-        
+
         // Re-render the MCP servers list
         this.renderMcpServersList();
-        
+
         // Show success notification
                     this.showNotification(`Successfully authenticated with ${this.currentAuthServer}`, 'success');
-        
+
         this.currentAuthServer = null;
     }
 
     updateMcpServerWithAuth(serverName, enabled, authenticated) {
         // Call the backend API to update MCP server configuration with authentication
-        fetch('http://localhost:8021/mcp-server-config', {
+        fetch(this.buildApiUrl('mcpConfig'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1807,11 +1869,11 @@ class RAGmeAssistant {
         const chatInput = document.getElementById('chatInput');
         chatInput.value = prompt;
         chatInput.focus();
-        
+
         // Auto-resize the textarea
         chatInput.style.height = 'auto';
         chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-        
+
         // Hide the popup
         this.hideRecentPromptsPopup();
     }
@@ -1819,7 +1881,7 @@ class RAGmeAssistant {
     addMessage(type, content, id = null) {
         const messagesContainer = document.getElementById('chatMessages');
         const messageId = id || Date.now().toString();
-        
+
         const message = {
             id: messageId,
             type,
@@ -1836,12 +1898,12 @@ class RAGmeAssistant {
             if (currentChat) {
                 currentChat.messages.push(message);
                 currentChat.updatedAt = new Date().toISOString();
-                
+
                 // Update chat title based on first user message
                 if (type === 'user' && currentChat.messages.filter(m => m.type === 'user').length === 1) {
                     currentChat.title = content.substring(0, 50) + (content.length > 50 ? '...' : '');
                 }
-                
+
                 this.saveChatSessions();
                 this.renderChatHistory();
             }
@@ -1855,7 +1917,7 @@ class RAGmeAssistant {
 
     addWelcomeMessage() {
         const appTitle = this.config?.application?.title || '🤖 RAGme.io Assistant';
-        const welcomeMessage = `Welcome to **${appTitle}**! 
+        const welcomeMessage = `Welcome to **${appTitle}**!
 
 I can help you with:
 
@@ -1879,11 +1941,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        
+
         this.chatSessions.unshift(newChat);
         this.currentChatId = chatId;
         this.chatHistory = [];
-        
+
         this.renderChatHistory();
         this.addWelcomeMessage();
         this.saveChatSessions();
@@ -1919,14 +1981,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const chatItem = document.createElement('div');
             chatItem.className = 'chat-history-item';
             chatItem.dataset.chatId = chat.id;
-            
+
             if (chat.id === this.currentChatId) {
                 chatItem.classList.add('active');
             }
 
             const date = new Date(chat.updatedAt);
             const timeString = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            
+
             chatItem.innerHTML = `
                 <div class="chat-id">#${chat.id}</div>
                 <div class="chat-title" data-chat-id="${chat.id}">${chat.title}</div>
@@ -1941,46 +2003,46 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     <i class="fas fa-trash"></i>
                 </button>
             `;
-            
+
             // Add click handler for loading chat
             chatItem.addEventListener('click', (e) => {
                 // Don't load chat if clicking on buttons or title (for editing)
-                if (!e.target.classList.contains('chat-title') && 
+                if (!e.target.classList.contains('chat-title') &&
                     !e.target.closest('.chat-delete-btn') &&
                     !e.target.closest('.chat-save-btn') &&
                     !e.target.closest('.chat-email-btn')) {
                     this.loadChat(chat.id);
                 }
             });
-            
+
             // Add click handler for editing title
             const titleElement = chatItem.querySelector('.chat-title');
             titleElement.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.editChatTitle(chat.id, chat.title);
             });
-            
+
             // Add click handler for deleting chat
             const deleteBtn = chatItem.querySelector('.chat-delete-btn');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.deleteChat(chat.id);
             });
-            
+
             // Add click handler for saving chat
             const saveBtn = chatItem.querySelector('.chat-save-btn');
             saveBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.saveChatAsFile(chat);
             });
-            
+
             // Add click handler for emailing chat
             const emailBtn = chatItem.querySelector('.chat-email-btn');
             emailBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.showChatEmailModal(chat);
             });
-            
+
             container.appendChild(chatItem);
         });
     }
@@ -1990,14 +2052,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (chat) {
             this.currentChatId = chatId;
             this.chatHistory = [...chat.messages];
-            
+
             const messagesContainer = document.getElementById('chatMessages');
             messagesContainer.innerHTML = '';
-            
+
             this.chatHistory.forEach(msg => {
                 this.renderMessage(msg);
             });
-            
+
             this.renderChatHistory();
         }
     }
@@ -2005,7 +2067,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     editChatTitle(chatId, currentTitle) {
         const titleElement = document.querySelector(`[data-chat-id="${chatId}"]`);
         if (!titleElement) return;
-        
+
         const input = document.createElement('input');
         input.type = 'text';
         input.value = currentTitle;
@@ -2020,7 +2082,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             background: white;
             color: #374151;
         `;
-        
+
         const saveTitle = () => {
             const newTitle = input.value.trim();
             if (newTitle && newTitle !== currentTitle) {
@@ -2034,11 +2096,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             }
             titleElement.textContent = newTitle || currentTitle;
         };
-        
+
         const cancelEdit = () => {
             titleElement.textContent = currentTitle;
         };
-        
+
         input.addEventListener('blur', saveTitle);
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -2047,7 +2109,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 cancelEdit();
             }
         });
-        
+
         titleElement.textContent = '';
         titleElement.appendChild(input);
         input.focus();
@@ -2060,31 +2122,31 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.showNotification('Chat not found', 'error');
             return;
         }
-        
+
         const confirmMessage = `Are you sure you want to delete "${chat.title}"? This action cannot be undone.`;
         if (!confirm(confirmMessage)) {
             return;
         }
-        
+
         // Remove chat from sessions
         this.chatSessions = this.chatSessions.filter(c => c.id !== chatId);
-        
+
         // If this was the current chat, clear it
         if (this.currentChatId === chatId) {
             this.currentChatId = null;
             this.clearChat();
         }
-        
+
         // Save updated sessions
         this.saveChatSessions();
         this.renderChatHistory();
-        
+
         this.showNotification(`Deleted chat: ${chat.title}`, 'success');
     }
 
     renderMessage(message) {
         const messagesContainer = document.getElementById('chatMessages');
-        
+
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.type}`;
         messageDiv.dataset.messageId = message.id;
@@ -2100,7 +2162,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const parsedContent = simpleMarkdownParser(message.content);
         const sanitizedContent = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(parsedContent) : parsedContent;
         contentDiv.innerHTML = sanitizedContent;
-        
+
         // Load any images in AI messages
         if (message.type === 'ai') {
             this.loadAgentImages(contentDiv);
@@ -2185,11 +2247,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('Toggling sidebar:', sidebarId, restoreBtnId);
         const sidebar = document.getElementById(sidebarId);
         const restoreBtn = document.getElementById(restoreBtnId);
-        
+
         if (sidebar && restoreBtn) {
             sidebar.classList.add('collapsed');
             restoreBtn.style.display = 'block';
-            
+
             // Hide resize divider when documents sidebar is collapsed
             if (sidebarId === 'documentsSidebar') {
                 const resizeDivider = document.getElementById('resizeDivider');
@@ -2197,7 +2259,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     resizeDivider.classList.add('hidden');
                 }
             }
-            
+
             console.log('Sidebar collapsed, restore button shown');
         } else {
             console.error('Could not find sidebar or restore button:', { sidebar, restoreBtn });
@@ -2208,11 +2270,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('Restoring sidebar:', sidebarId, restoreBtnId);
         const sidebar = document.getElementById(sidebarId);
         const restoreBtn = document.getElementById(restoreBtnId);
-        
+
         if (sidebar && restoreBtn) {
             sidebar.classList.remove('collapsed');
             restoreBtn.style.display = 'none';
-            
+
             // Show resize divider when documents sidebar is restored
             if (sidebarId === 'documentsSidebar') {
                 const resizeDivider = document.getElementById('resizeDivider');
@@ -2220,7 +2282,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     resizeDivider.classList.remove('hidden');
                 }
             }
-            
+
             console.log('Sidebar restored, restore button hidden');
         } else {
             console.error('Could not find sidebar or restore button:', { sidebar, restoreBtn });
@@ -2244,14 +2306,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
-            
+
             const deltaX = startX - e.clientX;
             const newWidth = startWidth + deltaX;
-            
+
             // Use configuration-based limits
             const minWidth = 200;
             const maxWidth = window.innerWidth * (this.settings.documentListWidth / 100);
-            
+
             if (newWidth > minWidth && newWidth < maxWidth) {
                 documentsSidebar.style.width = newWidth + 'px';
             }
@@ -2267,7 +2329,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const resizeHandle = document.getElementById('visualizationResizeHandle');
         const visualization = document.getElementById('documentsVisualization');
         const documentsContent = document.getElementById('documentsContent');
-        
+
         let isResizing = false;
         let startY = 0;
         let startHeight = 0;
@@ -2311,10 +2373,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
-            
+
             const deltaY = e.clientY - startY;
             const newHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + deltaY));
-            
+
             visualization.style.height = newHeight + 'px';
         });
 
@@ -2324,7 +2386,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 resizeHandle.classList.remove('resizing');
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
-                
+
                 // Only update visualization if it's visible and user manually resized
                 if (this.isVisualizationVisible) {
                     console.log('Manual resize complete, updating visualization...');
@@ -2341,25 +2403,25 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     async showSettingsModal() {
         this.showModal('settingsModal');
-        
+
         // Populate application information
         if (this.config && this.config.application) {
             document.getElementById('appName').textContent = this.config.application.name || 'RAGme';
             document.getElementById('appVersion').textContent = this.config.application.version || '1.0.0';
         }
-        
+
         // Load and set vector DB info with a delay to ensure it runs after other functions
         setTimeout(() => {
             this.loadVectorDbInfoForSettings();
         }, 100);
-        
+
         // Populate general settings
         document.getElementById('maxDocuments').value = this.settings.maxDocuments;
         document.getElementById('maxDocumentsValue').textContent = this.settings.maxDocuments;
         document.getElementById('showVectorDbInfo').checked = this.settings.showVectorDbInfo;
         document.getElementById('autoRefresh').checked = this.settings.autoRefresh;
         document.getElementById('refreshInterval').value = this.settings.refreshInterval / 1000; // Convert to seconds
-        
+
         // Populate interface settings
         document.getElementById('documentListWidth').value = this.settings.documentListWidth;
         document.getElementById('documentListWidthValue').textContent = this.settings.documentListWidth + '%';
@@ -2368,11 +2430,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         document.getElementById('documentListCollapsed').checked = this.settings.documentListCollapsed;
         document.getElementById('chatHistoryCollapsed').checked = this.settings.chatHistoryCollapsed;
         document.getElementById('documentOverviewVisible').checked = this.settings.documentOverviewVisible;
-        
+
         // Populate visualization settings
         document.getElementById('defaultVisualization').value = this.currentVisualizationType;
         document.getElementById('defaultDateFilter').value = this.currentDateFilter;
-        
+
         // Populate document settings
         document.getElementById('documentOverviewEnabled').checked = this.settings.documentOverviewEnabled;
         document.getElementById('maxDisplayDocuments').value = this.settings.maxDisplayDocuments || 10;
@@ -2380,14 +2442,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         document.getElementById('paginationSize').value = this.settings.paginationSize || 10;
         document.getElementById('paginationSizeValue').textContent = this.settings.paginationSize || 10;
         document.getElementById('defaultContentFilter').value = this.currentContentFilter;
-        
+
         // Populate chat settings
         document.getElementById('maxTokens').value = this.settings.maxTokens;
         document.getElementById('temperature').value = this.settings.temperature;
         document.getElementById('temperatureValue').textContent = this.settings.temperature;
         document.getElementById('chatHistoryLimit').value = this.settings.chatHistoryLimit || 50;
         document.getElementById('autoSaveChats').checked = this.settings.autoSaveChats !== false;
-        
+
         // Populate storage settings from backend config
         if (this.config && this.config.config && this.config.config.storage) {
             document.getElementById('copyUploadedDocs').checked = this.config.config.storage.copy_uploaded_docs || false;
@@ -2397,7 +2459,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             document.getElementById('copyUploadedDocs').checked = this.settings.copyUploadedDocs || false;
             document.getElementById('copyUploadedImages').checked = this.settings.copyUploadedImages || false;
         }
-        
+
         // Populate query settings
         document.getElementById('topK').value = this.settings.topK || 5;
         document.getElementById('textRerankTopK').value = this.settings.textRerankTopK || 3;
@@ -2405,12 +2467,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         document.getElementById('textRelevanceThresholdValue').textContent = this.settings.textRelevanceThreshold || 0.8;
         document.getElementById('imageRelevanceThreshold').value = this.settings.imageRelevanceThreshold || 0.8;
         document.getElementById('imageRelevanceThresholdValue').textContent = this.settings.imageRelevanceThreshold || 0.8;
-        
+
         // Ensure configuration is loaded
         if (!this.config) {
             await this.loadConfiguration();
         }
-        
+
         // Load storage information
         await this.loadStorageInfoForSettings();
     }
@@ -2423,7 +2485,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     hideModal(modalId) {
         const modal = document.getElementById(modalId);
         modal.classList.remove('show');
-        
+
         // Reset modal state when closing document details modal
         if (modalId === 'documentDetailsModal') {
             this.documentDetailsModal.isOpen = false;
@@ -2436,7 +2498,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     toggleSubmenu(submenuId, triggerId) {
         const submenu = document.getElementById(submenuId);
         const trigger = document.getElementById(triggerId);
-        
+
         if (submenu.classList.contains('show')) {
             submenu.classList.remove('show');
             trigger.classList.remove('active');
@@ -2462,11 +2524,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     submitAddContent() {
         const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-        
+
         if (activeTab === 'urlTab') {
             const urlsInput = document.getElementById('urlsInput');
             const urls = urlsInput.value.trim().split('\n').filter(url => url.trim());
-            
+
             if (urls.length === 0) {
                 this.showNotification('error', 'Please enter at least one URL');
                 return;
@@ -2478,7 +2540,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } else if (activeTab === 'filesTab') {
             const fileInput = document.getElementById('fileInput');
             const files = fileInput.files;
-            
+
             if (files.length === 0) {
                 this.showNotification('error', 'Please select at least one file');
                 return;
@@ -2489,7 +2551,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } else if (activeTab === 'imagesTab') {
             const imageInput = document.getElementById('imageInput');
             const images = imageInput.files;
-            
+
             if (images.length === 0) {
                 this.showNotification('error', 'Please select at least one image');
                 return;
@@ -2500,11 +2562,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } else if (activeTab === 'jsonTab') {
             const jsonInput = document.getElementById('jsonInput');
             const metadataInput = document.getElementById('metadataInput');
-            
+
             try {
                 const jsonData = JSON.parse(jsonInput.value.trim());
                 const metadata = metadataInput.value.trim() ? JSON.parse(metadataInput.value.trim()) : null;
-                
+
                 this.showProgressIndicator('JSON', 'Processing JSON data...');
                 this.socket.emit('add_json', { jsonData, metadata });
                 jsonInput.value = '';
@@ -2520,7 +2582,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     uploadFiles(files) {
         const formData = new FormData();
-        
+
         for (let i = 0; i < files.length; i++) {
             formData.append('files', files[i]);
         }
@@ -2546,7 +2608,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 setTimeout(() => {
                     this.updateProgressText(`Analyzing ${files.length} document(s) with AI...`);
                 }, 600);
-                
+
                 setTimeout(() => {
                     this.hideProgressIndicator();
                     this.showNotification(`✅ Successfully processed ${files.length} document(s) - text extraction and AI analysis complete`, 'success');
@@ -2568,7 +2630,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     uploadImages(files) {
         console.log('Uploading images:', files);
         const formData = new FormData();
-        
+
         for (let i = 0; i < files.length; i++) {
             console.log('Adding file to FormData:', files[i].name, files[i].type, files[i].size);
             formData.append('files', files[i]);
@@ -2596,7 +2658,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 setTimeout(() => {
                     this.updateProgressText(`Extracting text from ${files.length} image(s) with OCR...`);
                 }, 600);
-                
+
                 // Add a small delay to make the processing notification visible
                 setTimeout(() => {
                     this.hideProgressIndicator();
@@ -2620,7 +2682,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const fileUploadArea = document.getElementById('fileUploadArea');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
-        
+
         const imageUploadArea = document.getElementById('imageUploadArea');
         const imageInput = document.getElementById('imageInput');
         const imageList = document.getElementById('imageList');
@@ -2649,7 +2711,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         fileUploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             fileUploadArea.classList.remove('dragover');
-            
+
             const files = e.dataTransfer.files;
             fileInput.files = files;
             this.updateFileList(files);
@@ -2679,7 +2741,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         imageUploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             imageUploadArea.classList.remove('dragover');
-            
+
             const files = e.dataTransfer.files;
             imageInput.files = files;
             this.updateImageList(files);
@@ -2693,10 +2755,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         Array.from(files).forEach((file, index) => {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
-            
+
             const fileIcon = this.getFileIcon(file.name);
             const fileSize = this.formatFileSize(file.size);
-            
+
             fileItem.innerHTML = `
                 <div class="file-item-info">
                     <i class="fas ${fileIcon} file-item-icon"></i>
@@ -2709,7 +2771,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     <i class="fas fa-times"></i>
                 </button>
             `;
-            
+
             fileList.appendChild(fileItem);
         });
     }
@@ -2721,10 +2783,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         Array.from(files).forEach((file, index) => {
             const imageItem = document.createElement('div');
             imageItem.className = 'image-item';
-            
+
             const imageIcon = this.getImageIcon(file.name);
             const imageSize = this.formatImageSize(file.size);
-            
+
             imageItem.innerHTML = `
                 <div class="image-item-info">
                     <i class="${imageIcon} image-item-icon"></i>
@@ -2737,7 +2799,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     <i class="fas fa-times"></i>
                 </button>
             `;
-            
+
             imageList.appendChild(imageItem);
         });
     }
@@ -2791,43 +2853,43 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const showVectorDbInfo = document.getElementById('showVectorDbInfo').checked;
         const autoRefresh = document.getElementById('autoRefresh').checked;
         const refreshInterval = parseInt(document.getElementById('refreshInterval').value) * 1000; // Convert to milliseconds
-        
+
         // Interface settings
         const documentListWidth = parseInt(document.getElementById('documentListWidth').value);
         const chatHistoryWidth = parseInt(document.getElementById('chatHistoryWidth').value);
         const documentListCollapsed = document.getElementById('documentListCollapsed').checked;
         const chatHistoryCollapsed = document.getElementById('chatHistoryCollapsed').checked;
         const documentOverviewVisible = document.getElementById('documentOverviewVisible').checked;
-        
+
         // Visualization settings
         const defaultVisualization = document.getElementById('defaultVisualization').value;
         const defaultDateFilter = document.getElementById('defaultDateFilter').value;
-        
+
         // Document settings
         const documentOverviewEnabled = document.getElementById('documentOverviewEnabled').checked;
         const maxDisplayDocuments = parseInt(document.getElementById('maxDisplayDocuments').value);
         const paginationSize = parseInt(document.getElementById('paginationSize').value);
         const defaultContentFilter = document.getElementById('defaultContentFilter').value;
-        
+
         // Chat settings
         const maxTokens = parseInt(document.getElementById('maxTokens').value);
         const temperature = parseFloat(document.getElementById('temperature').value);
         const chatHistoryLimit = parseInt(document.getElementById('chatHistoryLimit').value);
         const autoSaveChats = document.getElementById('autoSaveChats').checked;
-        
+
         // Query settings
         const topK = parseInt(document.getElementById('topK').value);
         const textRerankTopK = parseInt(document.getElementById('textRerankTopK').value);
         const textRelevanceThreshold = parseFloat(document.getElementById('textRelevanceThreshold').value);
         const imageRelevanceThreshold = parseFloat(document.getElementById('imageRelevanceThreshold').value);
-        
+
         // Storage settings
         const copyUploadedDocs = document.getElementById('copyUploadedDocs').checked;
         const copyUploadedImages = document.getElementById('copyUploadedImages').checked;
-        
+
         // Save storage settings to backend
         try {
-            const storageResponse = await fetch('http://localhost:8021/update-storage-settings', {
+            const storageResponse = await fetch(this.buildApiUrl('updateStorageSettings'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2837,7 +2899,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     copy_uploaded_images: copyUploadedImages
                 })
             });
-            
+
             if (storageResponse.ok) {
                 const storageResult = await storageResponse.json();
                 if (storageResult.status === 'success') {
@@ -2847,10 +2909,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } catch (error) {
             console.warn('Failed to save storage settings to backend:', error);
         }
-        
+
         // Save query settings to backend
         try {
-            const queryResponse = await fetch('http://localhost:8021/update-query-settings', {
+            const queryResponse = await fetch(this.buildApiUrl('updateQuerySettings'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2862,7 +2924,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     image_relevance_threshold: imageRelevanceThreshold
                 })
             });
-            
+
             if (queryResponse.ok) {
                 const queryResult = await queryResponse.json();
                 if (queryResult.status === 'success') {
@@ -2872,28 +2934,28 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } catch (error) {
             console.warn('Failed to save query settings to backend:', error);
         }
-        
+
         // Validation
         if (maxDocuments < 5 || maxDocuments > 25) {
             this.showNotification('error', 'Max documents must be between 5 and 25');
             return;
         }
-        
+
         if (documentListWidth < 20 || documentListWidth > 60) {
             this.showNotification('error', 'Document list width must be between 20% and 60%');
             return;
         }
-        
+
         if (chatHistoryWidth < 5 || chatHistoryWidth > 30) {
             this.showNotification('error', 'Chat history width must be between 5% and 30%');
             return;
         }
-        
+
         if (maxTokens < 1000 || maxTokens > 16000) {
             this.showNotification('error', 'Max tokens must be between 1000 and 16000');
             return;
         }
-        
+
         if (temperature < 0 || temperature > 2) {
             this.showNotification('error', 'Temperature must be between 0 and 2');
             return;
@@ -2909,23 +2971,23 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.showNotification('error', 'Pagination size must be between 5 and 25');
             return;
         }
-        
+
         // Validate query settings
         if (topK < 1 || topK > 20) {
             this.showNotification('error', 'Top K must be between 1 and 20');
             return;
         }
-        
+
         if (textRerankTopK < 1 || textRerankTopK > 10) {
             this.showNotification('error', 'Text Rerank Top K must be between 1 and 10');
             return;
         }
-        
+
         if (textRelevanceThreshold < 0.1 || textRelevanceThreshold > 1.0) {
             this.showNotification('error', 'Text relevance threshold must be between 0.1 and 1.0');
             return;
         }
-        
+
         if (imageRelevanceThreshold < 0.1 || imageRelevanceThreshold > 1.0) {
             this.showNotification('error', 'Image relevance threshold must be between 0.1 and 1.0');
             return;
@@ -2950,18 +3012,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.settings.autoSaveChats = autoSaveChats;
         this.settings.copyUploadedDocs = copyUploadedDocs;
         this.settings.copyUploadedImages = copyUploadedImages;
-        
+
         // Query settings
         this.settings.topK = topK;
         this.settings.textRerankTopK = textRerankTopK;
         this.settings.textRelevanceThreshold = textRelevanceThreshold;
         this.settings.imageRelevanceThreshold = imageRelevanceThreshold;
-        
+
         // Update global settings
         this.currentVisualizationType = defaultVisualization;
         this.currentDateFilter = defaultDateFilter;
         this.currentContentFilter = defaultContentFilter;
-        
+
         // Save to localStorage
         localStorage.setItem('ragme-settings', JSON.stringify(this.settings));
         localStorage.setItem('ragme-date-filter', this.currentDateFilter);
@@ -2976,19 +3038,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         localStorage.setItem('ragme-chat-history-width', chatHistoryWidth.toString());
         localStorage.setItem('ragme-copy-uploaded-docs', copyUploadedDocs.toString());
         localStorage.setItem('ragme-copy-uploaded-images', copyUploadedImages.toString());
-        
+
         // Save query settings to localStorage
         localStorage.setItem('ragme-top-k', topK.toString());
         localStorage.setItem('ragme-text-rerank-top-k', textRerankTopK.toString());
         localStorage.setItem('ragme-text-relevance-threshold', textRelevanceThreshold.toString());
         localStorage.setItem('ragme-image-relevance-threshold', imageRelevanceThreshold.toString());
-        
+
         this.hideModal('settingsModal');
         this.showNotification('success', 'Settings saved successfully');
-        
+
         // Apply UI changes
         this.applyUIConfiguration();
-        
+
         // Update auto-refresh if changed
         if (autoRefresh !== this.settings.autoRefresh) {
             if (autoRefresh) {
@@ -2997,7 +3059,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 this.stopAutoRefresh();
             }
         }
-        
+
         // Reload documents with new settings
         this.loadDocuments();
     }
@@ -3007,7 +3069,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (saved) {
             this.settings = { ...this.settings, ...JSON.parse(saved) };
         }
-        
+
         // Load content filter preference
         const savedContentFilter = localStorage.getItem('ragme-content-filter');
         if (savedContentFilter) {
@@ -3020,7 +3082,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
         // Update filter indicator after loading preferences
         this.updateFilterIndicator();
-        
+
         // Load date filter preference
         const savedDateFilter = localStorage.getItem('ragme-date-filter');
         if (savedDateFilter) {
@@ -3033,19 +3095,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
         // Update date filter indicator after loading preferences
         this.updateDateFilterIndicator();
-        
+
         // Load visualization type preference
         const savedVisualizationType = localStorage.getItem('ragme-visualization-type');
         if (savedVisualizationType) {
             this.currentVisualizationType = savedVisualizationType;
         }
-        
+
         // Load visualization visibility preference
         const savedVisualizationVisible = localStorage.getItem('ragme-visualization-visible');
         if (savedVisualizationVisible !== null) {
             this.isVisualizationVisible = savedVisualizationVisible === 'true';
         }
-        
+
         // Load individual settings from localStorage for backward compatibility
         const savedMaxDocuments = localStorage.getItem('ragme-max-documents');
         if (savedMaxDocuments) {
@@ -3055,12 +3117,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             // Clear the old value to prevent future issues
             localStorage.removeItem('ragme-max-documents');
         }
-        
+
         const savedDocumentOverviewEnabled = localStorage.getItem('ragme-document-overview-enabled');
         if (savedDocumentOverviewEnabled !== null) {
             this.settings.documentOverviewEnabled = savedDocumentOverviewEnabled === 'true';
         }
-        
+
         const savedDocumentOverviewVisible = localStorage.getItem('ragme-document-overview-visible');
         if (savedDocumentOverviewVisible !== null) {
             // Only override if not explicitly set by configuration
@@ -3071,33 +3133,33 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 console.log('Keeping document overview visible from configuration:', this.settings.documentOverviewVisible);
             }
         }
-        
+
         const savedDocumentListCollapsed = localStorage.getItem('ragme-document-list-collapsed');
         if (savedDocumentListCollapsed !== null) {
             this.settings.documentListCollapsed = savedDocumentListCollapsed === 'true';
         }
-        
+
         const savedDocumentListWidth = localStorage.getItem('ragme-document-list-width');
         if (savedDocumentListWidth) {
             this.settings.documentListWidth = parseInt(savedDocumentListWidth);
         }
-        
+
         const savedChatHistoryCollapsed = localStorage.getItem('ragme-chat-history-collapsed');
         if (savedChatHistoryCollapsed !== null) {
             this.settings.chatHistoryCollapsed = savedChatHistoryCollapsed === 'true';
         }
-        
+
         const savedChatHistoryWidth = localStorage.getItem('ragme-chat-history-width');
         if (savedChatHistoryWidth) {
             this.settings.chatHistoryWidth = parseInt(savedChatHistoryWidth);
         }
-        
+
         // Load storage settings
         const savedCopyUploadedDocs = localStorage.getItem('ragme-copy-uploaded-docs');
         if (savedCopyUploadedDocs !== null) {
             this.settings.copyUploadedDocs = savedCopyUploadedDocs === 'true';
         }
-        
+
         const savedCopyUploadedImages = localStorage.getItem('ragme-copy-uploaded-images');
         if (savedCopyUploadedImages !== null) {
             this.settings.copyUploadedImages = savedCopyUploadedImages === 'true';
@@ -3111,7 +3173,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const showVectorDbInfo = document.getElementById('showVectorDbInfo');
         const maxDocuments = document.getElementById('maxDocuments');
         const maxDocumentsValue = document.getElementById('maxDocumentsValue');
-        
+
         if (autoRefresh) autoRefresh.checked = this.settings.autoRefresh;
         if (refreshInterval) refreshInterval.value = this.settings.refreshInterval / 1000; // Convert from ms to seconds
         if (showVectorDbInfo) showVectorDbInfo.checked = this.settings.showVectorDbInfo;
@@ -3119,7 +3181,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             maxDocuments.value = this.settings.maxDocuments;
             if (maxDocumentsValue) maxDocumentsValue.textContent = this.settings.maxDocuments;
         }
-        
+
         // Interface Settings
         const documentListWidth = document.getElementById('documentListWidth');
         const documentListWidthValue = document.getElementById('documentListWidthValue');
@@ -3130,7 +3192,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const documentOverviewVisible = document.getElementById('documentOverviewVisible');
         const defaultVisualization = document.getElementById('defaultVisualization');
         const defaultDateFilter = document.getElementById('defaultDateFilter');
-        
+
         if (documentListWidth) {
             documentListWidth.value = this.settings.documentListWidth;
             if (documentListWidthValue) documentListWidthValue.textContent = this.settings.documentListWidth + '%';
@@ -3144,7 +3206,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (documentOverviewVisible) documentOverviewVisible.checked = this.settings.documentOverviewVisible;
         if (defaultVisualization) defaultVisualization.value = this.currentVisualizationType;
         if (defaultDateFilter) defaultDateFilter.value = this.currentDateFilter;
-        
+
         // Document Settings
         const documentOverviewEnabled = document.getElementById('documentOverviewEnabled');
         const maxDisplayDocuments = document.getElementById('maxDisplayDocuments');
@@ -3152,7 +3214,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const paginationSize = document.getElementById('paginationSize');
         const paginationSizeValue = document.getElementById('paginationSizeValue');
         const defaultContentFilter = document.getElementById('defaultContentFilter');
-        
+
         if (documentOverviewEnabled) documentOverviewEnabled.checked = this.settings.documentOverviewEnabled;
         if (maxDisplayDocuments) {
             maxDisplayDocuments.value = this.settings.maxDocuments;
@@ -3163,21 +3225,21 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (paginationSizeValue) paginationSizeValue.textContent = this.settings.maxDocuments;
         }
         if (defaultContentFilter) defaultContentFilter.value = this.currentContentFilter;
-        
+
         // Storage Settings
         const copyUploadedDocs = document.getElementById('copyUploadedDocs');
         const copyUploadedImages = document.getElementById('copyUploadedImages');
-        
+
         if (copyUploadedDocs) copyUploadedDocs.checked = this.settings.copyUploadedDocs;
         if (copyUploadedImages) copyUploadedImages.checked = this.settings.copyUploadedImages;
-        
+
         // Chat Settings
         const maxTokens = document.getElementById('maxTokens');
         const temperature = document.getElementById('temperature');
         const temperatureValue = document.getElementById('temperatureValue');
         const chatHistoryLimit = document.getElementById('chatHistoryLimit');
         const autoSaveChats = document.getElementById('autoSaveChats');
-        
+
         if (maxTokens) maxTokens.value = this.settings.maxTokens;
         if (temperature) {
             temperature.value = this.settings.temperature;
@@ -3185,7 +3247,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
         if (chatHistoryLimit) chatHistoryLimit.value = this.settings.chatHistoryLimit || 50;
         if (autoSaveChats) autoSaveChats.checked = this.settings.autoSaveChats !== false; // Default to true
-        
+
         // Query Settings
         const topK = document.getElementById('topK');
         const textRerankTopK = document.getElementById('textRerankTopK');
@@ -3193,7 +3255,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const textRelevanceThresholdValue = document.getElementById('textRelevanceThresholdValue');
         const imageRelevanceThreshold = document.getElementById('imageRelevanceThreshold');
         const imageRelevanceThresholdValue = document.getElementById('imageRelevanceThresholdValue');
-        
+
         if (topK) topK.value = this.settings.topK || 5;
         if (textRerankTopK) textRerankTopK.value = this.settings.textRerankTopK || 3;
         if (textRelevanceThreshold) {
@@ -3204,7 +3266,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             imageRelevanceThreshold.value = this.settings.imageRelevanceThreshold || 0.5;
             if (imageRelevanceThresholdValue) imageRelevanceThresholdValue.textContent = this.settings.imageRelevanceThreshold || 0.5;
         }
-        
+
         console.log('Settings form populated with values from configuration');
     }
 
@@ -3212,15 +3274,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('Loading content with filters - date:', this.currentDateFilter, 'content:', this.currentContentFilter);
         console.log('Socket connected:', this.socket?.connected);
         console.log('Emitting list_content event...');
-        
+
         // Reset pagination to first page when loading new documents
         this.pagination.currentPage = 1;
-        
+
         // Only show loading notification for initial loads, not refreshes
         if (!this.pagination.allDocuments || this.pagination.allDocuments.length === 0) {
             this.showPaginationLoading(true);
         }
-        
+
         // Load more documents for client-side pagination (respect API limit of 25)
         const fetchLimit = Math.min(25, this.settings.maxDocuments * 3); // Fetch up to 3 pages worth, max 25
         this.socket.emit('list_content', {
@@ -3263,11 +3325,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         // Generate page numbers
         paginationPages.innerHTML = '';
-        
+
         const maxVisiblePages = 5;
         let startPage = Math.max(1, this.pagination.currentPage - Math.floor(maxVisiblePages / 2));
         let endPage = Math.min(this.pagination.totalPages, startPage + maxVisiblePages - 1);
-        
+
         // Adjust start page if we're near the end
         if (endPage - startPage < maxVisiblePages - 1) {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -3293,7 +3355,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             }
             this.addPageButton(paginationPages, this.pagination.totalPages);
         }
-        
+
         // Add "Load More" button if we have more documents available than loaded
         if (this.pagination.totalDocuments > this.pagination.allDocuments.length) {
             this.addLoadMoreButton(paginationPages);
@@ -3304,15 +3366,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const button = document.createElement('button');
         button.className = 'pagination-page';
         button.textContent = pageNumber;
-        
+
         if (pageNumber === this.pagination.currentPage) {
             button.classList.add('active');
         }
-        
+
         button.addEventListener('click', () => {
             this.goToPage(pageNumber);
         });
-        
+
         container.appendChild(button);
     }
 
@@ -3324,7 +3386,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         ellipsis.style.color = '#6b7280';
         container.appendChild(ellipsis);
     }
-    
+
     addLoadMoreButton(container) {
         const button = document.createElement('button');
         button.className = 'pagination-load-more';
@@ -3334,15 +3396,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         });
         container.appendChild(button);
     }
-    
+
     loadMoreDocuments() {
         const currentLoaded = this.pagination.allDocuments.length;
         const remaining = this.pagination.totalDocuments - currentLoaded;
         const fetchLimit = Math.min(25, remaining); // Load up to 25 more documents (API limit)
-        
+
         // Show specific loading notification for "Load More"
         this.showNotification('📥 Loading more documents...', 'info');
-        
+
         this.socket.emit('list_content', {
             limit: fetchLimit,
             offset: currentLoaded,
@@ -3355,24 +3417,24 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (pageNumber < 1 || pageNumber > this.pagination.totalPages) {
             return;
         }
-        
+
         // Client-side pagination - no API call needed
         this.pagination.currentPage = pageNumber;
         this.displayCurrentPage();
         this.updatePagination();
     }
-    
+
     displayCurrentPage() {
         // Get documents for current page from cached data
         const startIndex = (this.pagination.currentPage - 1) * this.settings.maxDocuments;
         const endIndex = startIndex + this.settings.maxDocuments;
         this.documents = this.pagination.allDocuments.slice(startIndex, endIndex);
-        
+
         // Update the UI
         this.renderDocuments();
         this.updateVisualization();
     }
-    
+
     showPaginationLoading(show) {
         if (show) {
             this.showNotification('📖 Loading documents...', 'info');
@@ -3394,26 +3456,26 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     refreshDocuments() {
         const refreshBtn = document.getElementById('refreshDocuments');
         const icon = refreshBtn.querySelector('i');
-        
+
         // Add loading animation
         refreshBtn.classList.add('loading');
         icon.className = 'fas fa-sync-alt';
-        
+
         // Load documents with current date filter
         this.loadDocuments();
-        
+
         // Also explicitly update visualization after a short delay to ensure it's refreshed
         setTimeout(() => {
             console.log('Explicitly updating visualization after refresh...');
             this.updateVisualization();
         }, 500);
-        
+
         // Remove loading animation after a short delay
         setTimeout(() => {
             refreshBtn.classList.remove('loading');
             icon.className = 'fas fa-sync-alt';
         }, 1000);
-        
+
         // Show notification
         this.showNotification(`Refreshing documents (${this.getDateFilterDisplayName()})...`, 'info');
     }
@@ -3452,46 +3514,40 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
     }
 
-    fetchDocumentSummary(doc) {
-        console.log('fetchDocumentSummary called for doc:', doc.id || doc.url);
-        
+    startHealthChecks() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+        }
+
+        // Check health every 30 seconds
+        this.healthCheckInterval = setInterval(() => {
+            this.checkHealthStatus();
+        }, 30000);
+    }
+
+    stopHealthChecks() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
+    }
+
+    async fetchDocumentSummary(doc, forceRefresh = false) {
+        console.log('fetchDocumentSummary called for doc:', doc.id || doc.url, 'forceRefresh:', forceRefresh);
+
         // Prevent multiple simultaneous summary requests
         if (this.documentDetailsModal.summaryInProgress) {
             console.log('Summary already in progress, skipping request');
             return;
         }
-        
+
         // Mark summary as in progress
         this.documentDetailsModal.summaryInProgress = true;
-        
-        // Find the document in the original documents array
-        let docIndex = -1;
-        
-        // Handle chunked documents differently
-        if (doc.isGroupedChunks && doc.chunks && doc.chunks.length > 0) {
-            // For grouped chunked documents, use the first chunk's index
-            const firstChunk = doc.chunks[0];
-            docIndex = this.documents.findIndex(d => d.id === firstChunk.id);
-        } else if (doc.metadata?.is_chunked && doc.metadata?.total_chunks) {
-            // For new chunked documents, find by base URL
-            const baseUrl = doc.url.split('#')[0];
-            docIndex = this.documents.findIndex(d => {
-                const docBaseUrl = d.url.split('#')[0];
-                return docBaseUrl === baseUrl;
-            });
-        } else if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
-            // For image stacks, skip index lookup since individual images are not in documents array
-            docIndex = 0; // Set a dummy index to avoid the error
-        } else {
-            // For regular documents, find by ID first, then by URL
-            docIndex = this.documents.findIndex(d => d.id === doc.id);
-            if (docIndex === -1) {
-                docIndex = this.documents.findIndex(d => d.url === doc.url);
-            }
-        }
-        
+
         // Determine the document ID to send for summarization
         let documentIdToSend;
+
+        // Handle different document types
         if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
             // For image stacks, send the image stack ID and indicate it's a stack
             documentIdToSend = {
@@ -3501,19 +3557,35 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 pdfFilename: doc.sourceDocument
             };
             console.log('Sending image stack summary request for:', doc.sourceDocument);
+        } else if (doc.isGroupedChunks && doc.chunks && doc.chunks.length > 0) {
+            // For grouped chunked documents, use the grouped document ID
+            documentIdToSend = doc.id;
+            console.log('Sending grouped chunked document summary request for:', doc.id);
+        } else if (doc.metadata?.is_chunked && doc.metadata?.total_chunks) {
+            // For new chunked documents, use the document ID directly
+            documentIdToSend = doc.id;
+            console.log('Sending chunked document summary request for:', doc.id);
         } else {
-            // For regular documents, check if we found the document
-            if (docIndex === -1) {
-                this.updateDocumentSummary('Document not found for summarization.');
-                return;
-            }
-            documentIdToSend = doc.id || docIndex.toString();
-            console.log('Found document at index:', docIndex, 'in documents array');
+            // For regular documents, use the document ID directly
+            documentIdToSend = doc.id;
+            console.log('Sending regular document summary request for:', doc.id);
         }
-        
+        if (doc.isGroupedImages && doc.images && doc.images.length > 0) {
+            // For image stacks, send the image stack ID and indicate it's a stack
+            documentIdToSend = {
+                type: "image_stack",
+                stackId: doc.id,
+                firstImageId: doc.images[0].id,
+                pdfFilename: doc.sourceDocument
+            };
+            console.log('Sending image stack summary request for:', doc.sourceDocument);
+        }
+
         console.log('Sending document ID for summarization:', documentIdToSend);
         console.log('Socket connected:', this.socket?.connected);
-        
+        console.log('Socket object:', this.socket);
+        console.log('Socket ID:', this.socket?.id);
+
         // Check if WebSocket is connected
         if (!this.socket || !this.socket.connected) {
             console.error('WebSocket not connected, cannot send summary request');
@@ -3521,21 +3593,114 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.documentDetailsModal.summaryInProgress = false;
             return;
         }
-        
-        // Set a timeout to show a message if summarization takes too long
-        const timeoutId = setTimeout(() => {
-            this.updateDocumentSummary('<div class="summary-loading">Still generating summary... This may take a moment for large documents.</div>');
-        }, 10000); // 10 seconds
-        
-        // Request summary from backend - send the actual document ID
-        console.log('Emitting summarize_document with:', { documentId: documentIdToSend });
+
+        // Request summary from backend - use HTTP request since socket is not working properly
+        console.log('Making HTTP request to summarize_document with:', { documentId: documentIdToSend, forceRefresh: forceRefresh });
+        try {
+            const response = await fetch(this.buildApiUrl('summarize-document'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    document_id: documentIdToSend,
+                    forceRefresh: forceRefresh
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                this.updateDocumentSummary(result.summary);
+                this.documentDetailsModal.summaryGenerated = true;
+            } else {
+                this.updateDocumentSummary(`Error: ${result.message || 'Failed to generate summary'}`);
+            }
+        } catch (error) {
+            console.error('HTTP request failed:', error);
+            this.updateDocumentSummary('Failed to connect to server. Please refresh the page and try again.');
+        }
+        this.documentDetailsModal.summaryInProgress = false;
+    }
+
+    // New method to force reload summary when document is not found
+    forceReloadSummary(docId, docUrl) {
+        console.log('Force reloading summary for docId:', docId, 'docUrl:', docUrl);
+
+        // Mark summary as in progress
+        this.documentDetailsModal.summaryInProgress = true;
+
+        // Try multiple strategies to find the document
+        let documentIdToSend = null;
+
+        // Strategy 1: Try using the original docId directly
+        if (docId) {
+            documentIdToSend = docId;
+            console.log('Strategy 1: Using original docId:', docId);
+        }
+        // Strategy 2: Try using the URL as document ID
+        else if (docUrl) {
+            documentIdToSend = docUrl;
+            console.log('Strategy 2: Using URL as document ID:', docUrl);
+        }
+        // Strategy 3: Try to find by URL in documents array
+        else {
+            const docIndex = this.documents.findIndex(d => d.url === docUrl);
+            if (docIndex !== -1) {
+                documentIdToSend = this.documents[docIndex].id;
+                console.log('Strategy 3: Found document by URL, using ID:', documentIdToSend);
+            }
+        }
+
+        if (!documentIdToSend) {
+            this.updateDocumentSummary('Unable to determine document ID for summarization. Please try refreshing the page.');
+            this.documentDetailsModal.summaryInProgress = false;
+            return;
+        }
+
+        // Check if WebSocket is connected
+        if (!this.socket || !this.socket.connected) {
+            console.error('WebSocket not connected, cannot send summary request');
+            this.updateDocumentSummary('WebSocket connection not available. Please refresh the page and try again.');
+            this.documentDetailsModal.summaryInProgress = false;
+            return;
+        }
+
+        // Request summary from backend
+        console.log('Force reload: Emitting summarize_document with:', { documentId: documentIdToSend });
         this.socket.emit('summarize_document', {
             documentId: documentIdToSend
         });
-        
-        // Store timeout ID to clear it when summary arrives
-        this.summaryTimeoutId = timeoutId;
     }
+
+    // Method to force refresh AI summary (clear cache and regenerate)
+    forceRefreshSummary() {
+        console.log('Force refreshing AI summary');
+        
+        // Clear the cached summary flag to force regeneration
+        this.documentDetailsModal.summaryGenerated = false;
+        
+        // Get the current document from the modal
+        const currentDocId = this.documentDetailsModal.currentDocId;
+        if (!currentDocId) {
+            console.error('No current document ID found for force refresh');
+            return;
+        }
+        
+        // Find the current document in the documents array
+        const currentDoc = this.documents.find(doc => doc.id === currentDocId);
+        if (!currentDoc) {
+            console.error('Current document not found in documents array');
+            return;
+        }
+        
+        // Show loading state
+        this.updateDocumentSummary('<div class="summary-loading"><i class="fas fa-spinner fa-spin"></i> Regenerating AI summary...</div>');
+        
+        // Force regenerate the summary with force_refresh flag
+        this.fetchDocumentSummary(currentDoc, true);
+    }
+
+
 
     updateDocumentSummary(summary) {
         // Clear the timeout if it exists
@@ -3543,22 +3708,22 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             clearTimeout(this.summaryTimeoutId);
             this.summaryTimeoutId = null;
         }
-        
+
         // Find the AI summary section specifically (not the image preview section)
         const aiSummarySection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-robot');
-        const contentPreview = aiSummarySection ? 
+        const contentPreview = aiSummarySection ?
             aiSummarySection.closest('.document-details-section').querySelector('.content-preview') :
             document.querySelector('#documentDetailsModal .content-preview');
-            
+
         if (contentPreview) {
             // Parse markdown and format the summary
             const formattedSummary = this.formatMarkdownSummary(summary);
             contentPreview.innerHTML = formattedSummary;
-            
+
             // Mark summary as generated for the current document
             this.documentDetailsModal.summaryGenerated = true;
         }
-        
+
         // Reset the in-progress flag
         this.documentDetailsModal.summaryInProgress = false;
     }
@@ -3567,7 +3732,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (!text) {
             return '<div class="no-content">No summary available</div>';
         }
-        
+
         // Simple markdown parsing for common elements
         let formattedText = text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
@@ -3578,10 +3743,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             .replace(/^- (.*$)/gim, '<li>$1</li>') // List items
             .replace(/\n\n/g, '</p><p>') // Paragraphs
             .replace(/^(.+)$/gm, '<p>$1</p>'); // Wrap lines in paragraphs
-        
+
         // Clean up empty paragraphs
         formattedText = formattedText.replace(/<p><\/p>/g, '');
-        
+
         return `
             <div class="content-text summary-content">
                 ${formattedText}
@@ -3595,7 +3760,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             console.log('Skipping document rendering - modal is open, currentDocId:', this.documentDetailsModal.currentDocId);
             return;
         }
-        
+
         console.log('Rendering documents, modal state:', this.documentDetailsModal);
 
         const container = document.getElementById('documentsListContainer');
@@ -3603,12 +3768,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         if (this.documents.length === 0) {
             const icon = this.currentContentFilter === 'images' ? 'fas fa-images' : 'fas fa-file-alt';
-            const message = this.currentContentFilter === 'images' ? 'No images found' : 
+            const message = this.currentContentFilter === 'images' ? 'No images found' :
                            this.currentContentFilter === 'documents' ? 'No documents found' : 'No content found';
             const subMessage = this.currentContentFilter === 'images' ? 'Add some images to get started' :
                               this.currentContentFilter === 'documents' ? 'Add some URLs or files to get started' :
                               'Add some URLs, files, or images to get started';
-            
+
             container.innerHTML = `
                 <div style="text-align: center; color: #666; padding: 2rem;">
                     <i class="${icon}" style="font-size: 3rem; opacity: 0.5; margin-bottom: 1rem;"></i>
@@ -3635,12 +3800,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const card = document.createElement('div');
             card.className = 'document-card';
             card.dataset.docIndex = index;
-            
+
             // Check if this document is being deleted
-            const isBeingDeleted = this.documentsBeingDeleted.has(group.id) || 
+            const isBeingDeleted = this.documentsBeingDeleted.has(group.id) ||
                                   (group.baseUrl && this.documentsBeingDeleted.has(group.baseUrl)) ||
                                   (group.sourceDocument && this.documentsBeingDeleted.has(group.sourceDocument));
-            
+
             if (isBeingDeleted) {
                 card.classList.add('deleting');
             }
@@ -3649,18 +3814,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const date = group.metadata?.date_added || 'Unknown date';
             const isNew = this.isDocumentNew(date);
             const contentType = group.content_type || 'document';
-            
+
             // Handle chunked documents (both new and existing)
             let summary = '';
             let chunkInfo = '';
             let newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
             let deletingBadge = isBeingDeleted ? '<span class="deleting-badge"><i class="fas fa-spinner fa-spin"></i> DELETING</span>' : '';
-            
+
             // Handle image stacks (grouped images from PDFs)
             if (contentType === 'image_stack' && group.isGroupedImages) {
                 const sourceDocument = group.sourceDocument;
                 const totalImages = group.totalImages;
-                
+
                 card.innerHTML = `
                     <div class="document-content">
                         <div class="document-title">
@@ -3670,7 +3835,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             ${deletingBadge}
                         </div>
                         <div class="document-meta">
-                            <i class="fas fa-calendar"></i> ${date} | 
+                            <i class="fas fa-calendar"></i> ${date} |
                             <i class="fas fa-database"></i> ${group.metadata?.collection || 'Images'} |
                             <i class="fas fa-file-pdf"></i> Extracted images
                         </div>
@@ -3687,7 +3852,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 const imageTitle = group.metadata?.filename || title;
                 const imageClassification = group.metadata?.classification || 'Unknown';
                 const imageSize = group.metadata?.file_size || 'Unknown size';
-                
+
                 card.innerHTML = `
                     <div class="document-content">
                         <div class="document-title">
@@ -3697,7 +3862,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             ${deletingBadge}
                         </div>
                         <div class="document-meta">
-                            <i class="fas fa-calendar"></i> ${date} | 
+                            <i class="fas fa-calendar"></i> ${date} |
                             <i class="fas fa-database"></i> ${group.metadata?.collection || 'Images'} |
                             <i class="fas fa-tag"></i> ${imageClassification} |
                             <i class="fas fa-weight-hanging"></i> ${imageSize}
@@ -3714,10 +3879,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             } else if (group.isGroupedChunks) {
                 // Chunked documents (both single and multiple chunks)
                 const originalFilename = group.originalFilename || title;
-                
+
                 summary = group.combinedText ? group.combinedText.substring(0, 200) + '...' : 'No content available';
                 chunkInfo = group.totalChunks > 1 ? `<span class="chunk-badge"><i class="fas fa-layer-group"></i> ${group.totalChunks} chunks</span>` : '';
-                
+
                 card.innerHTML = `
                     <div class="document-content">
                         <div class="document-title">
@@ -3727,7 +3892,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             ${deletingBadge}
                         </div>
                         <div class="document-meta">
-                            <i class="fas fa-calendar"></i> ${date} | 
+                            <i class="fas fa-calendar"></i> ${date} |
                             <i class="fas fa-database"></i> ${group.metadata?.collection || 'Default'} |
                             <i class="fas fa-file-alt"></i> ${group.totalChunks > 1 ? 'Chunked document' : 'Document'}
                         </div>
@@ -3740,7 +3905,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             } else {
                 // Regular document
                 summary = group.text ? group.text.substring(0, 150) + '...' : 'No content available';
-                
+
                 card.innerHTML = `
                     <div class="document-content">
                         <div class="document-title">
@@ -3749,7 +3914,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             ${deletingBadge}
                         </div>
                         <div class="document-meta">
-                            <i class="fas fa-calendar"></i> ${date} | 
+                            <i class="fas fa-calendar"></i> ${date} |
                             <i class="fas fa-database"></i> ${group.metadata?.collection || 'Default'}
                         </div>
                         <div class="document-summary">${this.escapeHtml(summary)}</div>
@@ -3779,7 +3944,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 }
             });
         });
-        
+
         // Check for text truncation after rendering all documents
         setTimeout(() => {
             this.checkDocumentTitlesTruncation();
@@ -3793,11 +3958,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         // Generate a unique document ID for tracking
         const docId = doc.id || doc.url || `doc_${Date.now()}`;
-        
+
         // Check if this is the same document already open
-        const isSameDocument = this.documentDetailsModal.isOpen && 
+        const isSameDocument = this.documentDetailsModal.isOpen &&
                               this.documentDetailsModal.currentDocId === docId;
-        
+
         console.log('showDocumentDetails called:', {
             docId,
             isOpen: this.documentDetailsModal.isOpen,
@@ -3805,19 +3970,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             isSameDocument,
             summaryGenerated: this.documentDetailsModal.summaryGenerated
         });
-        
+
         // Find the document index in the grouped documents array
         const groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
         const docIndex = groupedDocuments.findIndex(d => d.url === doc.url || d.id === doc.id);
-        
+
         console.log('Document details - found index:', docIndex, 'for doc:', { id: doc.id, url: doc.url, contentType: doc.content_type });
         console.log('Grouped documents count:', groupedDocuments.length);
-        
+
         // Store the document index for deletion
         modal.dataset.docIndex = docIndex;
 
         let displayTitle = doc.url || doc.metadata?.filename || 'Document Details';
-        
+
         // Use original filename for chunked documents
         if (doc.isGroupedChunks && doc.originalFilename) {
             displayTitle = doc.originalFilename;
@@ -3828,19 +3993,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Check if this is an image or image stack
         const isImage = doc.content_type === 'image';
         const isImageStack = doc.content_type === 'image_stack' && doc.isGroupedImages;
-        
+
         // Add NEW badge if document is new
         const isNew = this.isDocumentNew(doc.metadata?.date_added);
         const newBadge = isNew ? '<span class="new-badge-modal">NEW</span>' : '';
-        
+
         // Add image stack badge if this is an image stack
         const imageStackBadge = isImageStack ? `<span class="image-stack-badge-modal"><i class="fas fa-layer-group"></i> ${doc.totalImages} images</span>` : '';
-        
+
         title.innerHTML = `${displayTitle} ${imageStackBadge} ${newBadge}`;
-        
+
         // Create metadata tags (including collection and type)
         const metadataTags = this.createMetadataTags(doc.metadata);
-        
+
         // Show loading state for content
         const loadingContent = `
             <div class="content-preview">
@@ -3856,12 +4021,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 <h4><i class="fas fa-link"></i> URL/ID</h4>
                 <div class="detail-value">${this.escapeHtml(doc.url || doc.metadata?.filename || doc.metadata?.source || 'N/A')}</div>
             </div>
-            
+
             <div class="document-details-section">
                 <h4><i class="fas fa-calendar"></i> Date Added</h4>
                 <div class="detail-value">${this.formatDate(doc.metadata?.date_added) || 'Unknown'}</div>
             </div>
-            
+
             ${metadataTags ? `
                 <div class="document-details-section">
                     <h4><i class="fas fa-tags"></i> Metadata</h4>
@@ -3870,7 +4035,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 </div>
             ` : ''}
-            
+
             <div class="document-details-section" id="storage-section">
                 <h4><i class="fas fa-download"></i> File Download</h4>
                 <div class="storage-loading">
@@ -3878,7 +4043,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     <p>Checking storage availability...</p>
                 </div>
             </div>
-            
+
             ${isImageStack ? `
                 <div class="document-details-section">
                     <h4><i class="fas fa-images"></i> Image Selection</h4>
@@ -3895,7 +4060,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="document-details-section">
                     <h4><i class="fas fa-image"></i> Image Preview</h4>
                     <div class="content-preview" id="imageStackPreview">
@@ -3916,25 +4081,30 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 </div>
             ` : ''}
-            
+
             <div class="document-details-section">
-                <h4><i class="fas fa-robot"></i> AI Summary</h4>
+                <h4>
+                    <i class="fas fa-robot"></i> AI Summary
+                    <span class="force-refresh-icon" title="Force refresh AI summary" data-action="force-refresh-summary">
+                        <i class="fas fa-sync-alt"></i>
+                    </span>
+                </h4>
                 ${loadingContent}
             </div>
         `;
 
         body.innerHTML = details;
         this.showModal('documentDetailsModal');
-        
+
         // Update modal state
         this.documentDetailsModal.isOpen = true;
         this.documentDetailsModal.currentDocId = docId;
-        
+
         // Check for text truncation in modal details
         setTimeout(() => {
             this.checkDetailValuesTruncation();
         }, 100);
-        
+
         // Check storage availability and update the storage section
         if (isImageStack && doc.images && doc.images.length > 0) {
             // For image stacks, check storage for the first image
@@ -3942,7 +4112,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         } else {
             this.checkAndUpdateStorageSection(docId);
         }
-        
+
         // For images, show the image preview
         if (isImage) {
             console.log('Showing image preview for image document');
@@ -3951,7 +4121,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             console.log('Showing image stack preview');
             this.showImageStackInModal(doc);
         }
-        
+
         // Fetch AI summary for all document types (including images) if not already generated
         if (!isSameDocument || !this.documentDetailsModal.summaryGenerated) {
             console.log('Calling fetchDocumentSummary - conditions met');
@@ -3977,7 +4147,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Returns: Object with storage availability information
         const maxRetries = 3;
         const retryDelay = 1000; // 1 second
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 const response = await fetch(`/download-file/${docId}`);
@@ -3995,9 +4165,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     return { status: 'not_found', message: 'Document not found in system' };
                 } else {
                     const errorData = await response.json().catch(() => ({}));
-                    return { 
-                        status: 'error', 
-                        message: errorData.message || 'Failed to check storage availability' 
+                    return {
+                        status: 'error',
+                        message: errorData.message || 'Failed to check storage availability'
                     };
                 }
             } catch (error) {
@@ -4016,7 +4186,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Args: bytes - File size in bytes
         // Returns: Formatted file size string
         if (!bytes || bytes === 0) return 'Unknown size';
-        
+
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(1024));
         return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
@@ -4029,14 +4199,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         try {
             const storageInfo = await this.checkStorageAvailability(docId);
-            
+
             let storageContent = '';
-            
+
             if (storageInfo.status === 'success') {
                 // File is available in storage
                 const fileSize = this.formatFileSize(storageInfo.size);
                 const contentType = storageInfo.content_type || 'Unknown type';
-                
+
                 if (storageInfo.download_url) {
                     // Show download link
                     storageContent = `
@@ -4047,8 +4217,8 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                                 <p><strong>Type:</strong> ${contentType}</p>
                             </div>
                             <div class="storage-actions">
-                                <a href="${storageInfo.download_url}" 
-                                   class="btn btn-primary download-btn" 
+                                <a href="${storageInfo.download_url}"
+                                   class="btn btn-primary download-btn"
                                    download="${storageInfo.filename}"
                                    target="_blank">
                                     <i class="fas fa-download"></i> Download File
@@ -4102,7 +4272,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `;
             }
-            
+
             // Update the storage section
             const storageContentDiv = storageSection.querySelector('.storage-loading, .storage-available, .storage-not-available, .storage-error');
             if (storageContentDiv) {
@@ -4114,7 +4284,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     ${storageContent}
                 `;
             }
-            
+
         } catch (error) {
             console.error('Error updating storage section:', error);
             const errorContent = `
@@ -4132,19 +4302,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     createMetadataTags(metadata) {
         if (!metadata) return '';
-        
+
         // Special handling for image metadata - check for various image-related types
         if (metadata.type === 'image' || metadata.type === 'image_classification' || metadata.format === 'image') {
             return this.createImageMetadataTags(metadata);
         }
-        
+
         const tags = [];
         const excludeKeys = ['date_added']; // Only exclude date_added, show everything else
-        
+
         Object.entries(metadata).forEach(([key, value]) => {
             if (!excludeKeys.includes(key)) {
                 let displayValue = value;
-                
+
                 // Format specific fields
                 if (key === 'type') {
                     displayValue = this.formatDocumentType(value);
@@ -4155,7 +4325,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 } else {
                     displayValue = String(value);
                 }
-                
+
                 tags.push(`
                     <div class="metadata-tag">
                         <span class="tag-key">${this.escapeHtml(this.formatMetadataKey(key))}</span>
@@ -4164,15 +4334,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 `);
             }
         });
-        
+
         return tags.join('');
     }
 
     createImageMetadataTags(metadata) {
         if (!metadata) return '';
-        
+
         const sections = [];
-        
+
         // Basic Info Section
         const basicInfo = [];
         if (metadata.source) {
@@ -4216,7 +4386,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         if (basicInfo.length > 0) {
             sections.push(`
                 <div class="metadata-section">
@@ -4225,15 +4395,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         // EXIF Data Section
         if (metadata.exif && Object.keys(metadata.exif).length > 0) {
             const exifTags = [];
             const importantExifKeys = [
-                'make', 'model', 'datetime', 'exposure_time', 'f_number', 
+                'make', 'model', 'datetime', 'exposure_time', 'f_number',
                 'iso_speed_ratings', 'focal_length', 'gps_latitude', 'gps_longitude'
             ];
-            
+
             // Show important EXIF data first
             importantExifKeys.forEach(key => {
                 if (metadata.exif[key]) {
@@ -4245,7 +4415,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     `);
                 }
             });
-            
+
             // Show other EXIF data in a collapsible section
             const otherExifKeys = Object.keys(metadata.exif).filter(key => !importantExifKeys.includes(key));
             if (otherExifKeys.length > 0) {
@@ -4255,7 +4425,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <span class="tag-value">${this.escapeHtml(metadata.exif[key])}</span>
                     </div>
                 `).join('');
-                
+
                 exifTags.push(`
                     <div class="metadata-collapsible">
                         <button class="collapsible-btn" data-action="toggle-collapse">
@@ -4267,7 +4437,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `);
             }
-            
+
             sections.push(`
                 <div class="metadata-section">
                     <h5 class="section-title">EXIF Data</h5>
@@ -4277,14 +4447,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         // Classification Section
         if (metadata.classifications || metadata.classification) {
             const classifications = metadata.classifications || metadata.classification?.classifications || [];
             const topPred = metadata.top_prediction || metadata.classification?.top_prediction;
-            
+
             const classificationTags = [];
-            
+
             // Model and Dataset info
             if (metadata.model) {
                 classificationTags.push(`
@@ -4310,7 +4480,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `);
             }
-            
+
             if (topPred && topPred.label) {
                 classificationTags.push(`
                     <div class="metadata-tag">
@@ -4328,7 +4498,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `);
             }
-            
+
             // Show all predictions if available
             if (classifications && classifications.length > 0) {
                 const predictionTags = classifications.map((pred, index) => `
@@ -4337,7 +4507,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <span class="tag-value">${((pred.confidence || 0) * 100).toFixed(1)}%</span>
                     </div>
                 `).join('');
-                
+
                 classificationTags.push(`
                     <div class="metadata-collapsible">
                         <button class="collapsible-btn" data-action="toggle-collapse">
@@ -4349,7 +4519,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `);
             }
-            
+
             sections.push(`
                 <div class="metadata-section">
                     <h5 class="section-title">AI Classification</h5>
@@ -4357,7 +4527,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         // Processing Info Section
         const processingInfo = [];
         if (metadata.processing_timestamp) {
@@ -4401,7 +4571,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         if (processingInfo.length > 0) {
             sections.push(`
                 <div class="metadata-section">
@@ -4410,12 +4580,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         // OCR Content Section
         if (metadata.ocr_content && typeof metadata.ocr_content === 'object') {
             const ocrContent = metadata.ocr_content;
             const ocrTags = [];
-            
+
             // Show useful OCR metadata first
             if (ocrContent.ocr_processing !== undefined) {
                 ocrTags.push(`
@@ -4449,7 +4619,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `);
             }
-            
+
             // Show text_blocks in a collapsible section if available
             if (ocrContent.text_blocks && ocrContent.text_blocks.length > 0) {
                 const textBlocksContent = ocrContent.text_blocks.map((block, index) => {
@@ -4461,7 +4631,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         </div>
                     `;
                 }).join('');
-                
+
                 ocrTags.push(`
                     <div class="metadata-collapsible">
                         <button class="collapsible-btn" data-action="toggle-collapse">
@@ -4473,7 +4643,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `);
             }
-            
+
             if (ocrTags.length > 0) {
                 sections.push(`
                     <div class="metadata-section">
@@ -4483,16 +4653,16 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 `);
             }
         }
-        
+
         // Raw Metadata Section (for any other fields, excluding ocr_content)
-        const otherKeys = Object.keys(metadata).filter(key => 
+        const otherKeys = Object.keys(metadata).filter(key =>
             !['source', 'collection', 'exif', 'classification', 'processing_timestamp', 'pytorch_processing', 'date_added', 'url', 'filename', 'file_size', 'model', 'dataset', 'top_k', 'format', 'size_bytes', 'daft_processing', 'daft_dataframe_shape', 'schema', 'ocr_content'].includes(key)
         );
-        
+
         if (otherKeys.length > 0) {
             const otherTags = otherKeys.map(key => {
                 let value = metadata[key];
-                
+
                 // Special handling for base64 data
                 if (key === 'image_data' || key === 'base64_data' || key === 'image') {
                     if (typeof value === 'string' && value.length > 50) {
@@ -4510,7 +4680,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         `;
                     }
                 }
-                
+
                 if (typeof value === 'object') {
                     value = JSON.stringify(value, null, 2);
                 } else {
@@ -4523,7 +4693,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     </div>
                 `;
             }).join('');
-            
+
             sections.push(`
                 <div class="metadata-section">
                     <h5 class="section-title">Other Metadata</h5>
@@ -4533,7 +4703,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 </div>
             `);
         }
-        
+
         return sections.join('');
     }
 
@@ -4552,13 +4722,13 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             'artist': 'Artist',
             'copyright': 'Copyright'
         };
-        
+
         return exifKeyMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
     formatDocumentType(type) {
         if (!type) return 'Unknown';
-        
+
         const typeMap = {
             'webpage': 'URL',
             'pdf': 'PDF',
@@ -4568,7 +4738,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             'xml': 'XML',
             'csv': 'CSV'
         };
-        
+
         return typeMap[type.toLowerCase()] || type.charAt(0).toUpperCase() + type.slice(1);
     }
 
@@ -4581,7 +4751,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             'source': 'Source',
             'category': 'Category'
         };
-        
+
         return keyMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
     }
 
@@ -4589,25 +4759,25 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('showImageInModal called with doc:', doc);
         // For images, we want to update the image preview section specifically
         const imagePreviewSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-image');
-        const contentPreview = imagePreviewSection ? 
+        const contentPreview = imagePreviewSection ?
             imagePreviewSection.closest('.document-details-section').querySelector('.content-preview') :
             document.querySelector('#documentDetailsModal .content-preview');
-            
+
         if (contentPreview) {
             // Get image data from the document - check multiple possible locations
             // Check for image_data in various locations including the root level and metadata
-            const imageData = doc.image_data || 
-                            doc.metadata?.image_data || 
+            const imageData = doc.image_data ||
+                            doc.metadata?.image_data ||
                             doc.metadata?.base64_data ||
                             doc.metadata?.image ||
                             doc.image;
-            
+
             // Check for image URL in various locations
-            const imageUrl = doc.url || 
-                           doc.metadata?.url || 
+            const imageUrl = doc.url ||
+                           doc.metadata?.url ||
                            doc.metadata?.source ||
                            doc.metadata?.filename;
-            
+
             console.log('Image data found:', !!imageData);
             console.log('Image URL found:', imageUrl);
             console.log('Available doc keys:', Object.keys(doc));
@@ -4616,15 +4786,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             console.log('Content type:', doc.content_type);
             console.log('Document type:', doc.metadata?.type);
             console.log('Image data length:', imageData ? imageData.length : 0);
-            
+
             if (imageData) {
                 // If we have base64 image data, display it
                 // Determine the correct MIME type based on metadata or default to jpeg
-                const mimeType = doc.metadata?.mime_type || 
-                                doc.metadata?.format || 
-                                doc.metadata?.content_type || 
+                const mimeType = doc.metadata?.mime_type ||
+                                doc.metadata?.format ||
+                                doc.metadata?.content_type ||
                                 'image/jpeg';
-                
+
                 contentPreview.innerHTML = `
                     <div class="image-preview">
                         <img src="data:${mimeType};base64,${imageData}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
@@ -4642,10 +4812,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 console.log('No image data found, attempting to fetch from backend...');
                 this.fetchImageFromBackend(doc.id, contentPreview);
             }
-            
+
             // Mark summary as generated for images
             this.documentDetailsModal.summaryGenerated = true;
-            
+
             // Set up event listeners for collapsible sections
             this.setupCollapsibleSections();
         }
@@ -4653,10 +4823,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     showImageStackInModal(doc) {
         console.log('showImageStackInModal called with doc:', doc);
-        
+
         // Store the document reference for use in dropdown changes
         this.currentImageStackDoc = doc;
-        
+
         // Set up the dropdown change event listener
         const imageStackSelect = document.getElementById('imageStackSelect');
         if (imageStackSelect) {
@@ -4666,52 +4836,52 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 this.showSelectedImageInStack(selectedImage);
             });
         }
-        
+
         // Store the image stack object for later use
         this.documentDetailsModal.currentImageStack = doc;
         console.log('Stored image stack:', doc.id, doc.sourceDocument);
-        
+
         // Show the first image by default
         if (doc.images && doc.images.length > 0) {
             this.showSelectedImageInStack(doc.images[0]);
         }
-        
+
         // Mark summary as generated for image stacks
         this.documentDetailsModal.summaryGenerated = true;
-        
+
         // Set up event listeners for collapsible sections
         this.setupCollapsibleSections();
     }
 
     showSelectedImageInStack(selectedImage) {
         console.log('showSelectedImageInStack called with image:', selectedImage);
-        
+
         const imageStackPreview = document.getElementById('imageStackPreview');
         if (!imageStackPreview) return;
-        
+
         // Get image data from the selected image
-        const imageData = selectedImage.image_data || 
-                         selectedImage.metadata?.image_data || 
+        const imageData = selectedImage.image_data ||
+                         selectedImage.metadata?.image_data ||
                          selectedImage.metadata?.base64_data ||
                          selectedImage.metadata?.image ||
                          selectedImage.image;
-        
+
         // Check for image URL
-        const imageUrl = selectedImage.url || 
-                        selectedImage.metadata?.url || 
+        const imageUrl = selectedImage.url ||
+                        selectedImage.metadata?.url ||
                         selectedImage.metadata?.source ||
                         selectedImage.metadata?.filename;
-        
+
         console.log('Selected image data found:', !!imageData);
         console.log('Selected image URL found:', imageUrl);
-        
+
         if (imageData) {
             // If we have base64 image data, display it
-            const mimeType = selectedImage.metadata?.mime_type || 
-                            selectedImage.metadata?.format || 
-                            selectedImage.metadata?.content_type || 
+            const mimeType = selectedImage.metadata?.mime_type ||
+                            selectedImage.metadata?.format ||
+                            selectedImage.metadata?.content_type ||
                             'image/jpeg';
-            
+
             imageStackPreview.innerHTML = `
                 <div class="image-preview">
                     <img src="data:${mimeType};base64,${imageData}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
@@ -4729,13 +4899,13 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             console.log('No image data found, attempting to fetch from backend...');
             this.fetchImageFromBackend(selectedImage.id, imageStackPreview);
         }
-        
+
         // Update storage section for the selected image
         this.checkAndUpdateStorageSection(selectedImage.id);
-        
+
         // Update metadata section for the selected image
         this.updateMetadataSection(selectedImage);
-        
+
         // Update AI summary for the image stack (not the individual image)
         console.log('currentImageStack:', this.documentDetailsModal.currentImageStack);
         if (this.documentDetailsModal.currentImageStack) {
@@ -4754,7 +4924,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         console.log('Selected image OCR content:', selectedImage.metadata?.ocr_content);
         console.log('Selected image OCR text:', selectedImage.metadata?.ocr_content?.extracted_text);
         console.log('Selected image filename:', selectedImage.metadata?.filename);
-        
+
         // Update URL/ID section
         const urlSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-link');
         if (urlSection) {
@@ -4763,7 +4933,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 urlContainer.textContent = selectedImage.url || selectedImage.metadata?.filename || selectedImage.metadata?.source || 'N/A';
             }
         }
-        
+
         // Update Date Added section
         const dateSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-calendar');
         if (dateSection) {
@@ -4772,14 +4942,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 dateContainer.textContent = this.formatDate(selectedImage.metadata?.date_added) || 'Unknown';
             }
         }
-        
+
         // Find the metadata section
         const metadataSection = document.querySelector('#documentDetailsModal .document-details-section h4 i.fas.fa-tags');
         if (!metadataSection) return;
-        
+
         const metadataContainer = metadataSection.closest('.document-details-section').querySelector('.metadata-tags');
         if (!metadataContainer) return;
-        
+
         // Check if metadata is a JSON string that needs parsing
         let processedMetadata = selectedImage.metadata;
         if (typeof selectedImage.metadata === 'string') {
@@ -4791,15 +4961,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 processedMetadata = selectedImage.metadata;
             }
         }
-        
+
         // Create new metadata tags for the selected image (includes OCR content)
         const metadataTags = this.createMetadataTags(processedMetadata);
         console.log('Generated metadata tags length:', metadataTags ? metadataTags.length : 0);
-        
+
         if (metadataTags) {
             metadataContainer.innerHTML = metadataTags;
             console.log('Metadata section updated with new content');
-            
+
             // Check if OCR text is actually in the DOM
             const ocrTextElement = metadataContainer.querySelector('.ocr-text-content');
             if (ocrTextElement) {
@@ -4820,17 +4990,17 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 <p>Loading image from backend...</p>
             </div>
         `;
-        
+
         // Try to fetch the image from backend using the dedicated image endpoint
         fetch(`/image/${docId}`)
             .then(response => response.json())
             .then(result => {
                 if (result.image_data) {
-                    const mimeType = result.metadata?.mime_type || 
-                                    result.metadata?.format || 
-                                    result.metadata?.content_type || 
+                    const mimeType = result.metadata?.mime_type ||
+                                    result.metadata?.format ||
+                                    result.metadata?.content_type ||
                                     'image/jpeg';
-                    
+
                     contentPreview.innerHTML = `
                         <div class="image-preview">
                             <img src="data:${mimeType};base64,${result.image_data}" alt="Image preview" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
@@ -4863,7 +5033,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         imageContainers.forEach(container => {
             const imageId = container.getAttribute('data-image-id');
             const filename = container.getAttribute('data-filename');
-            
+
             if (imageId) {
                 this.loadAgentImage(container, imageId, filename);
             }
@@ -4878,21 +5048,21 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 <p>Loading ${filename}...</p>
             </div>
         `;
-        
+
         // Fetch image from backend
         fetch(`/image/${imageId}`)
             .then(response => response.json())
             .then(result => {
                 if (result.image_data) {
-                    const mimeType = result.metadata?.format || 
-                                    result.metadata?.mime_type || 
-                                    result.metadata?.content_type || 
+                    const mimeType = result.metadata?.format ||
+                                    result.metadata?.mime_type ||
+                                    result.metadata?.content_type ||
                                     'image/jpeg';
-                    
+
                     container.innerHTML = `
                         <div class="agent-image-preview">
-                            <img src="data:${mimeType};base64,${result.image_data}" 
-                                 alt="${filename}" 
+                            <img src="data:${mimeType};base64,${result.image_data}"
+                                 alt="${filename}"
                                  style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
                             <div class="image-caption">${filename}</div>
                         </div>
@@ -4928,7 +5098,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 parent.classList.toggle('expanded');
             });
         });
-        
+
         // Find all expand buttons for base64 data and add event listeners
         const expandButtons = document.querySelectorAll('.expand-btn[data-action="expand-base64"]');
         expandButtons.forEach(button => {
@@ -4937,7 +5107,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 const value = button.getAttribute('data-value');
                 const parent = button.closest('.metadata-tag');
                 const tagValue = parent.querySelector('.tag-value');
-                
+
                 // Replace the preview and button with the full content
                 tagValue.innerHTML = `
                     <div class="base64-content">
@@ -4947,7 +5117,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         </button>
                     </div>
                 `;
-                
+
                 // Add event listener to the new collapse button
                 const collapseBtn = tagValue.querySelector('.collapse-btn');
                 collapseBtn.addEventListener('click', () => {
@@ -4958,7 +5128,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             <i class="fas fa-expand-alt"></i> Show content
                         </button>
                     `;
-                    
+
                     // Re-add event listener to the new expand button
                     const newExpandBtn = tagValue.querySelector('.expand-btn');
                     newExpandBtn.addEventListener('click', arguments.callee);
@@ -4971,23 +5141,23 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (!text) {
             return '<div class="no-content">No content available</div>';
         }
-        
+
         // Clean and format the text
         let formattedText = text
             .replace(/\n\s*\n/g, '\n\n') // Remove extra blank lines
             .replace(/\t/g, '    ') // Replace tabs with spaces
             .trim();
-        
+
         // Limit to first 1000 characters with ellipsis
         const maxLength = 1000;
         const truncated = formattedText.length > maxLength;
         const displayText = truncated ? formattedText.substring(0, maxLength) + '...' : formattedText;
-        
+
         // Split into paragraphs and format
-        const paragraphs = displayText.split('\n\n').map(para => 
+        const paragraphs = displayText.split('\n\n').map(para =>
             `<p>${this.escapeHtml(para.trim())}</p>`
         ).join('');
-        
+
         return `
             <div class="content-text">
                 ${paragraphs}
@@ -5001,17 +5171,17 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const visualizationResizeHandle = document.getElementById('visualizationResizeHandle');
         const documentsVisualization = document.getElementById('documentsVisualization');
         const toggleBtn = document.getElementById('visualizationToggleBtn');
-        
+
         this.isVisualizationVisible = !this.isVisualizationVisible;
         localStorage.setItem('ragme-visualization-visible', this.isVisualizationVisible.toString());
-        
+
         if (this.isVisualizationVisible) {
             visualizationContent.style.display = 'block';
             visualizationResizeHandle.style.display = 'flex';
             documentsVisualization.style.height = '20vh'; // Restore original height
             documentsVisualization.style.minHeight = '200px';
             toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
-            
+
             // D3.js is now loaded synchronously, so we can call updateVisualization immediately
             this.updateVisualization();
         } else {
@@ -5025,7 +5195,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     updateVisualization() {
         console.log('updateVisualization called - isVisible:', this.isVisualizationVisible, 'documents:', this.documents.length);
-        
+
         // Always update the visualization data, even if not visible
         // This ensures the visualization is ready when made visible
         if (this.documents.length === 0) {
@@ -5056,21 +5226,21 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         try {
             console.log('Creating D3.js visualization...');
-            
+
             // Get container dimensions as they currently are (no forced resizing)
             const containerRect = container.getBoundingClientRect();
             const containerWidth = containerRect.width;
             const containerHeight = containerRect.height;
-            
+
             // Ensure minimum dimensions but don't force larger sizes
             const minWidth = 200;
             const minHeight = 150;
             const finalWidth = Math.max(containerWidth, minWidth);
             const finalHeight = Math.max(containerHeight, minHeight);
-            
+
             console.log('Container dimensions (current):', finalWidth, 'x', finalHeight);
             console.log('Container rect:', containerRect);
-            
+
             // Prepare data based on visualization type
             let data;
             switch (this.currentVisualizationType) {
@@ -5094,7 +5264,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     console.log('Default bar chart data:', data);
                     this.createBarChart(container, data, finalWidth, finalHeight);
             }
-            
+
         } catch (error) {
             console.error('Error creating visualization:', error);
             container.innerHTML = `
@@ -5114,7 +5284,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const type = doc.metadata?.type || 'unknown';
             typeCounts[type] = (typeCounts[type] || 0) + 1;
         });
-        
+
         return Object.entries(typeCounts).map(([type, count]) => ({
             type: this.formatDocumentType(type),
             count: count
@@ -5128,7 +5298,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const type = doc.metadata?.type || 'unknown';
             typeCounts[type] = (typeCounts[type] || 0) + 1;
         });
-        
+
         return Object.entries(typeCounts).map(([type, count]) => ({
             type: this.formatDocumentType(type),
             count: count
@@ -5138,12 +5308,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     prepareGraphData() {
         // Group documents first to handle existing chunked documents
         const groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
-        
+
         // Create nodes for each grouped document
         const nodes = groupedDocuments.map((doc, index) => {
             // For chunked documents, use the original filename as the name
             let displayName = doc.url || `Document ${index + 1}`;
-            
+
             if (doc.metadata?.is_chunked && doc.metadata?.original_filename) {
                 displayName = doc.metadata.original_filename;
             } else if (doc.isGroupedChunks && doc.originalFilename) {
@@ -5151,7 +5321,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             } else if (doc.metadata?.filename) {
                 displayName = doc.metadata.filename;
             }
-            
+
             return {
                 id: doc.id || index,
                 name: displayName,
@@ -5161,14 +5331,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 totalChunks: doc.metadata?.total_chunks || doc.totalChunks || 1
             };
         });
-        
+
         const edges = [];
         // Create edges between documents with similar metadata
         for (let i = 0; i < nodes.length; i++) {
             for (let j = i + 1; j < nodes.length; j++) {
                 const node1 = nodes[i];
                 const node2 = nodes[j];
-                
+
                 // Create edge if they share the same type or collection
                 if (node1.type === node2.type || node1.group === node2.group) {
                     edges.push({
@@ -5179,7 +5349,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 }
             }
         }
-        
+
         return { nodes, edges };
     }
 
@@ -5428,12 +5598,12 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             .text(d => {
                 const maxLength = Math.max(10, width / 20);
                 let displayText = d.name;
-                
+
                 // Add chunk information for chunked documents
                 if (d.isChunked && d.totalChunks > 1) {
                     displayText += ` (${d.totalChunks} chunks)`;
                 }
-                
+
                 return displayText.length > maxLength ? displayText.substring(0, maxLength) + '...' : displayText;
             });
 
@@ -5564,11 +5734,46 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 this.loadVectorDbInfo();
             }, 1000);
         }
+
+        // Also check health status to detect connection issues
+        this.checkHealthStatus();
+    }
+
+    async checkHealthStatus() {
+        try {
+            const response = await fetch(this.buildApiUrl('health'));
+            const healthData = await response.json();
+
+            if (healthData.status === 'success') {
+                const vdbStatus = healthData.vector_database?.status;
+                if (vdbStatus === 'error') {
+                    // Update connection status on VDB error
+                    this.connectionStatus.isConnected = false;
+                    this.connectionStatus.failureCount++;
+                    this.connectionStatus.lastFailure = Date.now();
+                    this.updateVectorDbInfoDisplay();
+                } else if (vdbStatus === 'healthy') {
+                    // Update connection status on VDB success
+                    this.connectionStatus.isConnected = true;
+                    this.connectionStatus.lastSuccess = Date.now();
+                    this.connectionStatus.failureCount = 0;
+                    this.connectionStatus.lastFailure = null;
+                    this.updateVectorDbInfoDisplay();
+                }
+            }
+        } catch (error) {
+            console.error('Health check failed:', error);
+            // Update connection status on health check failure
+            this.connectionStatus.isConnected = false;
+            this.connectionStatus.failureCount++;
+            this.connectionStatus.lastFailure = Date.now();
+            this.updateVectorDbInfoDisplay();
+        }
     }
 
     async loadVectorDbInfoFromBackend() {
         try {
-            const response = await fetch('http://localhost:8021/config');
+            const response = await fetch(this.buildApiUrl('config'));
             if (response.ok) {
                 const data = await response.json();
                 if (data.status === 'success' && data.config.vector_database) {
@@ -5578,7 +5783,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         collections: data.config.vector_database.collections || []
                     };
                     this.updateVectorDbInfoDisplay();
-                    
+
                     // Update Settings modal if it's open - but don't override if we just set it
                     const settingsModal = document.getElementById('settingsModal');
                     if (settingsModal && settingsModal.classList.contains('show')) {
@@ -5598,18 +5803,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     async loadVectorDbInfoForSettings() {
         const vectorDbElement = document.getElementById('settingsVectorDbType');
         if (!vectorDbElement) return;
-        
+
         // Show loading state
         vectorDbElement.textContent = 'Loading...';
-        
+
         try {
-            const response = await fetch('http://localhost:8021/config');
+            const response = await fetch(this.buildApiUrl('config'));
             if (response.ok) {
                 const data = await response.json();
                 if (data.status === 'success' && data.config.vector_database && data.config.vector_database.type) {
                     const dbType = data.config.vector_database.type;
                     vectorDbElement.textContent = dbType;
-                    
+
                     // Also update the global vectorDbInfo
                     this.vectorDbInfo = {
                         dbType: dbType,
@@ -5632,7 +5837,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const storageType = this.config.config.storage.type || 'Unknown';
             const bucketName = this.config.config.storage.bucket_name || 'Unknown';
             const backendConfig = this.config.config.storage.backend_config || {};
-            
+
             // Determine bucket name based on storage type
             let displayBucketName = bucketName;
             if (storageType === 'local') {
@@ -5642,11 +5847,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             } else if (storageType === 's3') {
                 displayBucketName = backendConfig.bucket_name || bucketName;
             }
-            
+
             // Check if MinIO is available via backend endpoint
             let minioStatus = 'Unknown';
             try {
-                const storageStatusResponse = await fetch('http://localhost:8021/storage/status');
+                const storageStatusResponse = await fetch(this.buildApiUrl('storage'));
                 if (storageStatusResponse.ok) {
                     const storageStatus = await storageStatusResponse.json();
                     if (storageStatus.status === 'success' && storageStatus.storage) {
@@ -5660,7 +5865,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             } catch (error) {
                 minioStatus = 'Not Available';
             }
-            
+
             // Determine status based on storage type and MinIO availability
             let status = 'Configured';
             if (storageType === 'local') {
@@ -5670,7 +5875,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             } else if (storageType === 's3') {
                 status = 'Online (S3)';
             }
-            
+
             document.getElementById('storageType').textContent = storageType;
             document.getElementById('storageBucket').textContent = displayBucketName;
             document.getElementById('storageStatus').textContent = status;
@@ -5685,19 +5890,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const vectorDbInfoElement = document.getElementById('vectorDbInfo');
         const vectorDbTypeElement = document.getElementById('vectorDbType');
         const vectorDbCollectionElement = document.getElementById('vectorDbCollection');
-        
+
         if (!this.settings.showVectorDbInfo) {
             vectorDbInfoElement.style.display = 'none';
             return;
         }
-        
+
         // Update connection status styling
         if (this.connectionStatus && !this.connectionStatus.isConnected) {
             vectorDbInfoElement.classList.add('connection-error');
         } else {
             vectorDbInfoElement.classList.remove('connection-error');
         }
-        
+
         if (this.vectorDbInfo) {
             vectorDbTypeElement.textContent = this.vectorDbInfo.dbType || this.vectorDbInfo.type || 'Unknown';
 
@@ -5722,7 +5927,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             vectorDbTypeElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
             vectorDbCollectionElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
             vectorDbInfoElement.style.display = 'flex';
-            
+
             // Retry loading vector DB info if not available after a delay
             if (!this.vectorDbInfoRetryTimeout) {
                 this.vectorDbInfoRetryTimeout = setTimeout(() => {
@@ -5740,19 +5945,19 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Get the grouped documents to find the correct document
         const groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
         const groupedDoc = groupedDocuments[docIndex];
-        
+
         if (!groupedDoc) {
             this.showNotification('error', 'Document not found');
             return;
         }
-        
+
         const isImage = groupedDoc.content_type === 'image';
         const isImageStack = groupedDoc.content_type === 'image_stack' && groupedDoc.isGroupedImages;
         const contentType = isImageStack ? 'image stack' : (isImage ? 'image' : 'document');
-        
+
         if (confirm(`Are you sure you want to delete this ${contentType}? This action cannot be undone.`)) {
             console.log('Deleting document:', docIndex, groupedDoc);
-            
+
             // Check if this is a chunked document that needs special handling
             if (groupedDoc.isGroupedChunks && groupedDoc.totalChunks > 1) {
                 // Delete all chunks of this document
@@ -5762,7 +5967,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 this.deleteImageStack(groupedDoc);
             } else {
                 // Delete single document - find the actual document index in the original array
-                const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex : 
+                const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex :
                                      this.documents.findIndex(doc => doc.id === groupedDoc.id);
                 this.deleteSingleDocument(actualDocIndex, groupedDoc);
             }
@@ -5771,57 +5976,57 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     deleteChunkedDocument(groupedDoc) {
         console.log('Deleting chunked document:', groupedDoc);
-        
+
         // Set deletion in progress flag
         this.deletionInProgress = true;
-        
+
         // Add to documents being deleted set
         if (groupedDoc.id) this.documentsBeingDeleted.add(groupedDoc.id);
         if (groupedDoc.baseUrl) this.documentsBeingDeleted.add(groupedDoc.baseUrl);
-        
+
         // Re-render to show deleting state
         this.renderDocuments();
-        
+
         // Show initial progress notification
         const progressNotification = this.showProgressNotification(`Deleting document chunks...`, 0, 1);
-        
+
         // Use the new backend endpoint to delete all chunks at once
         const deleteDocumentGroup = async () => {
             try {
                 console.log(`Starting deletion of document group:`, groupedDoc.originalFilename || groupedDoc.url);
                 console.log(`Base URL: ${groupedDoc.baseUrl}`);
-                
+
                 // Encode the base URL for the API call
                 const encodedBaseUrl = encodeURIComponent(groupedDoc.baseUrl);
-                const endpoint = `http://localhost:8021/delete-document-group/${encodedBaseUrl}`;
-                
+                const endpoint = this.buildApiUrl(`/delete-document-group/${encodedBaseUrl}`);
+
                 console.log(`Calling backend endpoint: ${endpoint}`);
-                
+
                 const response = await fetch(endpoint, { method: 'DELETE' });
                 const result = await response.json();
-                
+
                 // Remove progress notification
                 this.removeProgressNotification(progressNotification);
-                
+
                 if (result.status === 'success') {
                     console.log(`✅ Successfully deleted document group:`, result);
-                    
+
                     // Remove from documents being deleted set
                     if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
                     if (groupedDoc.baseUrl) this.documentsBeingDeleted.delete(groupedDoc.baseUrl);
-                    
+
                     // Now remove the document from the UI
                     this.removeGroupedDocumentFromUI(groupedDoc);
-                    
+
                     // Close the modal first
                     this.hideModal('documentDetailsModal');
-                    
+
                     // Update cached documents
                     this.updateCachedDocumentsAfterDeletion(groupedDoc);
-                    
+
                     // Show success notification
                     this.showNotification('success', result.message);
-                    
+
                     // Verify deletion by checking backend
                     console.log('Verifying deletion by checking backend...');
                     try {
@@ -5831,53 +6036,53 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     }
                 } else {
                     console.error(`❌ Failed to delete document group:`, result);
-                    
+
                     // Remove from documents being deleted set on failure
                     if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
                     if (groupedDoc.baseUrl) this.documentsBeingDeleted.delete(groupedDoc.baseUrl);
-                    
+
                     // Re-render to remove deleting badge
                     this.renderDocuments();
-                    
+
                     this.showNotification('error', `Failed to delete document: ${result.message || 'Unknown error'}`);
                 }
-                
+
             } catch (error) {
                 console.error(`❌ Error deleting document group:`, error);
                 this.removeProgressNotification(progressNotification);
-                
+
                 // Remove from documents being deleted set on error
                 if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
                 if (groupedDoc.baseUrl) this.documentsBeingDeleted.delete(groupedDoc.baseUrl);
-                
+
                 // Re-render to remove deleting badge
                 this.renderDocuments();
-                
+
                 this.showNotification('error', `Error deleting document: ${error.message}`);
             }
-            
+
             // Reset deletion in progress flag
             this.deletionInProgress = false;
         };
-        
+
         // Start the deletion process
         deleteDocumentGroup();
     }
 
     deleteSingleDocument(docIndex, doc) {
         console.log('deleteSingleDocument called with:', { docIndex, docId: doc.id, docType: doc.content_type });
-        
+
         // Add to documents being deleted set
         if (doc.id) this.documentsBeingDeleted.add(doc.id);
-        
+
         // Re-render to show deleting state
         this.renderDocuments();
-        
+
         // Determine the appropriate endpoint based on content type
         const endpoint = doc.content_type === 'image' ? `/delete-image/${doc.id}` : `/delete-document/${doc.id}`;
-        
+
         // Call backend API to delete the document/image using the appropriate endpoint
-        fetch(endpoint, {
+        fetch(this.buildApiUrl(endpoint), {
             method: 'DELETE',
         })
         .then(response => response.json())
@@ -5886,22 +6091,22 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (result.status === 'success') {
                 // Immediately remove from local array and update UI
                 console.log('Delete successful, updating UI immediately...');
-                
+
                 // Remove the document from the local array
                 if (docIndex >= 0 && docIndex < this.documents.length) {
                     this.documents.splice(docIndex, 1);
                     console.log('Document removed from local array. New count:', this.documents.length);
                 }
-                
+
                 // Re-render the documents list immediately
                 this.renderDocuments();
-                
+
                 // Update visualization to reflect the changes
                 this.updateVisualization();
-                
+
                 // Update the cached allDocuments to remove the deleted document
                 this.updateCachedDocumentsAfterDeletion(doc);
-                
+
                 // Show success notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
                 this.showNotification('success', `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} deleted successfully`);
@@ -5921,10 +6126,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     deleteDocumentFromDetails() {
         const modal = document.getElementById('documentDetailsModal');
         const docIndex = parseInt(modal.dataset.docIndex);
-        
+
         // Get the grouped documents to find the correct document
         const groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
-        
+
         if (isNaN(docIndex) || docIndex < 0 || docIndex >= groupedDocuments.length) {
             this.showNotification('error', 'Invalid document index');
             return;
@@ -5933,7 +6138,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         const groupedDoc = groupedDocuments[docIndex];
         const isImage = groupedDoc.content_type === 'image';
         const contentType = isImage ? 'image' : 'document';
-        
+
         if (confirm(`Are you sure you want to delete this ${contentType}? This action cannot be undone.`)) {
             // Check if this is a chunked document that needs special handling
             if (groupedDoc.isGroupedChunks && groupedDoc.totalChunks > 1) {
@@ -5955,9 +6160,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     this.deleteImageStack(groupedDoc);
                 } else {
                     // Fallback: find the actual document index in the original array
-                    const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex : 
+                    const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex :
                                          this.documents.findIndex(doc => doc.id === groupedDoc.id);
-                    
+
                     // Call deleteSingleDocument and close modal after successful deletion
                     this.deleteSingleDocumentFromDetails(actualDocIndex, groupedDoc);
                 }
@@ -5967,18 +6172,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     deleteSingleDocumentFromDetails(docIndex, doc) {
         console.log('deleteSingleDocumentFromDetails called with:', { docIndex, docId: doc.id, docType: doc.content_type });
-        
+
         // Add to documents being deleted set
         if (doc.id) this.documentsBeingDeleted.add(doc.id);
-        
+
         // Re-render to show deleting state
         this.renderDocuments();
-        
+
         // Determine the appropriate endpoint based on content type
         const endpoint = doc.content_type === 'image' ? `/delete-image/${doc.id}` : `/delete-document/${doc.id}`;
-        
+
         // Call backend API to delete the document/image using the appropriate endpoint
-        fetch(endpoint, {
+        fetch(this.buildApiUrl(endpoint), {
             method: 'DELETE',
         })
         .then(response => response.json())
@@ -5987,25 +6192,25 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (result.status === 'success') {
                 // Immediately remove from local array and update UI
                 console.log('Delete successful, updating UI immediately...');
-                
+
                 // Remove the document from the local array
                 if (docIndex >= 0 && docIndex < this.documents.length) {
                     this.documents.splice(docIndex, 1);
                     console.log('Document removed from local array. New count:', this.documents.length);
                 }
-                
+
                 // Close the modal first to allow rendering
                 this.hideModal('documentDetailsModal');
-                
+
                 // Re-render the documents list immediately
                 this.renderDocuments();
-                
+
                 // Update visualization to reflect the changes
                 this.updateVisualization();
-                
+
                 // Remove from documents being deleted set
                 if (doc.id) this.documentsBeingDeleted.delete(doc.id);
-                
+
                 // Update the cached allDocuments to remove the deleted document
                 // Check if this is a grouped document or single document
                 if (doc.isGroupedChunks || doc.isGroupedImages) {
@@ -6018,21 +6223,21 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         if (cacheIndex !== -1) {
                             this.pagination.allDocuments.splice(cacheIndex, 1);
                             console.log('Removed single document from cached allDocuments');
-                            
+
                             // Update pagination counts
                             this.pagination.totalDocuments = Math.max(0, this.pagination.totalDocuments - 1);
                             this.pagination.totalPages = Math.ceil(this.pagination.totalDocuments / this.pagination.documentsPerPage);
                         }
                     }
                 }
-                
+
                 // Show success notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
                 this.showNotification('success', `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} deleted successfully`);
             } else {
                 // Remove from documents being deleted set on failure
                 if (doc.id) this.documentsBeingDeleted.delete(doc.id);
-                
+
                 // Show error notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
                 this.showNotification('error', result.message || `Failed to delete ${contentType}`);
@@ -6040,10 +6245,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         })
         .catch(error => {
             console.error('Error deleting document:', error);
-            
+
             // Remove from documents being deleted set on error
             if (doc.id) this.documentsBeingDeleted.delete(doc.id);
-            
+
             const contentType = doc.content_type === 'image' ? 'image' : 'document';
             this.showNotification('error', `Failed to delete ${contentType}. Please try again.`);
         });
@@ -6051,29 +6256,29 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     deleteImageStack(groupedDoc) {
         console.log('Deleting image stack:', groupedDoc);
-        
+
         // Set deletion in progress flag
         this.deletionInProgress = true;
-        
+
         // Add to documents being deleted set
         if (groupedDoc.id) this.documentsBeingDeleted.add(groupedDoc.id);
         if (groupedDoc.sourceDocument) this.documentsBeingDeleted.add(groupedDoc.sourceDocument);
-        
+
         // Re-render to show deleting state
         this.renderDocuments();
-        
+
         // Get all images that belong to this stack
         const imagesToDelete = groupedDoc.images || [];
-        
+
         console.log('Found images to delete:', imagesToDelete.length);
-        
+
         // Show initial progress notification
         const progressNotification = this.showProgressNotification(`Deleting ${imagesToDelete.length} images...`, 0, imagesToDelete.length);
-        
+
         let completedCount = 0;
         let successCount = 0;
         let errorCount = 0;
-        
+
         // Delete images one by one to show progress
         const deleteSequentially = async () => {
             for (let i = 0; i < imagesToDelete.length; i++) {
@@ -6082,9 +6287,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     const endpoint = `/delete-image/${image.id}`;
                     const response = await fetch(endpoint, { method: 'DELETE' });
                     const result = await response.json();
-                    
+
                     completedCount++;
-                    
+
                     if (result.status === 'success') {
                         successCount++;
                         // Remove the individual image from local array
@@ -6096,10 +6301,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         errorCount++;
                         console.error(`Failed to delete image ${image.id}:`, result);
                     }
-                    
+
                     // Update progress notification
                     this.updateProgressNotification(progressNotification, `Deleting images... (${completedCount}/${imagesToDelete.length})`, completedCount, imagesToDelete.length);
-                    
+
                 } catch (error) {
                     completedCount++;
                     errorCount++;
@@ -6107,10 +6312,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     this.updateProgressNotification(progressNotification, `Deleting images... (${completedCount}/${imagesToDelete.length})`, completedCount, imagesToDelete.length);
                 }
             }
-            
+
             // Remove progress notification
             this.removeProgressNotification(progressNotification);
-            
+
             // Also remove any remaining images that might be related to this stack
             const remainingRelatedImages = this.documents.filter(doc => {
                 if (doc.content_type === 'image' && doc.metadata?.pdf_filename) {
@@ -6118,29 +6323,29 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 }
                 return false;
             });
-            
+
             remainingRelatedImages.forEach(doc => {
                 const index = this.documents.findIndex(d => d.id === doc.id);
                 if (index !== -1) {
                     this.documents.splice(index, 1);
                 }
             });
-            
+
             console.log(`Deleted ${successCount} images, ${errorCount} failed. New document count:`, this.documents.length);
-            
+
             // Re-render the documents list
             this.renderDocuments();
-            
+
             // Update visualization to reflect the changes
             this.updateVisualization();
-            
+
             // Close the modal first
             this.hideModal('documentDetailsModal');
-            
+
             // Remove from documents being deleted set
             if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
             if (groupedDoc.sourceDocument) this.documentsBeingDeleted.delete(groupedDoc.sourceDocument);
-            
+
             // Show final notification
             if (errorCount === 0) {
                 // Success - remove from UI
@@ -6157,11 +6362,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 this.updateCachedDocumentsAfterDeletion(groupedDoc);
                 this.showNotification('warning', `Deleted ${successCount} images, ${errorCount} failed`);
             }
-            
+
             // Clear deletion in progress flag
             this.deletionInProgress = false;
         };
-        
+
         // Start the sequential deletion
         deleteSequentially();
     }
@@ -6169,7 +6374,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     scrollToDocumentInList(documentId) {
         console.log('Scrolling to document in list:', documentId);
-        
+
         // Find the document in the documents array
         const docIndex = this.documents.findIndex(doc => doc.id === documentId);
         if (docIndex === -1) {
@@ -6198,10 +6403,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
         // Get the target document card
         const targetCard = documentCards[docIndex];
-        
+
         // Add highlight class
         targetCard.classList.add('highlighted');
-        
+
         // Scroll to the card with smooth animation
         targetCard.scrollIntoView({
             behavior: 'smooth',
@@ -6221,17 +6426,17 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     groupDocumentsByBaseUrl(documents) {
         const groups = {};
-        
+
         documents.forEach((doc, index) => {
             console.log('Processing document:', doc.id, doc.content_type, doc.metadata);
             // Check if this is an existing chunked document (is_chunk) or new chunked document (is_chunked)
-            if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) || 
+            if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) ||
                 (doc.metadata?.is_chunked && doc.metadata?.total_chunks)) {
-                
+
                 // Extract base filename from URL like "file://ragme-io.pdf#chunk-4"
                 const url = doc.url || '';
                 const baseUrl = url.split('#')[0]; // Remove chunk suffix
-                
+
                 if (!groups[baseUrl]) {
                     groups[baseUrl] = {
                         isGroupedChunks: true,
@@ -6244,14 +6449,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         id: doc.id,
                         docIndex: index
                     };
-                    
+
                     // Ensure chunked documents use consistent timestamp
                     // This helps keep them adjacent to related items in the sorted list
                     if (doc.metadata.date_added) {
                         groups[baseUrl].metadata.date_added = doc.metadata.date_added;
                     }
                 }
-                
+
                 if (groups[baseUrl] && groups[baseUrl].chunks) {
                     groups[baseUrl].chunks.push({
                         ...doc,
@@ -6260,11 +6465,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 } else {
                     console.error('Group or chunks array is undefined for baseUrl:', baseUrl);
                 }
-                
+
                 // Sort chunks by index
                 if (groups[baseUrl] && groups[baseUrl].chunks && Array.isArray(groups[baseUrl].chunks)) {
                     groups[baseUrl].chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
-                    
+
                     // Combine text from all chunks
                     groups[baseUrl].combinedText = groups[baseUrl].chunks
                         .map(chunk => chunk.text)
@@ -6273,9 +6478,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     console.error('Cannot sort chunks - array is undefined for baseUrl:', baseUrl);
                     groups[baseUrl].combinedText = '';
                 }
-                
+
                 // Use the latest date (most recent)
-                if (!groups[baseUrl].metadata.date_added || 
+                if (!groups[baseUrl].metadata.date_added ||
                     doc.metadata.date_added > groups[baseUrl].metadata.date_added) {
                     groups[baseUrl].metadata.date_added = doc.metadata.date_added;
                 }
@@ -6283,14 +6488,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 // Group images by their source PDF document
                 const pdfFilename = doc.metadata.pdf_filename;
                 const key = `pdf_images_${pdfFilename}`;
-                
+
                 if (!groups[key]) {
                     groups[key] = {
                         isGroupedImages: true,
                         sourceDocument: pdfFilename,
                         totalImages: 0,
                         images: [],
-                        metadata: { 
+                        metadata: {
                             ...doc.metadata,
                             date_added: doc.metadata.date_added,
                             collection: 'Images'
@@ -6301,7 +6506,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         content_type: 'image_stack'
                     };
                 }
-                
+
                 // Ensure image stacks use the same base timestamp as their source PDF
                 // This helps keep them adjacent in the sorted list
                 const baseTimestamp = doc.metadata.date_added;
@@ -6309,7 +6514,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                     // Use the same base timestamp for all images from the same PDF
                     groups[key].metadata.date_added = baseTimestamp;
                 }
-                
+
                 if (groups[key] && groups[key].images) {
                     groups[key].images.push({
                         ...doc,
@@ -6318,10 +6523,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 } else {
                     console.error('Group or images array is undefined for key:', key);
                 }
-                
+
                 if (groups[key] && groups[key].images && Array.isArray(groups[key].images)) {
                     groups[key].totalImages = groups[key].images.length;
-                    
+
                     // Sort images by page number
                     groups[key].images.sort((a, b) => (a.imageIndex || 0) - (b.imageIndex || 0));
                 } else {
@@ -6330,16 +6535,16 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         groups[key].totalImages = 0;
                     }
                 }
-                
+
                 // Use the latest date (most recent)
-                if (!groups[key].metadata.date_added || 
+                if (!groups[key].metadata.date_added ||
                     doc.metadata.date_added > groups[key].metadata.date_added) {
                     groups[key].metadata.date_added = doc.metadata.date_added;
                 }
             } else {
                 // Regular document - use URL as key, but ensure unique keys for different document types
                 let key = doc.url || `doc_${index}`;
-                
+
                 // For URLs, use the full URL as key
                 if (doc.url && (doc.url.startsWith('http://') || doc.url.startsWith('https://'))) {
                     key = doc.url;
@@ -6352,14 +6557,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 else {
                     key = `doc_${index}_${Date.now()}`;
                 }
-                
+
                 groups[key] = {
                     ...doc,
                     docIndex: index
                 };
             }
         });
-        
+
         // Convert groups object to array
         return Object.values(groups);
     }
@@ -6370,10 +6575,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (inputField) {
             inputField.value = query;
         }
-        
+
         // Directly send the message
         this.sendMessage();
-        
+
         // Show notification
                     this.showNotification('Retrying query...', 'info');
     }
@@ -6382,7 +6587,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Find the user message that generated this AI response
         const userMessage = this.findUserMessageForResponse(message);
         let filename = 'ragme-response.md';
-        
+
         if (userMessage) {
             // Create filename from first three words of the query
             const words = userMessage.content.trim().split(/\s+/).slice(0, 3);
@@ -6390,7 +6595,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 filename = words.join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') + '.md';
             }
         }
-        
+
         // Create the file content
         const fileContent = `# RAGme.io Response
 
@@ -6414,7 +6619,7 @@ ${message.content}
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         this.showNotification('success', `Response saved as ${filename}`);
     }
 
@@ -6434,21 +6639,21 @@ ${message.content}
     showEmailModal(message) {
         // Find the user message that generated this AI response
         const userMessage = this.findUserMessageForResponse(message);
-        
+
         // Set the subject and body
         const subjectInput = document.getElementById('emailSubject');
         const bodyInput = document.getElementById('emailBody');
         const toInput = document.getElementById('emailTo');
-        
+
         if (userMessage) {
             subjectInput.value = userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? '...' : '');
         } else {
             subjectInput.value = 'RAGme.io Response';
         }
-        
+
         bodyInput.value = message.content;
         toInput.value = '';
-        
+
         // Show the modal
         this.showModal('emailModal');
     }
@@ -6457,22 +6662,22 @@ ${message.content}
         const toInput = document.getElementById('emailTo');
         const subjectInput = document.getElementById('emailSubject');
         const bodyInput = document.getElementById('emailBody');
-        
+
         const to = toInput.value.trim();
         const subject = subjectInput.value;
         const body = bodyInput.value;
-        
+
         if (!to) {
             this.showNotification('error', 'Please enter a recipient email address');
             return;
         }
-        
+
         // Create mailto link
         const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
+
         // Open default email client
         window.open(mailtoLink);
-        
+
         // Hide modal and show success notification
         this.hideModal('emailModal');
         this.showNotification('success', 'Email client opened with your message');
@@ -6481,7 +6686,7 @@ ${message.content}
     saveChatAsFile(chat) {
         // Create filename from chat title
         let filename = 'ragme-chat.md';
-        
+
         if (chat.title) {
             // Create filename from first three words of the title
             const words = chat.title.trim().split(/\s+/).slice(0, 3);
@@ -6489,12 +6694,12 @@ ${message.content}
                 filename = words.join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') + '.md';
             }
         }
-        
+
         // Create the file content with entire conversation
         let fileContent = `# RAGme.io Chat: ${chat.title}
 
-**Chat ID:** ${chat.id}  
-**Created:** ${new Date(chat.createdAt).toLocaleString()}  
+**Chat ID:** ${chat.id}
+**Created:** ${new Date(chat.createdAt).toLocaleString()}
 **Updated:** ${new Date(chat.updatedAt).toLocaleString()}
 
 ---
@@ -6506,7 +6711,7 @@ ${message.content}
             chat.messages.forEach((message, index) => {
                 const timestamp = message.timestamp ? new Date(message.timestamp).toLocaleString() : '';
                 const role = message.type === 'user' ? '👤 User' : '🤖 AI';
-                
+
                 fileContent += `## ${role}${timestamp ? ` (${timestamp})` : ''}
 
 ${message.content}
@@ -6534,7 +6739,7 @@ ${message.content}
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         this.showNotification('success', `Chat saved as ${filename}`);
     }
 
@@ -6543,10 +6748,10 @@ ${message.content}
         const subjectInput = document.getElementById('emailSubject');
         const bodyInput = document.getElementById('emailBody');
         const toInput = document.getElementById('emailTo');
-        
+
         // Use chat title as subject
         subjectInput.value = chat.title || 'RAGme.io Chat';
-        
+
         // Create email body with entire conversation
         let emailBody = `RAGme.io Chat: ${chat.title}
 
@@ -6563,7 +6768,7 @@ Updated: ${new Date(chat.updatedAt).toLocaleString()}
             chat.messages.forEach((message, index) => {
                 const timestamp = message.timestamp ? new Date(message.timestamp).toLocaleString() : '';
                 const role = message.type === 'user' ? 'User' : 'AI';
-                
+
                 emailBody += `${role}${timestamp ? ` (${timestamp})` : ''}:
 ${message.content}
 
@@ -6578,10 +6783,10 @@ ${message.content}
 
         emailBody += `---
 Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new Date().toLocaleString()}`;
-        
+
         bodyInput.value = emailBody;
         toInput.value = '';
-        
+
         // Show the modal
         this.showModal('emailModal');
     }
@@ -6589,10 +6794,10 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
     // Function to detect if text is truncated and add tooltip if needed
     checkTextTruncation(element) {
         if (!element) return;
-        
+
         // Force a reflow to get accurate measurements
         element.offsetHeight;
-        
+
         // For document titles, check the document-title-text span
         if (element.classList.contains('document-title')) {
             const titleTextSpan = element.querySelector('.document-title-text');
@@ -6626,7 +6831,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
     checkDocumentTitlesTruncation() {
         const documentTitles = document.querySelectorAll('.document-title');
         console.log('Checking', documentTitles.length, 'document titles for truncation');
-        
+
         documentTitles.forEach((title, index) => {
             const titleTextSpan = title.querySelector('.document-title-text');
             console.log('Checking title', index, ':', titleTextSpan ? (titleTextSpan.textContent || titleTextSpan.innerText) : 'No title text span');
@@ -6638,7 +6843,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
     checkDetailValuesTruncation() {
         const detailValues = document.querySelectorAll('.detail-value');
         console.log('Checking', detailValues.length, 'detail values for truncation');
-        
+
         detailValues.forEach((value, index) => {
             console.log('Checking detail value', index, ':', value.textContent || value.innerText);
             this.checkTextTruncation(value);
@@ -6647,13 +6852,13 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
 
     isDocumentNew(dateAdded) {
         if (!dateAdded) return false;
-        
+
         try {
             const addedDate = new Date(dateAdded);
             const now = new Date();
             const timeDiff = now.getTime() - addedDate.getTime();
             const hoursDiff = timeDiff / (1000 * 60 * 60);
-            
+
             return hoursDiff <= 24;
         } catch (error) {
             console.error('Error parsing date:', error);
@@ -6702,7 +6907,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
     initializeSpeechRecognition() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         this.speechRecognition = new SpeechRecognition();
-        
+
         this.speechRecognition.continuous = false;
         this.speechRecognition.interimResults = false;
         // Get language from config or default to en-US
@@ -6718,13 +6923,13 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         this.speechRecognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             console.log('Speech recognition result:', transcript);
-            
+
             const chatInput = document.getElementById('chatInput');
             chatInput.value = transcript;
-            
+
             // Trigger the input event to resize the textarea
             chatInput.dispatchEvent(new Event('input'));
-            
+
             this.showNotification('Voice input received', 'success');
         };
 
@@ -6732,7 +6937,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             console.error('Speech recognition error:', event.error);
             this.isRecording = false;
             this.updateMicrophoneButton(false);
-            
+
             let errorMessage = 'Voice input error';
             if (event.error === 'no-speech') {
                 errorMessage = 'No speech detected. Please try again.';
@@ -6741,7 +6946,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             } else if (event.error === 'not-allowed') {
                 errorMessage = 'Microphone access denied. Please allow microphone access.';
             }
-            
+
             this.showNotification(errorMessage, 'error');
         };
 
@@ -6755,7 +6960,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
     updateMicrophoneButton(isRecording) {
         const microphoneBtn = document.getElementById('microphoneBtn');
         const icon = microphoneBtn.querySelector('i');
-        
+
         if (isRecording) {
             microphoneBtn.classList.add('recording');
             icon.className = 'fas fa-microphone-slash';
@@ -6771,14 +6976,14 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         this.progressState.isProcessing = true;
         this.progressState.currentOperation = operation;
         this.progressState.startTime = Date.now();
-        
+
         const progressIndicator = document.getElementById('progressIndicator');
         const progressText = document.getElementById('progressText');
-        
+
         if (progressIndicator && progressText) {
             progressText.textContent = text || `Processing ${operation}...`;
             progressIndicator.classList.add('show');
-            
+
             // Disable the Add Content button during processing
             const addContentBtn = document.getElementById('addContentBtn');
             if (addContentBtn) {
@@ -6786,7 +6991,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
                 addContentBtn.style.opacity = '0.6';
                 addContentBtn.style.cursor = 'not-allowed';
             }
-            
+
             // Set a timeout to automatically hide the progress indicator after 5 minutes
             // This prevents the indicator from getting stuck if something goes wrong
             setTimeout(() => {
@@ -6803,12 +7008,12 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         this.progressState.isProcessing = false;
         this.progressState.currentOperation = null;
         this.progressState.startTime = null;
-        
+
         const progressIndicator = document.getElementById('progressIndicator');
         if (progressIndicator) {
             progressIndicator.classList.remove('show');
         }
-        
+
         // Re-enable the Add Content button after processing
         const addContentBtn = document.getElementById('addContentBtn');
         if (addContentBtn) {
@@ -6839,7 +7044,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.textContent = message;
-        
+
         // Add styles
         notification.style.cssText = `
             position: fixed;
@@ -6855,7 +7060,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             animation: slideIn 0.3s ease-out;
         `;
-        
+
         // Set background color based on type
         switch (type) {
             case 'success':
@@ -6871,10 +7076,10 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             default:
                 notification.style.backgroundColor = '#17a2b8';
         }
-        
+
         // Add to page
         document.body.appendChild(notification);
-        
+
         // Remove after 3 seconds
         setTimeout(() => {
             if (notification.parentNode) {
@@ -6893,9 +7098,9 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         const notification = document.createElement('div');
         notification.className = 'notification notification-progress';
         notification.id = 'progress-notification';
-        
+
         const progressPercentage = total > 0 ? Math.round((current / total) * 100) : 0;
-        
+
         notification.innerHTML = `
             <div style="margin-bottom: 8px;">${message}</div>
             <div style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; height: 6px; overflow: hidden;">
@@ -6903,7 +7108,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             </div>
             <div style="font-size: 0.8rem; margin-top: 4px;">${current}/${total} (${progressPercentage}%)</div>
         `;
-        
+
         // Add styles
         notification.style.cssText = `
             position: fixed;
@@ -6920,18 +7125,18 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             animation: slideIn 0.3s ease-out;
             background-color: #17a2b8;
         `;
-        
+
         // Add to page
         document.body.appendChild(notification);
-        
+
         return notification;
     }
 
     updateProgressNotification(notification, message, current, total) {
         if (!notification || !notification.parentNode) return;
-        
+
         const progressPercentage = total > 0 ? Math.round((current / total) * 100) : 0;
-        
+
         notification.innerHTML = `
             <div style="margin-bottom: 8px;">${message}</div>
             <div style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; height: 6px; overflow: hidden;">
@@ -6964,15 +7169,15 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             }
             return false;
         });
-        
+
         if (index !== -1) {
             this.documents.splice(index, 1);
             console.log('Removed grouped image from documents array');
         }
-        
+
         // Re-render the documents list immediately to remove from UI
         this.renderDocuments();
-        
+
         // Update visualization to reflect the changes
         this.updateVisualization();
     }
@@ -6989,15 +7194,15 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             }
             return false;
         });
-        
+
         if (index !== -1) {
             this.documents.splice(index, 1);
             console.log('Removed grouped document from documents array');
         }
-        
+
         // Re-render the documents list immediately to remove from UI
         this.renderDocuments();
-        
+
         // Update visualization to reflect the changes
         this.updateVisualization();
     }
@@ -7018,15 +7223,15 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
                 }
                 return false;
             });
-            
+
             if (cacheIndex !== -1) {
                 this.pagination.allDocuments.splice(cacheIndex, 1);
                 console.log('Removed grouped document from cached allDocuments');
-                
+
                 // Update pagination counts
                 this.pagination.totalDocuments = Math.max(0, this.pagination.totalDocuments - 1);
                 this.pagination.totalPages = Math.ceil(this.pagination.totalDocuments / this.pagination.documentsPerPage);
-                
+
                 console.log('Updated pagination - total documents:', this.pagination.totalDocuments, 'total pages:', this.pagination.totalPages);
             } else {
                 console.log('Grouped document not found in cached allDocuments');
@@ -7036,13 +7241,13 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
 
     async verifyDeletionFromBackend(groupedDoc) {
         console.log('Verifying deletion from backend for:', groupedDoc.originalFilename || groupedDoc.url);
-        
+
         // Temporarily disable auto-refresh to prevent interference
         const wasAutoRefreshEnabled = this.autoRefreshInterval !== null;
         if (wasAutoRefreshEnabled) {
             this.stopAutoRefresh();
         }
-        
+
         try {
             // Force a fresh load from backend
             await new Promise((resolve) => {
@@ -7052,13 +7257,13 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
                     dateFilter: this.currentDateFilter,
                     contentType: this.currentContentFilter
                 });
-                
+
                 // Listen for the response
                 const originalHandler = this.socket.listeners('content_listed')[0];
                 const verifyHandler = (result) => {
                     if (result.success) {
                         console.log('Backend verification - received documents:', result.items.length);
-                        
+
                         // Check if the deleted document still exists
                         const stillExists = result.items.some(doc => {
                             if (doc.isGroupedChunks && doc.baseUrl === groupedDoc.baseUrl) {
@@ -7071,25 +7276,25 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
                             }
                             return false;
                         });
-                        
+
                         if (stillExists) {
                             console.log('❌ VERIFICATION FAILED: Document still exists in backend after deletion');
                         } else {
                             console.log('✅ VERIFICATION SUCCESS: Document successfully deleted from backend');
                         }
-                        
+
                         // Restore original handler
                         this.socket.off('content_listed', verifyHandler);
                         this.socket.on('content_listed', originalHandler);
-                        
+
                         resolve();
                     }
                 };
-                
+
                 this.socket.off('content_listed', originalHandler);
                 this.socket.once('content_listed', verifyHandler);
             });
-            
+
         } finally {
             // Restore auto-refresh if it was enabled
             if (wasAutoRefreshEnabled) {
@@ -7115,7 +7320,7 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
             chatHistoryCollapsed: false,
             chatHistoryWidth: 10
         };
-        
+
         // Save to localStorage
         localStorage.setItem('ragme-settings', JSON.stringify(this.settings));
         localStorage.setItem('ragme-date-filter', this.currentDateFilter);
@@ -7126,13 +7331,13 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         localStorage.setItem('ragme-document-list-width', this.settings.documentListWidth.toString());
         localStorage.setItem('ragme-chat-history-collapsed', this.settings.chatHistoryCollapsed.toString());
         localStorage.setItem('ragme-chat-history-width', this.settings.chatHistoryWidth.toString());
-        
+
         this.hideModal('settingsModal');
         this.showNotification('success', 'Settings reset to default');
-        
+
         // Apply UI changes
         this.applyUIConfiguration();
-        
+
         // Reload documents with new settings
         this.loadDocuments();
     }
@@ -7140,18 +7345,18 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
     switchSettingsTab(tab) {
         // Remove active class from all tabs
         document.querySelectorAll('.settings-tab-btn').forEach(btn => btn.classList.remove('active'));
-        
+
         // Add active class to the clicked tab
         const tabButton = document.querySelector(`[data-settings-tab="${tab}"]`);
         if (tabButton) {
             tabButton.classList.add('active');
         }
-        
+
         // Update tab content
         document.querySelectorAll('.settings-tab-content').forEach(content => {
             content.classList.remove('active');
         });
-        
+
         const tabContent = document.getElementById(tab);
         if (tabContent) {
             tabContent.classList.add('active');
@@ -7171,10 +7376,10 @@ function simpleMarkdownParser(text) {
                 </div>
             </div>`;
         });
-        
+
         return marked.parse(text);
     }
-    
+
     // Fallback simple markdown parser
     return text
         .replace(/\[IMAGE:([^:]+):([^\]]+)\]/g, function(match, imageId, filename) {
@@ -7196,7 +7401,7 @@ function simpleMarkdownParser(text) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM Content Loaded - Starting RAGmeAssistant initialization');
     console.log('RAGme.io Assistant - Application starting...');
-    
+
     // Check if required dependencies are available
     const requiredDeps = {
         io: typeof io !== 'undefined',
@@ -7204,16 +7409,16 @@ document.addEventListener('DOMContentLoaded', () => {
         marked: typeof marked !== 'undefined',
         d3: typeof d3 !== 'undefined'
     };
-    
+
     console.log('Dependencies check:', requiredDeps);
-    
+
     // Add a visible indicator that the app is loading
     const loadingDiv = document.createElement('div');
     loadingDiv.id = 'ragme-loading';
     loadingDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: #2563eb; color: white; padding: 10px; border-radius: 5px; z-index: 10000; font-size: 12px;';
     loadingDiv.textContent = 'RAGme: Loading...';
     document.body.appendChild(loadingDiv);
-    
+
     // Wait a bit for external scripts to load, especially for Safari
     setTimeout(() => {
         try {
@@ -7234,4 +7439,4 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(errorDiv);
         }
     }, 200); // Increased delay for Safari
-}); 
+});

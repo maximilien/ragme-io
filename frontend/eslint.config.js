@@ -28,7 +28,7 @@ export default [
       // TypeScript specific rules
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
-      
+
       // General rules
       'no-console': 'off', // Turn off no-console since we have a logger function
       'no-debugger': 'error',

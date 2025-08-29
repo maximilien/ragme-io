@@ -16,18 +16,18 @@
   <script>
     function drawIcon(canvas, size) {
       const ctx = canvas.getContext('2d');
-      
+
       // Draw background
       ctx.fillStyle = '#4CAF50';
       ctx.fillRect(0, 0, size, size);
-      
+
       // Draw letter
       ctx.fillStyle = 'white';
       ctx.font = `bold ${size * 0.6}px Arial`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('R', size/2, size/2);
-      
+
       // Save the icon
       const link = document.createElement('a');
       link.download = `icon${size}.png`;
@@ -41,4 +41,4 @@
     drawIcon(document.getElementById('canvas128'), 128);
   </script>
 </body>
-</html> 
+</html>

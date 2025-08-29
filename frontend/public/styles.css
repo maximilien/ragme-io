@@ -5,6 +5,8 @@
     box-sizing: border-box;
 }
 
+
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -121,6 +123,24 @@ body {
 .vector-db-separator {
     color: #9ca3af;
     font-weight: 300;
+}
+
+.cached-summary-indicator {
+    background: #e0f2fe;
+    color: #0277bd;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid #81c784;
+}
+
+.cached-summary-indicator i {
+    font-size: 0.7rem;
 }
 
 .hamburger-menu {
@@ -2665,46 +2685,46 @@ body {
         bottom: 0;
         z-index: 100;
     }
-    
+
     .chat-history-sidebar {
         left: 0;
     }
-    
+
     .documents-sidebar {
         right: 0;
     }
-    
+
     .main-content {
         position: relative;
     }
-    
+
     .chat-main-area {
         width: 100%;
     }
-    
+
     .chat-messages {
         padding: 0.5rem 0.5rem 0.5rem 1.5rem;
     }
-    
+
     .message-content {
         max-width: 85%;
         padding: 0.75rem;
     }
-    
+
     .message.ai {
         margin-left: 1rem;
     }
-    
+
     .message-text {
         font-size: 0.9rem;
         line-height: 1.4;
     }
-    
+
     .message-text pre {
         font-size: 0.8rem;
         padding: 0.75rem;
     }
-    
+
     .message-text code {
         font-size: 0.8rem;
         padding: 0.15rem 0.3rem;
@@ -2727,7 +2747,7 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.3);
-} 
+}
 
 /* File upload styles */
 .file-upload-area {
@@ -2824,7 +2844,7 @@ body {
 
 .file-item-remove:hover {
     background-color: rgba(231, 76, 60, 0.1);
-} 
+}
 
 /* Modal styles */
 .modal-overlay {
@@ -2994,6 +3014,33 @@ body {
     font-size: 1rem;
     font-weight: 600;
     color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Force refresh icon styles */
+.force-refresh-icon {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-left: auto;
+}
+
+.force-refresh-icon:hover {
+    opacity: 1;
+    color: #10b981;
+    transform: scale(1.1);
+}
+
+.force-refresh-icon i {
+    transition: transform 0.3s ease;
+}
+
+.force-refresh-icon:hover i {
+    transform: rotate(180deg);
 }
 
 #documentDetailsModal .detail-value {
@@ -3522,28 +3569,28 @@ body {
         max-width: 95vw;
         margin: 1rem;
     }
-    
+
     .settings-tab-header {
         flex-wrap: wrap;
     }
-    
+
     .settings-tab-btn {
         padding: 0.75rem 1rem;
         font-size: 0.8rem;
     }
-    
+
     .settings-tab-content {
         padding: 1rem;
     }
-    
+
     .settings-section {
         padding: 1rem;
     }
-    
+
     .setting-item input[type="range"] {
         width: 150px;
     }
-    
+
     .setting-item select {
         width: 150px;
     }
@@ -3793,7 +3840,7 @@ body {
     .pagination-controls {
         gap: 0.25rem;
     }
-    
+
     .pagination-btn,
     .pagination-page {
         min-width: 2rem;
@@ -3801,7 +3848,7 @@ body {
         padding: 0.25rem 0.5rem;
         font-size: 0.875rem;
     }
-    
+
     .pagination-pages {
         gap: 0.125rem;
     }
@@ -3845,4 +3892,4 @@ body {
 
 .recommendation-item:not(:last-child) {
     border-bottom: 1px solid #f1f5f9;
-} 
+}

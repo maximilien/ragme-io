@@ -9,14 +9,14 @@
         // Debug script to check MCP Tools elements
 
     </script>
-    
+
     <!-- Immediate redirect if on HTTPS -->
     <script>
         if (window.location.protocol === 'https:' && window.location.hostname === 'localhost') {
             window.location.replace('http://localhost:8020/');
         }
     </script>
-    
+
     <!-- Load resources dynamically to force HTTP -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -28,11 +28,11 @@
                 link.href = 'http://localhost:8020/' + href;
                 document.head.appendChild(link);
             });
-            
+
             // Create script tags
             const scripts = ['d3.v7.min.js', 'marked.min.js', 'purify.min.js'];
             let loadedScripts = 0;
-            
+
             function loadNextScript() {
                 if (loadedScripts < scripts.length) {
                     const script = document.createElement('script');
@@ -59,7 +59,7 @@
                     document.head.appendChild(socketScript);
                 }
             }
-            
+
             loadNextScript();
         });
     </script>
@@ -138,8 +138,8 @@
                     <button class="microphone-btn" id="microphoneBtn" title="Voice input">
                         <i class="fas fa-microphone"></i>
                     </button>
-                    <textarea 
-                        id="chatInput" 
+                    <textarea
+                        id="chatInput"
                         placeholder="Ask me about your documents or tell me URLs to RAG..."
                         rows="1"
                     ></textarea>
@@ -159,7 +159,7 @@
                         <!-- Recent prompts will be populated here -->
                     </div>
                 </div>
-                
+
                 <!-- MCP Tools Popup -->
                 <div class="mcp-tools-backdrop" id="mcpToolsBackdrop"></div>
                 <div class="mcp-tools-popup" id="mcpToolsPopup">
@@ -239,19 +239,19 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Resize handle for visualization -->
                     <div class="visualization-resize-handle" id="visualizationResizeHandle">
                         <div class="resize-indicator">
                             <i class="fas fa-grip-lines"></i>
                         </div>
                     </div>
-                    
+
                     <!-- Documents list container -->
                     <div class="documents-list-container" id="documentsListContainer">
                         <!-- Document cards will be populated here -->
                     </div>
-                    
+
                     <!-- Pagination container -->
                     <div class="pagination-container" id="paginationContainer" style="display: none;">
                         <div class="pagination-controls" id="paginationControls" title="">
@@ -267,7 +267,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Document Settings Popup -->
                 <div class="document-settings-backdrop" id="documentSettingsBackdrop"></div>
                 <div class="document-settings-popup" id="documentSettingsPopup">
@@ -355,14 +355,14 @@
                         <button class="tab-btn" data-tab="imagesTab">Images</button>
                         <button class="tab-btn" data-tab="jsonTab">JSON</button>
                     </div>
-                    
+
                     <div class="tab-content active" id="urlTab">
                         <div class="form-group">
                             <label for="urlsInput">Enter URLs (one per line):</label>
                             <textarea id="urlsInput" placeholder="https://example.com/page1&#10;https://example.com/page2" rows="5"></textarea>
                         </div>
                     </div>
-                    
+
                     <div class="tab-content" id="filesTab">
                         <div class="form-group">
                             <label for="fileInput">Select files to upload:</label>
@@ -379,7 +379,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="tab-content" id="imagesTab">
                         <div class="form-group">
                             <label for="imageInput">Select images to upload:</label>
@@ -396,7 +396,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="tab-content" id="jsonTab">
                         <div class="form-group">
                             <label for="jsonInput">Enter JSON data:</label>
@@ -486,7 +486,7 @@
                             <i class="fas fa-search"></i> Query
                         </button>
                     </div>
-                    
+
                     <!-- General Settings Tab -->
                     <div class="settings-tab-content active" id="generalTab">
                         <div class="settings-section">
@@ -504,7 +504,7 @@
                                 <span id="settingsVectorDbType">-</span>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-sync-alt"></i> Auto-Refresh Settings</h4>
                             <div class="setting-item">
@@ -520,7 +520,7 @@
                                 <small>How often to refresh content (5-300 seconds)</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-eye"></i> Display Settings</h4>
                             <div class="setting-item">
@@ -538,7 +538,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Interface Settings Tab -->
                     <div class="settings-tab-content" id="uiTab">
                         <div class="settings-section">
@@ -556,7 +556,7 @@
                                 <small>Width of the chat history pane (5-30%)</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-toggle-on"></i> Panel Visibility</h4>
                             <div class="setting-item">
@@ -581,7 +581,7 @@
                                 <small>Display the document overview visualization</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-chart-bar"></i> Visualization Settings</h4>
                             <div class="setting-item">
@@ -605,7 +605,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Documents Settings Tab -->
                     <div class="settings-tab-content" id="documentsTab">
                         <div class="settings-section">
@@ -630,7 +630,7 @@
                                 <small>Number of documents per page (5-25)</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-search"></i> Search & Filtering</h4>
                             <div class="setting-item">
@@ -644,7 +644,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Storage Settings Tab -->
                     <div class="settings-tab-content" id="storageTab">
                         <div class="settings-section">
@@ -664,7 +664,7 @@
                                 <small>Automatically copy uploaded images to the storage service</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-info-circle"></i> Storage Information</h4>
                             <div class="setting-item read-only">
@@ -681,7 +681,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Chat Settings Tab -->
                     <div class="settings-tab-content" id="chatTab">
                         <div class="settings-section">
@@ -698,7 +698,7 @@
                                 <small>AI response creativity (0=deterministic, 2=creative)</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-history"></i> Chat History</h4>
                             <div class="setting-item">
@@ -715,7 +715,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Query Settings Tab -->
                     <div class="settings-tab-content" id="queryTab">
                         <div class="settings-section">
@@ -731,7 +731,7 @@
                                 <small>Number of top text results to rerank for better relevance (1-10)</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-percentage"></i> Similarity Thresholds</h4>
                             <div class="setting-item">
@@ -747,7 +747,7 @@
                                 <small>Minimum similarity score for image documents (0.1-1.0). Higher values = more strict filtering.</small>
                             </div>
                         </div>
-                        
+
                         <div class="settings-section">
                             <h4><i class="fas fa-lightbulb"></i> Recommendations</h4>
                             <div class="recommendations">
@@ -840,4 +840,4 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js?v=1.2"></script>
 </body>
-</html> 
+</html>
