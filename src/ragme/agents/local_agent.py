@@ -527,27 +527,27 @@ class RagMeLocalAgent:
                     }
                 }
             else:
-                # Multiple chunks - create a single document with all chunks
-                combined_text = "\n\n--- Chunk ---\n\n".join(chunks)
-                chunked_metadata = {
-                    **metadata,
-                    "total_chunks": len(chunks),
-                    "is_chunked": True,
-                    "chunk_sizes": [len(chunk) for chunk in chunks],
-                    "original_filename": metadata.get("filename", "unknown"),
-                }
-
-                document_data = {
-                    "data": {
-                        "documents": [
-                            {
-                                "text": combined_text,
-                                "url": unique_url,
-                                "metadata": chunked_metadata,
-                            }
-                        ]
+                # Multiple chunks - store each chunk as a separate document
+                documents = []
+                for i, chunk in enumerate(chunks):
+                    chunk_metadata = {
+                        **metadata,
+                        "total_chunks": len(chunks),
+                        "is_chunked": True,
+                        "chunk_index": i,
+                        "chunk_sizes": [len(chunk) for chunk in chunks],
+                        "original_filename": metadata.get("filename", "unknown"),
                     }
-                }
+
+                    documents.append(
+                        {
+                            "text": chunk,
+                            "url": f"{unique_url}#chunk-{i}",
+                            "metadata": chunk_metadata,
+                        }
+                    )
+
+                document_data = {"data": {"documents": documents}}
 
             print(f"Chunked into {len(chunks)} chunks, sending to API...")
 

@@ -133,9 +133,10 @@ llm:
 # Query Configuration
 query:
   top_k: 5  # Number of most relevant documents to retrieve for queries
-  text_relevance_threshold: 0.8  # Minimum similarity score for text documents (0.0 to 1.0)
-  image_relevance_threshold: 0.8  # Minimum similarity score for image documents (0.0 to 1.0)
-  text_rerank_top_k: 3  # Number of top text results to rerank for better relevance
+  relevance_thresholds:
+    text: 0.5  # Minimum similarity score for text documents (0.0 to 1.0)
+    image: 0.5  # Minimum similarity score for image documents (0.0 to 1.0)
+  rerank_top_k: 3  # Number of top text results to rerank for better relevance
 
 # Agent Configuration
 agents:

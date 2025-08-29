@@ -514,6 +514,46 @@ class ConfigManager:
         """Reload configuration from file."""
         self._config = self._load_config()
 
+    def update_query_settings(self, settings: dict[str, Any]) -> None:
+        """
+        Update query settings in the configuration file.
+
+        Args:
+            settings: Dictionary containing query settings to update
+        """
+        try:
+            # Get the current config
+            current_config = self.config
+
+            # Update the query section
+            if "query" not in current_config:
+                current_config["query"] = {}
+
+            # Update individual settings
+            if "top_k" in settings:
+                current_config["query"]["top_k"] = settings["top_k"]
+
+            if "text_rerank_top_k" in settings:
+                current_config["query"]["text_rerank_top_k"] = settings[
+                    "text_rerank_top_k"
+                ]
+
+            if "relevance_thresholds" in settings:
+                current_config["query"]["relevance_thresholds"] = settings[
+                    "relevance_thresholds"
+                ]
+
+            # Write the updated config back to file
+            config_path = Path("config.yaml")
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(current_config, f, default_flow_style=False, indent=2)
+
+            # Reload the config
+            self.reload()
+
+        except Exception as e:
+            raise Exception(f"Failed to update query settings: {str(e)}") from e
+
     def __str__(self) -> str:
         """String representation of the configuration."""
         try:
