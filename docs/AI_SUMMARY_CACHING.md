@@ -18,6 +18,12 @@ The AI Summary Caching system prevents redundant AI summary generation by storin
 - **Cost Optimization**: Reduces AI service usage costs
 - **Improved UX**: No waiting for summary regeneration
 
+### 🔄 Force Refresh Capability
+- **Manual Refresh**: Users can force regenerate summaries using the refresh button
+- **Bypass Cache**: Force refresh bypasses cached summaries and generates new content
+- **Visual Feedback**: Clear indication when summaries are being regenerated
+- **HTTP Request Handling**: Proper handling of force refresh requests with parameter validation
+
 ## Architecture
 
 ### Backend Implementation
@@ -44,11 +50,13 @@ def update_document_metadata(self, document_id: str, metadata: dict[str, Any]) -
     """Update metadata for a document in the text collection."""
     collection = self.client.collections.get(self.text_collection.name)
     
-    # Get existing document
+    # Use the correct Weaviate filter syntax to get the object by ID
+    import weaviate.classes as wvc
+    
     response = collection.query.fetch_objects(
         limit=1,
         include_vector=False,
-        where=collection.query.filter.by_id().equal(document_id)
+        filters=wvc.query.Filter.by_id().equal(document_id),
     )
     
     if not response.objects:
@@ -213,6 +221,109 @@ ragme.update_document_metadata(document_id, {"ai_summary": None})
 # Check if document has cached summary
 document = ragme.list_documents(limit=1, offset=0)[0]
 has_cached_summary = "ai_summary" in document.get("metadata", {})
+```
+
+## Force Refresh Implementation
+
+### Frontend Implementation
+
+The force refresh feature is implemented in the frontend with a refresh button next to the "AI Summary" title:
+
+```javascript
+// Force refresh button in document details modal
+<span class="force-refresh-icon" title="Force refresh AI summary" data-action="force-refresh-summary">
+    <i class="fas fa-sync-alt"></i>
+</span>
+```
+
+#### Event Handling
+
+```javascript
+// Event delegation for force refresh
+document.addEventListener('click', (e) => {
+    const forceRefreshIcon = e.target.closest('[data-action="force-refresh-summary"]');
+    if (forceRefreshIcon) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.forceRefreshSummary();
+    }
+});
+```
+
+#### HTTP Request Implementation
+
+```javascript
+// Force refresh with HTTP request
+async fetchDocumentSummary(doc, forceRefresh = false) {
+    const response = await fetch(this.buildApiUrl('summarize-document'), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            document_id: documentIdToSend,
+            forceRefresh: forceRefresh
+        })
+    });
+}
+```
+
+### Backend Implementation
+
+#### Pydantic Model
+
+```python
+class SummarizeInput(BaseModel):
+    """Input model for document summarization."""
+    document_id: str | dict
+    force_refresh: bool = Field(default=False, alias="forceRefresh")
+```
+
+#### Force Refresh Logic
+
+```python
+# Check if summary already exists in metadata (unless force refresh is requested)
+metadata = document.get("metadata", {})
+existing_summary = metadata.get("ai_summary")
+
+if existing_summary and not input_data.force_refresh:
+    print(f"📋 RETRIEVED cached AI summary for document: {document_id}")
+    return {
+        "status": "success",
+        "summary": existing_summary,
+        "document_id": input_data.document_id,
+        "cached": True,
+    }
+
+if input_data.force_refresh and existing_summary:
+    print(f"🔄 FORCE REFRESH requested for document: {document_id} - regenerating AI summary")
+```
+
+### CSS Styling
+
+```css
+.force-refresh-icon {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-left: auto;
+}
+
+.force-refresh-icon:hover {
+    opacity: 1;
+    color: #10b981;
+    transform: scale(1.1);
+}
+
+.force-refresh-icon i {
+    transition: transform 0.3s ease;
+}
+
+.force-refresh-icon:hover i {
+    transform: rotate(180deg);
+}
 ```
 
 ## Configuration

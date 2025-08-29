@@ -375,7 +375,18 @@ class TestFileHandler:
         handler = FileHandler(callback)
 
         assert handler.callback == callback
-        assert handler.supported_extensions == {".pdf", ".docx"}
+        assert handler.supported_extensions == {
+            ".pdf",
+            ".docx",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".bmp",
+            ".heic",
+            ".heif",
+        }
 
     def test_on_created_supported_file(self):
         """Test on_created with supported file"""

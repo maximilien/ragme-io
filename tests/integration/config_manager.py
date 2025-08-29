@@ -268,13 +268,29 @@ class TestConfigManager:
         try:
             if not self.backup_config_path.exists():
                 print(f"Warning: Backup file {self.backup_config_path} does not exist")
-                return False
+                # Try to find any backup file with similar name
+                backup_files = list(Path(".").glob("config.yaml.backup_*"))
+                if backup_files:
+                    # Use the most recent backup file
+                    most_recent_backup = max(
+                        backup_files, key=lambda x: x.stat().st_mtime
+                    )
+                    print(f"Found alternative backup file: {most_recent_backup}")
+                    shutil.copy2(most_recent_backup, self.original_config_path)
+                    print("✅ Restored config.yaml from alternative backup")
+                    # Clean up the alternative backup
+                    most_recent_backup.unlink()
+                    self.cleanup()
+                    return True
+                else:
+                    print("No backup files found, cannot restore config.yaml")
+                    return False
 
             # Restore original config
             shutil.copy2(self.backup_config_path, self.original_config_path)
             print("✅ Restored config.yaml from backup")
 
-            # Clean up backup and temp files
+            # Clean up temp files but keep backup for now
             self.cleanup()
 
             return True
@@ -411,11 +427,6 @@ class TestConfigManager:
     def cleanup(self):
         """Clean up temporary and backup files."""
         try:
-            # Remove backup file
-            if self.backup_config_path.exists():
-                self.backup_config_path.unlink()
-                print(f"🗑️ Removed backup file {self.backup_config_path}")
-
             # Remove temp file
             if self.temp_config_path.exists():
                 self.temp_config_path.unlink()
@@ -428,6 +439,16 @@ class TestConfigManager:
 
         except Exception as e:
             print(f"Warning: Failed to cleanup temporary files: {e}")
+
+    def cleanup_backup(self):
+        """Clean up backup files after successful restoration."""
+        try:
+            # Remove backup file only after successful restoration
+            if self.backup_config_path.exists():
+                self.backup_config_path.unlink()
+                print(f"🗑️ Removed backup file {self.backup_config_path}")
+        except Exception as e:
+            print(f"Warning: Failed to cleanup backup file: {e}")
 
     def setup_for_tests(self) -> bool:
         """
@@ -467,8 +488,9 @@ class TestConfigManager:
         config_success = self.restore_config()
         env_success = self.restore_env_file()
 
-        # Clean up temporary files regardless of success
-        self.cleanup()
+        # Clean up backup files only after successful restoration
+        if config_success:
+            self.cleanup_backup()
 
         if config_success and env_success:
             print("✅ Configuration cleanup completed successfully")

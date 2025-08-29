@@ -138,19 +138,30 @@ signal.signal(signal.SIGTERM, signal_handler)
 class FileHandler(FileSystemEventHandler):
     def __init__(self, callback: Callable | None = None):
         self.callback = callback
-        self.supported_extensions = {".pdf", ".docx"}
+        self.supported_extensions = {
+            ".pdf",
+            ".docx",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".bmp",
+            ".heic",
+            ".heif",
+        }
         self.recently_processed = {}  # Track recently processed files to prevent duplicates
 
     def _should_process_file(self, file_path: Path) -> bool:
         """Check if file should be processed (debouncing mechanism)"""
         current_time = time.time()
-        file_key = str(file_path)
+        file_key = str(file_path.resolve())  # Use resolved path for consistency
 
         # Check if file was processed recently (within 10 seconds)
         if file_key in self.recently_processed:
             last_processed = self.recently_processed[file_key]
             if current_time - last_processed < 10:  # 10 second debounce
-                logging.info(f"Skipping recently processed file: {file_path}")
+                logging.debug(f"Skipping recently processed file: {file_path}")
                 return False
 
         # Update the timestamp
@@ -192,6 +203,10 @@ class DirectoryMonitor:
             return
 
         logging.info(f"Starting to monitor directory: {self.directory}")
+
+        # Process existing files on startup
+        self._process_existing_files()
+
         self.observer.schedule(self.handler, str(self.directory), recursive=False)
         self.observer.start()
 
@@ -200,6 +215,39 @@ class DirectoryMonitor:
                 time.sleep(1)
         except KeyboardInterrupt:
             self.stop()
+
+    def _process_existing_files(self):
+        """Process existing files in the directory on startup"""
+        if not self.directory.exists():
+            return
+
+        logging.info("Scanning for existing files to process...")
+        processed_count = 0
+
+        for file_path in self.directory.iterdir():
+            if (
+                file_path.is_file()
+                and file_path.suffix.lower() in self.handler.supported_extensions
+            ):
+                # Skip files that have been processed recently
+                processed_marker = file_path.with_suffix(
+                    file_path.suffix + ".processed"
+                )
+                if processed_marker.exists():
+                    marker_age = time.time() - processed_marker.stat().st_mtime
+                    if marker_age < 60:  # Skip if processed within last minute
+                        logging.info(f"Skipping recently processed file: {file_path}")
+                        continue
+
+                logging.info(f"Processing existing file: {file_path}")
+                if self.handler.callback:
+                    self.handler.callback(file_path)
+                processed_count += 1
+
+        if processed_count > 0:
+            logging.info(f"Processed {processed_count} existing files on startup")
+        else:
+            logging.info("No existing files found to process")
 
     def stop(self):
         """Stop monitoring the directory"""
@@ -424,11 +472,14 @@ class RagMeLocalAgent:
         file_ext = file_path.suffix.lower()
 
         # Only process files that are within the watch directory
+        # Resolve both paths to absolute paths for comparison
         try:
-            file_path.relative_to(self.watch_directory)
+            resolved_file_path = file_path.resolve()
+            resolved_watch_dir = self.watch_directory.resolve()
+            resolved_file_path.relative_to(resolved_watch_dir)
         except ValueError:
             logging.warning(
-                f"File {file_path} is outside watch directory {self.watch_directory}, skipping"
+                f"File {file_path} (resolved: {resolved_file_path}) is outside watch directory {self.watch_directory} (resolved: {resolved_watch_dir}), skipping"
             )
             return
 
@@ -579,16 +630,20 @@ class RagMeLocalAgent:
             return False
 
 
-if __name__ == "__main__":
+def main():
+    """Main function to start the local agent"""
     # Example usage
     watch_dir = "./watch_directory"
-    local_agent = RagMeLocalAgent(watch_directory=watch_dir)
+    # Resolve the watch directory to absolute path for consistency
+    watch_dir_resolved = Path(watch_dir).resolve()
+    local_agent = RagMeLocalAgent(watch_directory=str(watch_dir_resolved))
     monitor = DirectoryMonitor(
-        directory=watch_dir,  # Directory to monitor
+        directory=str(watch_dir_resolved),  # Directory to monitor
         callback=local_agent.process_file,
     )
 
     # Set global reference for cleanup
+    global _monitor
     _monitor = monitor
 
     try:
@@ -597,3 +652,7 @@ if __name__ == "__main__":
         print("\nShutting down gracefully...")
     finally:
         cleanup()
+
+
+if __name__ == "__main__":
+    main()
