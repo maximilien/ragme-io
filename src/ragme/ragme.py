@@ -220,6 +220,21 @@ class RagMe:
         """
         return self.vector_db.delete_document(document_id)
 
+    def update_document_metadata(
+        self, document_id: str, metadata: dict[str, Any]
+    ) -> bool:
+        """
+        Update metadata for a document in the vector database.
+
+        Args:
+            document_id: ID of the document to update
+            metadata: Dictionary of metadata fields to update
+
+        Returns:
+            bool: True if document was updated successfully, False if not found
+        """
+        return self.vector_db.update_document_metadata(document_id, metadata)
+
     async def run(self, query: str):
         response = await self.ragme_agent.run(query)
         return str(response)

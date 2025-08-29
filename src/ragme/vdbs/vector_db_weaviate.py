@@ -329,6 +329,44 @@ class WeaviateVectorDatabase(VectorDatabase):
         except Exception:
             return False
 
+    def update_document_metadata(
+        self, document_id: str, metadata: dict[str, Any]
+    ) -> bool:
+        """Update metadata for a document in the text collection."""
+        if not self.has_text_collection():
+            return False
+
+        collection = self.client.collections.get(self.text_collection.name)
+        try:
+            # First, get the existing document to preserve other fields
+            response = collection.query.fetch_objects(
+                limit=1,
+                include_vector=False,
+                where=collection.query.filter.by_id().equal(document_id),
+            )
+
+            if not response.objects:
+                logger.warning(f"Document not found for metadata update: {document_id}")
+                return False
+
+            existing_doc = response.objects[0]
+            existing_metadata = existing_doc.properties.get("metadata", {})
+
+            # Update the metadata with new values
+            existing_metadata.update(metadata)
+
+            # Update the document with new metadata
+            collection.data.update(
+                uuid=document_id, properties={"metadata": existing_metadata}
+            )
+
+            logger.info(f"Successfully updated metadata for document: {document_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update metadata for document {document_id}: {e}")
+            return False
+
     def find_document_by_url(self, url: str) -> dict[str, Any] | None:
         """Find a document by its URL in the text collection."""
         if not self.has_text_collection():
@@ -649,6 +687,42 @@ class WeaviateVectorDatabase(VectorDatabase):
             collection.data.delete_by_id(image_id)
             return True
         except Exception:
+            return False
+
+    def update_image_metadata(self, image_id: str, metadata: dict[str, Any]) -> bool:
+        """Update metadata for an image in the image collection."""
+        if not self.has_image_collection():
+            return False
+
+        collection = self.client.collections.get(self.image_collection.name)
+        try:
+            # First, get the existing image to preserve other fields
+            response = collection.query.fetch_objects(
+                limit=1,
+                include_vector=False,
+                where=collection.query.filter.by_id().equal(image_id),
+            )
+
+            if not response.objects:
+                logger.warning(f"Image not found for metadata update: {image_id}")
+                return False
+
+            existing_image = response.objects[0]
+            existing_metadata = existing_image.properties.get("metadata", {})
+
+            # Update the metadata with new values
+            existing_metadata.update(metadata)
+
+            # Update the image with new metadata
+            collection.data.update(
+                uuid=image_id, properties={"metadata": existing_metadata}
+            )
+
+            logger.info(f"Successfully updated metadata for image: {image_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update metadata for image {image_id}: {e}")
             return False
 
     def find_image_by_url(self, url: str) -> dict[str, Any] | None:

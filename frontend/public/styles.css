@@ -1998,6 +1998,89 @@ body {
     transform: scale(1.05);
 }
 
+.deleting-badge {
+    background: #fee2e2;
+    color: #dc2626;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
+    border-radius: 8px;
+    border: 1px solid #ef4444;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 4rem;
+    text-align: center;
+    margin-left: 0.1rem;
+    margin-right: 1.5rem;
+    transition: all 0.2s ease;
+    animation: deletingBadgePulse 1.5s ease-in-out infinite;
+}
+
+.deleting-badge:hover {
+    background: #dc2626;
+    color: white;
+    transform: scale(1.05);
+}
+
+@keyframes deletingBadgePulse {
+    0%, 100% {
+        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 4px 8px rgba(220, 38, 38, 0.5);
+        transform: scale(1.05);
+    }
+}
+
+.document-card.deleting {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%);
+    border-color: #ef4444;
+    opacity: 0.8;
+    position: relative;
+}
+
+.document-card.deleting::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.document-card.deleting .document-content {
+    position: relative;
+    z-index: 2;
+}
+
+.document-card.deleting .document-delete-btn {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cached-summary-indicator {
+    background: #e0f2fe;
+    color: #0277bd;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid #81c784;
+}
+
+.cached-summary-indicator i {
+    font-size: 0.7rem;
+}
+
 @keyframes newBadgePulse {
     0%, 100% {
         box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);

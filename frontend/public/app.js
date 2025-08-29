@@ -2,7 +2,9 @@
 class RAGmeAssistant {
     constructor() {
         this.socket = null;
+        this.deletionInProgress = false;
         this.documents = [];
+        this.documentsBeingDeleted = new Set(); // Track documents being deleted
         this.chatHistory = [];
         this.chatSessions = [];
         this.currentChatId = null;
@@ -668,7 +670,11 @@ class RAGmeAssistant {
         this.socket.on('document_summarized', (result) => {
             console.log('Document summarized:', result);
             if (result.success) {
-                this.updateDocumentSummary(result.summary);
+                let summaryText = result.summary;
+                if (result.cached) {
+                    summaryText = `<div class="cached-summary-indicator"><i class="fas fa-save"></i> Cached Summary</div>${summaryText}`;
+                }
+                this.updateDocumentSummary(summaryText);
             } else {
                 this.updateDocumentSummary('Failed to generate summary. Please try again.');
             }
@@ -3428,6 +3434,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         this.stopAutoRefresh();
         // Start new interval - refresh every 30 seconds
         this.autoRefreshInterval = setInterval(() => {
+            // Don't auto-refresh if a deletion operation is in progress
+            if (this.deletionInProgress) {
+                console.log('Skipping auto-refresh - deletion in progress');
+                return;
+            }
             console.log('Auto-refreshing documents and vector DB info...');
             this.loadDocuments();
             this.loadVectorDbInfoFromBackend();
@@ -3608,13 +3619,31 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             return;
         }
 
-        // Group documents by their base URL/filename to handle existing chunked documents
-        const groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
+        // Check if documents are already grouped by the backend
+        let groupedDocuments;
+        if (this.documents.some(doc => doc.isGroupedChunks || doc.isGroupedImages)) {
+            // Documents are already grouped by the backend, use them as-is
+            console.log('Documents are already grouped by backend, using as-is');
+            groupedDocuments = this.documents;
+        } else {
+            // Documents are not grouped, apply frontend grouping
+            console.log('Documents are not grouped, applying frontend grouping');
+            groupedDocuments = this.groupDocumentsByBaseUrl(this.documents);
+        }
 
         groupedDocuments.forEach((group, index) => {
             const card = document.createElement('div');
             card.className = 'document-card';
             card.dataset.docIndex = index;
+            
+            // Check if this document is being deleted
+            const isBeingDeleted = this.documentsBeingDeleted.has(group.id) || 
+                                  (group.baseUrl && this.documentsBeingDeleted.has(group.baseUrl)) ||
+                                  (group.sourceDocument && this.documentsBeingDeleted.has(group.sourceDocument));
+            
+            if (isBeingDeleted) {
+                card.classList.add('deleting');
+            }
 
             const title = group.url || group.metadata?.filename || `Document ${index + 1}`;
             const date = group.metadata?.date_added || 'Unknown date';
@@ -3625,6 +3654,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             let summary = '';
             let chunkInfo = '';
             let newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
+            let deletingBadge = isBeingDeleted ? '<span class="deleting-badge"><i class="fas fa-spinner fa-spin"></i> DELETING</span>' : '';
             
             // Handle image stacks (grouped images from PDFs)
             if (contentType === 'image_stack' && group.isGroupedImages) {
@@ -3637,6 +3667,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             <span class="document-title-text">${this.escapeHtml(sourceDocument)}</span>
                             <span class="image-stack-badge"><i class="fas fa-layer-group"></i> ${totalImages} images</span>
                             ${newBadge}
+                            ${deletingBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -3663,6 +3694,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             <span class="document-title-text">${this.escapeHtml(imageTitle)}</span>
                             <span class="image-badge"><i class="fas fa-image"></i> Image</span>
                             ${newBadge}
+                            ${deletingBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -3692,6 +3724,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                             <span class="document-title-text">${this.escapeHtml(originalFilename)}</span>
                             ${chunkInfo}
                             ${newBadge}
+                            ${deletingBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -3713,6 +3746,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <div class="document-title">
                             <span class="document-title-text">${this.escapeHtml(title)}</span>
                             ${newBadge}
+                            ${deletingBadge}
                         </div>
                         <div class="document-meta">
                             <i class="fas fa-calendar"></i> ${date} | 
@@ -5738,96 +5772,106 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     deleteChunkedDocument(groupedDoc) {
         console.log('Deleting chunked document:', groupedDoc);
         
-        // Get all chunks that belong to this document
-        let chunksToDelete;
+        // Set deletion in progress flag
+        this.deletionInProgress = true;
         
-        if (groupedDoc.chunks && groupedDoc.chunks.length > 0) {
-            // Use the chunks from the grouped document
-            chunksToDelete = groupedDoc.chunks;
-        } else {
-            // Fallback: find chunks in the original documents array
-            chunksToDelete = this.documents.filter(doc => {
-                if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) || 
-                    (doc.metadata?.is_chunked && doc.metadata?.total_chunks)) {
-                    // Extract base URL from chunk URL
-                    const chunkBaseUrl = doc.url.split('#')[0];
-                    const groupBaseUrl = groupedDoc.baseUrl;
-                    return chunkBaseUrl === groupBaseUrl;
-                }
-                return false;
-            });
-        }
+        // Add to documents being deleted set
+        if (groupedDoc.id) this.documentsBeingDeleted.add(groupedDoc.id);
+        if (groupedDoc.baseUrl) this.documentsBeingDeleted.add(groupedDoc.baseUrl);
         
-        console.log('Found chunks to delete:', chunksToDelete.length);
+        // Re-render to show deleting state
+        this.renderDocuments();
         
-        // Delete all chunks
-        const deletePromises = chunksToDelete.map(chunk => {
-            const endpoint = chunk.content_type === 'image' ? `/delete-image/${chunk.id}` : `/delete-document/${chunk.id}`;
-            return fetch(endpoint, { method: 'DELETE' })
-                .then(response => response.json());
-        });
+        // Show initial progress notification
+        const progressNotification = this.showProgressNotification(`Deleting document chunks...`, 0, 1);
         
-        Promise.all(deletePromises)
-            .then(results => {
-                const successCount = results.filter(result => result.status === 'success').length;
-                const totalCount = results.length;
+        // Use the new backend endpoint to delete all chunks at once
+        const deleteDocumentGroup = async () => {
+            try {
+                console.log(`Starting deletion of document group:`, groupedDoc.originalFilename || groupedDoc.url);
+                console.log(`Base URL: ${groupedDoc.baseUrl}`);
                 
-                if (successCount === totalCount) {
-                    // Remove all chunks from local array
-                    chunksToDelete.forEach(chunk => {
-                        const index = this.documents.findIndex(doc => doc.id === chunk.id);
-                        if (index !== -1) {
-                            this.documents.splice(index, 1);
-                        }
-                    });
+                // Encode the base URL for the API call
+                const encodedBaseUrl = encodeURIComponent(groupedDoc.baseUrl);
+                const endpoint = `http://localhost:8021/delete-document-group/${encodedBaseUrl}`;
+                
+                console.log(`Calling backend endpoint: ${endpoint}`);
+                
+                const response = await fetch(endpoint, { method: 'DELETE' });
+                const result = await response.json();
+                
+                // Remove progress notification
+                this.removeProgressNotification(progressNotification);
+                
+                if (result.status === 'success') {
+                    console.log(`✅ Successfully deleted document group:`, result);
                     
-                    // Also remove any remaining documents that might be related to this grouped document
-                    // This handles cases where the grouping might not have captured all related documents
-                    const remainingRelatedDocs = this.documents.filter(doc => {
-                        if ((doc.metadata?.is_chunk && doc.metadata?.total_chunks) || 
-                            (doc.metadata?.is_chunked && doc.metadata?.total_chunks)) {
-                            const chunkBaseUrl = doc.url.split('#')[0];
-                            const groupBaseUrl = groupedDoc.baseUrl;
-                            return chunkBaseUrl === groupBaseUrl;
-                        }
-                        return false;
-                    });
+                    // Remove from documents being deleted set
+                    if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
+                    if (groupedDoc.baseUrl) this.documentsBeingDeleted.delete(groupedDoc.baseUrl);
                     
-                    remainingRelatedDocs.forEach(doc => {
-                        const index = this.documents.findIndex(d => d.id === doc.id);
-                        if (index !== -1) {
-                            this.documents.splice(index, 1);
-                        }
-                    });
+                    // Now remove the document from the UI
+                    this.removeGroupedDocumentFromUI(groupedDoc);
                     
-                    console.log(`Deleted ${successCount} chunks. New document count:`, this.documents.length);
+                    // Close the modal first
+                    this.hideModal('documentDetailsModal');
                     
-                    // Re-render the documents list
+                    // Update cached documents
+                    this.updateCachedDocumentsAfterDeletion(groupedDoc);
+                    
+                    // Show success notification
+                    this.showNotification('success', result.message);
+                    
+                    // Verify deletion by checking backend
+                    console.log('Verifying deletion by checking backend...');
+                    try {
+                        await this.verifyDeletionFromBackend(groupedDoc);
+                    } catch (verifyError) {
+                        console.error('Error verifying deletion:', verifyError);
+                    }
+                } else {
+                    console.error(`❌ Failed to delete document group:`, result);
+                    
+                    // Remove from documents being deleted set on failure
+                    if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
+                    if (groupedDoc.baseUrl) this.documentsBeingDeleted.delete(groupedDoc.baseUrl);
+                    
+                    // Re-render to remove deleting badge
                     this.renderDocuments();
                     
-                    // Update visualization to reflect the changes
-                    this.updateVisualization();
-                    
-                    // Force a refresh of the documents list to ensure everything is in sync
-                    setTimeout(() => {
-                        this.loadDocuments();
-                    }, 500);
-                    
-                                    // Show success notification
-                const contentType = groupedDoc.content_type === 'image' ? 'image' : 'document';
-                this.showNotification('success', `Deleted ${contentType} with ${successCount} chunks successfully`);
-                } else {
-                    this.showNotification('error', `Failed to delete some chunks. Deleted ${successCount}/${totalCount}`);
+                    this.showNotification('error', `Failed to delete document: ${result.message || 'Unknown error'}`);
                 }
-            })
-            .catch(error => {
-                console.error('Error deleting chunked document:', error);
-                this.showNotification('error', 'Failed to delete chunked document. Please try again.');
-            });
+                
+            } catch (error) {
+                console.error(`❌ Error deleting document group:`, error);
+                this.removeProgressNotification(progressNotification);
+                
+                // Remove from documents being deleted set on error
+                if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
+                if (groupedDoc.baseUrl) this.documentsBeingDeleted.delete(groupedDoc.baseUrl);
+                
+                // Re-render to remove deleting badge
+                this.renderDocuments();
+                
+                this.showNotification('error', `Error deleting document: ${error.message}`);
+            }
+            
+            // Reset deletion in progress flag
+            this.deletionInProgress = false;
+        };
+        
+        // Start the deletion process
+        deleteDocumentGroup();
     }
 
     deleteSingleDocument(docIndex, doc) {
         console.log('deleteSingleDocument called with:', { docIndex, docId: doc.id, docType: doc.content_type });
+        
+        // Add to documents being deleted set
+        if (doc.id) this.documentsBeingDeleted.add(doc.id);
+        
+        // Re-render to show deleting state
+        this.renderDocuments();
         
         // Determine the appropriate endpoint based on content type
         const endpoint = doc.content_type === 'image' ? `/delete-image/${doc.id}` : `/delete-document/${doc.id}`;
@@ -5854,6 +5898,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 
                 // Update visualization to reflect the changes
                 this.updateVisualization();
+                
+                // Update the cached allDocuments to remove the deleted document
+                this.updateCachedDocumentsAfterDeletion(doc);
                 
                 // Show success notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
@@ -5892,21 +5939,40 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             if (groupedDoc.isGroupedChunks && groupedDoc.totalChunks > 1) {
                 // Delete all chunks of this document
                 this.deleteChunkedDocument(groupedDoc);
-                // Close the modal after chunked deletion
-                this.hideModal('documentDetailsModal');
+                // Modal will be closed after deletion is completed
+            } else if (groupedDoc.isGroupedImages && groupedDoc.images && groupedDoc.images.length > 0) {
+                // Delete all images in the stack
+                this.deleteImageStack(groupedDoc);
+                // Modal will be closed after deletion is completed
             } else {
-                // Delete single document - find the actual document index in the original array
-                const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex : 
-                                     this.documents.findIndex(doc => doc.id === groupedDoc.id);
-                
-                // Call deleteSingleDocument and close modal after successful deletion
-                this.deleteSingleDocumentFromDetails(actualDocIndex, groupedDoc);
+                // This is a grouped document with only one chunk/image, but still a grouped document
+                // Handle it as a grouped document deletion to ensure proper cache updates
+                if (groupedDoc.isGroupedChunks) {
+                    // Single chunk document - use the chunked document deletion
+                    this.deleteChunkedDocument(groupedDoc);
+                } else if (groupedDoc.isGroupedImages) {
+                    // Single image in stack - use the image stack deletion
+                    this.deleteImageStack(groupedDoc);
+                } else {
+                    // Fallback: find the actual document index in the original array
+                    const actualDocIndex = groupedDoc.docIndex !== undefined ? groupedDoc.docIndex : 
+                                         this.documents.findIndex(doc => doc.id === groupedDoc.id);
+                    
+                    // Call deleteSingleDocument and close modal after successful deletion
+                    this.deleteSingleDocumentFromDetails(actualDocIndex, groupedDoc);
+                }
             }
         }
     }
 
     deleteSingleDocumentFromDetails(docIndex, doc) {
         console.log('deleteSingleDocumentFromDetails called with:', { docIndex, docId: doc.id, docType: doc.content_type });
+        
+        // Add to documents being deleted set
+        if (doc.id) this.documentsBeingDeleted.add(doc.id);
+        
+        // Re-render to show deleting state
+        this.renderDocuments();
         
         // Determine the appropriate endpoint based on content type
         const endpoint = doc.content_type === 'image' ? `/delete-image/${doc.id}` : `/delete-document/${doc.id}`;
@@ -5934,13 +6000,39 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 // Re-render the documents list immediately
                 this.renderDocuments();
                 
-                                                    // Update visualization to reflect the changes
+                // Update visualization to reflect the changes
                 this.updateVisualization();
+                
+                // Remove from documents being deleted set
+                if (doc.id) this.documentsBeingDeleted.delete(doc.id);
+                
+                // Update the cached allDocuments to remove the deleted document
+                // Check if this is a grouped document or single document
+                if (doc.isGroupedChunks || doc.isGroupedImages) {
+                    // It's a grouped document, use the grouped deletion function
+                    this.updateCachedDocumentsAfterDeletion(doc);
+                } else {
+                    // It's a single document, remove it directly from cached documents
+                    if (this.pagination.allDocuments && this.pagination.allDocuments.length > 0) {
+                        const cacheIndex = this.pagination.allDocuments.findIndex(cachedDoc => cachedDoc.id === doc.id);
+                        if (cacheIndex !== -1) {
+                            this.pagination.allDocuments.splice(cacheIndex, 1);
+                            console.log('Removed single document from cached allDocuments');
+                            
+                            // Update pagination counts
+                            this.pagination.totalDocuments = Math.max(0, this.pagination.totalDocuments - 1);
+                            this.pagination.totalPages = Math.ceil(this.pagination.totalDocuments / this.pagination.documentsPerPage);
+                        }
+                    }
+                }
                 
                 // Show success notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
                 this.showNotification('success', `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} deleted successfully`);
             } else {
+                // Remove from documents being deleted set on failure
+                if (doc.id) this.documentsBeingDeleted.delete(doc.id);
+                
                 // Show error notification
                 const contentType = doc.content_type === 'image' ? 'image' : 'document';
                 this.showNotification('error', result.message || `Failed to delete ${contentType}`);
@@ -5948,6 +6040,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         })
         .catch(error => {
             console.error('Error deleting document:', error);
+            
+            // Remove from documents being deleted set on error
+            if (doc.id) this.documentsBeingDeleted.delete(doc.id);
+            
             const contentType = doc.content_type === 'image' ? 'image' : 'document';
             this.showNotification('error', `Failed to delete ${contentType}. Please try again.`);
         });
@@ -5956,66 +6052,118 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
     deleteImageStack(groupedDoc) {
         console.log('Deleting image stack:', groupedDoc);
         
+        // Set deletion in progress flag
+        this.deletionInProgress = true;
+        
+        // Add to documents being deleted set
+        if (groupedDoc.id) this.documentsBeingDeleted.add(groupedDoc.id);
+        if (groupedDoc.sourceDocument) this.documentsBeingDeleted.add(groupedDoc.sourceDocument);
+        
+        // Re-render to show deleting state
+        this.renderDocuments();
+        
         // Get all images that belong to this stack
         const imagesToDelete = groupedDoc.images || [];
         
         console.log('Found images to delete:', imagesToDelete.length);
         
-        // Delete all images
-        const deletePromises = imagesToDelete.map(image => {
-            const endpoint = `/delete-image/${image.id}`;
-            return fetch(endpoint, { method: 'DELETE' })
-                .then(response => response.json());
-        });
+        // Show initial progress notification
+        const progressNotification = this.showProgressNotification(`Deleting ${imagesToDelete.length} images...`, 0, imagesToDelete.length);
         
-        Promise.all(deletePromises)
-            .then(results => {
-                const successCount = results.filter(result => result.status === 'success').length;
-                const totalCount = results.length;
-                
-                if (successCount === totalCount) {
-                    // Remove all images from local array
-                    imagesToDelete.forEach(image => {
+        let completedCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Delete images one by one to show progress
+        const deleteSequentially = async () => {
+            for (let i = 0; i < imagesToDelete.length; i++) {
+                const image = imagesToDelete[i];
+                try {
+                    const endpoint = `/delete-image/${image.id}`;
+                    const response = await fetch(endpoint, { method: 'DELETE' });
+                    const result = await response.json();
+                    
+                    completedCount++;
+                    
+                    if (result.status === 'success') {
+                        successCount++;
+                        // Remove the individual image from local array
                         const index = this.documents.findIndex(doc => doc.id === image.id);
                         if (index !== -1) {
                             this.documents.splice(index, 1);
                         }
-                    });
+                    } else {
+                        errorCount++;
+                        console.error(`Failed to delete image ${image.id}:`, result);
+                    }
                     
-                    // Also remove any remaining images that might be related to this stack
-                    const remainingRelatedImages = this.documents.filter(doc => {
-                        if (doc.content_type === 'image' && doc.metadata?.pdf_filename) {
-                            return doc.metadata.pdf_filename === groupedDoc.sourceDocument;
-                        }
-                        return false;
-                    });
+                    // Update progress notification
+                    this.updateProgressNotification(progressNotification, `Deleting images... (${completedCount}/${imagesToDelete.length})`, completedCount, imagesToDelete.length);
                     
-                    remainingRelatedImages.forEach(doc => {
-                        const index = this.documents.findIndex(d => d.id === doc.id);
-                        if (index !== -1) {
-                            this.documents.splice(index, 1);
-                        }
-                    });
-                    
-                    console.log(`Deleted ${successCount} images. New document count:`, this.documents.length);
-                    
-                    // Re-render the documents list
-                    this.renderDocuments();
-                    
-                    // Update visualization to reflect the changes
-                    this.updateVisualization();
-                    
-                    // Show success notification
-                    this.showNotification('success', `Successfully deleted ${successCount} images`);
-                } else {
-                    console.error('Some images failed to delete:', results);
-                    this.showNotification('error', `Failed to delete ${totalCount - successCount} images`);
+                } catch (error) {
+                    completedCount++;
+                    errorCount++;
+                    console.error(`Error deleting image ${image.id}:`, error);
+                    this.updateProgressNotification(progressNotification, `Deleting images... (${completedCount}/${imagesToDelete.length})`, completedCount, imagesToDelete.length);
                 }
-            })
-            .catch(error => {
-                console.error('Error deleting image stack:', error);
-                this.showNotification('error', 'Error deleting image stack');
+            }
+            
+            // Remove progress notification
+            this.removeProgressNotification(progressNotification);
+            
+            // Also remove any remaining images that might be related to this stack
+            const remainingRelatedImages = this.documents.filter(doc => {
+                if (doc.content_type === 'image' && doc.metadata?.pdf_filename) {
+                    return doc.metadata.pdf_filename === groupedDoc.sourceDocument;
+                }
+                return false;
             });
+            
+            remainingRelatedImages.forEach(doc => {
+                const index = this.documents.findIndex(d => d.id === doc.id);
+                if (index !== -1) {
+                    this.documents.splice(index, 1);
+                }
+            });
+            
+            console.log(`Deleted ${successCount} images, ${errorCount} failed. New document count:`, this.documents.length);
+            
+            // Re-render the documents list
+            this.renderDocuments();
+            
+            // Update visualization to reflect the changes
+            this.updateVisualization();
+            
+            // Close the modal first
+            this.hideModal('documentDetailsModal');
+            
+            // Remove from documents being deleted set
+            if (groupedDoc.id) this.documentsBeingDeleted.delete(groupedDoc.id);
+            if (groupedDoc.sourceDocument) this.documentsBeingDeleted.delete(groupedDoc.sourceDocument);
+            
+            // Show final notification
+            if (errorCount === 0) {
+                // Success - remove from UI
+                this.removeGroupedImageFromUI(groupedDoc);
+                this.updateCachedDocumentsAfterDeletion(groupedDoc);
+                this.showNotification('success', `Successfully deleted ${successCount} images`);
+            } else if (successCount === 0) {
+                // Complete failure - keep in UI but remove deleting badge
+                this.renderDocuments();
+                this.showNotification('error', `Failed to delete all ${imagesToDelete.length} images`);
+            } else {
+                // Partial success - remove from UI but show warning
+                this.removeGroupedImageFromUI(groupedDoc);
+                this.updateCachedDocumentsAfterDeletion(groupedDoc);
+                this.showNotification('warning', `Deleted ${successCount} images, ${errorCount} failed`);
+            }
+            
+            // Clear deletion in progress flag
+            this.deletionInProgress = false;
+        };
+        
+        // Start the sequential deletion
+        deleteSequentially();
     }
 
 
@@ -6738,6 +6886,216 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
                 }, 300);
             }
         }, 3000);
+    }
+
+    showProgressNotification(message, current, total) {
+        // Create progress notification element
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-progress';
+        notification.id = 'progress-notification';
+        
+        const progressPercentage = total > 0 ? Math.round((current / total) * 100) : 0;
+        
+        notification.innerHTML = `
+            <div style="margin-bottom: 8px;">${message}</div>
+            <div style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; height: 6px; overflow: hidden;">
+                <div style="background: white; height: 100%; width: ${progressPercentage}%; transition: width 0.3s ease;"></div>
+            </div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">${current}/${total} (${progressPercentage}%)</div>
+        `;
+        
+        // Add styles
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 10001;
+            max-width: 300px;
+            word-wrap: break-word;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease-out;
+            background-color: #17a2b8;
+        `;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        return notification;
+    }
+
+    updateProgressNotification(notification, message, current, total) {
+        if (!notification || !notification.parentNode) return;
+        
+        const progressPercentage = total > 0 ? Math.round((current / total) * 100) : 0;
+        
+        notification.innerHTML = `
+            <div style="margin-bottom: 8px;">${message}</div>
+            <div style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; height: 6px; overflow: hidden;">
+                <div style="background: white; height: 100%; width: ${progressPercentage}%; transition: width 0.3s ease;"></div>
+            </div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">${current}/${total} (${progressPercentage}%)</div>
+        `;
+    }
+
+    removeProgressNotification(notification) {
+        if (notification && notification.parentNode) {
+            notification.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+    }
+
+    removeGroupedImageFromUI(groupedDoc) {
+        // Remove the grouped image from the documents array
+        const index = this.documents.findIndex(doc => {
+            if (doc.isGroupedImages && doc.sourceDocument === groupedDoc.sourceDocument) {
+                return true;
+            }
+            // Also check for the specific grouped image ID
+            if (doc.id === groupedDoc.id) {
+                return true;
+            }
+            return false;
+        });
+        
+        if (index !== -1) {
+            this.documents.splice(index, 1);
+            console.log('Removed grouped image from documents array');
+        }
+        
+        // Re-render the documents list immediately to remove from UI
+        this.renderDocuments();
+        
+        // Update visualization to reflect the changes
+        this.updateVisualization();
+    }
+
+    removeGroupedDocumentFromUI(groupedDoc) {
+        // Remove the grouped document from the documents array
+        const index = this.documents.findIndex(doc => {
+            if (doc.isGroupedChunks && doc.baseUrl === groupedDoc.baseUrl) {
+                return true;
+            }
+            // Also check for the specific grouped document ID
+            if (doc.id === groupedDoc.id) {
+                return true;
+            }
+            return false;
+        });
+        
+        if (index !== -1) {
+            this.documents.splice(index, 1);
+            console.log('Removed grouped document from documents array');
+        }
+        
+        // Re-render the documents list immediately to remove from UI
+        this.renderDocuments();
+        
+        // Update visualization to reflect the changes
+        this.updateVisualization();
+    }
+
+    updateCachedDocumentsAfterDeletion(groupedDoc) {
+        // Remove the deleted grouped document from the cached allDocuments
+        if (this.pagination.allDocuments && this.pagination.allDocuments.length > 0) {
+            const cacheIndex = this.pagination.allDocuments.findIndex(doc => {
+                if (doc.isGroupedChunks && doc.baseUrl === groupedDoc.baseUrl) {
+                    return true;
+                }
+                if (doc.isGroupedImages && doc.sourceDocument === groupedDoc.sourceDocument) {
+                    return true;
+                }
+                // Also check for the specific grouped document ID
+                if (doc.id === groupedDoc.id) {
+                    return true;
+                }
+                return false;
+            });
+            
+            if (cacheIndex !== -1) {
+                this.pagination.allDocuments.splice(cacheIndex, 1);
+                console.log('Removed grouped document from cached allDocuments');
+                
+                // Update pagination counts
+                this.pagination.totalDocuments = Math.max(0, this.pagination.totalDocuments - 1);
+                this.pagination.totalPages = Math.ceil(this.pagination.totalDocuments / this.pagination.documentsPerPage);
+                
+                console.log('Updated pagination - total documents:', this.pagination.totalDocuments, 'total pages:', this.pagination.totalPages);
+            } else {
+                console.log('Grouped document not found in cached allDocuments');
+            }
+        }
+    }
+
+    async verifyDeletionFromBackend(groupedDoc) {
+        console.log('Verifying deletion from backend for:', groupedDoc.originalFilename || groupedDoc.url);
+        
+        // Temporarily disable auto-refresh to prevent interference
+        const wasAutoRefreshEnabled = this.autoRefreshInterval !== null;
+        if (wasAutoRefreshEnabled) {
+            this.stopAutoRefresh();
+        }
+        
+        try {
+            // Force a fresh load from backend
+            await new Promise((resolve) => {
+                this.socket.emit('list_content', {
+                    limit: 25,
+                    offset: 0,
+                    dateFilter: this.currentDateFilter,
+                    contentType: this.currentContentFilter
+                });
+                
+                // Listen for the response
+                const originalHandler = this.socket.listeners('content_listed')[0];
+                const verifyHandler = (result) => {
+                    if (result.success) {
+                        console.log('Backend verification - received documents:', result.items.length);
+                        
+                        // Check if the deleted document still exists
+                        const stillExists = result.items.some(doc => {
+                            if (doc.isGroupedChunks && doc.baseUrl === groupedDoc.baseUrl) {
+                                console.log('❌ Document still exists in backend:', doc.originalFilename || doc.url);
+                                return true;
+                            }
+                            if (doc.isGroupedImages && doc.sourceDocument === groupedDoc.sourceDocument) {
+                                console.log('❌ Image stack still exists in backend:', doc.sourceDocument);
+                                return true;
+                            }
+                            return false;
+                        });
+                        
+                        if (stillExists) {
+                            console.log('❌ VERIFICATION FAILED: Document still exists in backend after deletion');
+                        } else {
+                            console.log('✅ VERIFICATION SUCCESS: Document successfully deleted from backend');
+                        }
+                        
+                        // Restore original handler
+                        this.socket.off('content_listed', verifyHandler);
+                        this.socket.on('content_listed', originalHandler);
+                        
+                        resolve();
+                    }
+                };
+                
+                this.socket.off('content_listed', originalHandler);
+                this.socket.once('content_listed', verifyHandler);
+            });
+            
+        } finally {
+            // Restore auto-refresh if it was enabled
+            if (wasAutoRefreshEnabled) {
+                this.startAutoRefresh();
+            }
+        }
     }
 
     resetSettings() {

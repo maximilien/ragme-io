@@ -8,6 +8,7 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture
 - **[Storage Service](STORAGE_SERVICE.md)** - S3-compatible file storage service with MinIO ⭐ **NEW!**
 - **[Optimization Tools](OPTIMIZER.md)** - Query threshold optimization and performance tuning ⭐ **NEW!**
+- **[AI Summary Caching](AI_SUMMARY_CACHING.md)** - Intelligent caching system for AI-generated summaries ⭐ **NEW!**
 - **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to the project
 - **[Presentation](PRESENTATION.md)** - Project overview and technical details
 - **[CI/CD Pipeline](CI_CD.md)** - Continuous Integration and testing setup
@@ -19,6 +20,7 @@ Welcome to the RagMe documentation! This directory contains comprehensive docume
 - **[Settings UI Improvements](SETTINGS_UI_IMPROVEMENTS.md)** ⭐ **NEW!** - Enhanced Settings interface with tabbed organization and comprehensive configuration options
 
 ### 🆕 Latest Features Documentation
+- **🧠 AI Summary Caching**: Intelligent caching system that stores AI-generated summaries in document metadata to prevent redundant generation ⭐ **NEW!**
 - **⏳ Frontend Progress Indicator**: Visual progress indicator for document and image processing with multi-stage feedback ⭐ **NEW!**
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection ⭐ **NEW!**
 - **💾 S3-Compatible File Storage**: MinIO-based storage service for document and image persistence with support for multiple storage backends ⭐ **NEW!**
@@ -60,6 +62,7 @@ RagMe is built with a modular, vector database agnostic architecture:
 - [Vector Database Abstraction](VECTOR_DB_ABSTRACTION.md) - Understanding the database layer
 - [Storage Service](STORAGE_SERVICE.md) - File storage service implementation and usage ⭐ **NEW!**
 - [Optimization Tools](OPTIMIZER.md) - Performance tuning and threshold optimization ⭐ **NEW!**
+- [AI Summary Caching](AI_SUMMARY_CACHING.md) - Caching system implementation and usage ⭐ **NEW!**
 - [Contributing Guidelines](CONTRIBUTING.md) - Development workflow and standards
 - [CI/CD Pipeline](CI_CD.md) - Testing and continuous integration
 - [Process Management](PROCESS_MANAGEMENT.md) - Service management and troubleshooting
