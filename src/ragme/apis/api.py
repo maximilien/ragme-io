@@ -11,10 +11,10 @@ from typing import Any
 
 import PyPDF2
 from docx import Document
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..ragme import RagMe
 from ..utils.config_manager import config
@@ -120,6 +120,10 @@ class SummarizeInput(BaseModel):
     """Input model for document summarization."""
 
     document_id: str | dict
+    force_refresh: bool = Field(default=False, alias="forceRefresh")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class McpServerConfig(BaseModel):
@@ -317,32 +321,6 @@ def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, A
     """
     groups = {}
 
-    # Debug: Count chunked documents by base URL
-    chunked_by_base = {}
-    for doc in documents:
-        if (
-            doc.get("metadata", {}).get("is_chunk")
-            and doc.get("metadata", {}).get("total_chunks")
-        ) or (
-            doc.get("metadata", {}).get("is_chunked")
-            and doc.get("metadata", {}).get("total_chunks")
-        ):
-            url = doc.get("url", "")
-            base_url = url.split("#")[0]
-            if base_url not in chunked_by_base:
-                chunked_by_base[base_url] = []
-            chunked_by_base[base_url].append(doc)
-
-    # Debug: Print chunk counts
-    for base_url, chunks in chunked_by_base.items():
-        print(
-            f"Backend grouping: {base_url} has {len(chunks)} chunks (expected: {chunks[0]['metadata']['total_chunks']})"
-        )
-        for chunk in chunks:
-            print(
-                f"  - chunk_index: {chunk['metadata'].get('chunk_index')}, id: {chunk['id']}"
-            )
-
     for doc in documents:
         # Check if this is a chunked document
         if (
@@ -461,37 +439,64 @@ def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, A
     # Convert groups to list
     grouped_documents = list(groups.values())
 
-    # Debug: Print final grouped documents
-    print(f"Backend: Final grouped documents count: {len(grouped_documents)}")
-    for i, doc in enumerate(grouped_documents):
-        if doc.get("isGroupedChunks"):
-            print(
-                f"Backend: Grouped doc {i}: {doc.get('originalFilename')} has {len(doc.get('chunks', []))} chunks"
-            )
-            for chunk in doc.get("chunks", []):
-                print(
-                    f"  - chunk_id: {chunk.get('id')}, chunk_index: {chunk.get('chunk_index')}"
-                )
-
-    # Debug: Print what's actually being returned
-    print(f"Backend: Returning {len(grouped_documents)} grouped documents to frontend")
-    for i, doc in enumerate(grouped_documents):
-        if doc.get("isGroupedChunks"):
-            print(
-                f"Backend: Returning grouped doc {i}: {doc.get('originalFilename')} with {len(doc.get('chunks', []))} chunks"
-            )
-            print(
-                f"Backend: Chunks array type: {type(doc.get('chunks'))}, length: {len(doc.get('chunks', []))}"
-            )
-            if doc.get("chunks"):
-                print(
-                    f"Backend: First chunk: {doc['chunks'][0].get('id') if doc['chunks'] else 'None'}"
-                )
-                print(
-                    f"Backend: Last chunk: {doc['chunks'][-1].get('id') if doc['chunks'] else 'None'}"
-                )
-
     return grouped_documents
+
+
+@app.get("/health")
+async def health_check():
+    """
+    Check the health of the RAG system and vector database connection.
+
+    Returns:
+        dict: Health status information
+    """
+    try:
+        # Test vector database connection
+        ragme = get_ragme()
+        try:
+            # Try to list documents to test connection
+            ragme.list_documents(limit=1, offset=0)
+            vdb_status = "healthy"
+            vdb_error = None
+        except Exception as e:
+            vdb_status = "error"
+            vdb_error = str(e)
+
+        # Test image collection if available
+        image_status = "not_configured"
+        image_error = None
+        try:
+            from ..utils.config_manager import config
+            from ..vdbs.vector_db_factory import create_vector_database
+
+            image_collection_name = config.get_image_collection_name()
+            if image_collection_name:
+                image_vdb = create_vector_database(
+                    collection_name=image_collection_name
+                )
+                image_vdb.list_images(limit=1, offset=0)
+                image_status = "healthy"
+        except Exception as e:
+            image_status = "error"
+            image_error = str(e)
+
+        # Overall status
+        overall_status = "healthy" if vdb_status == "healthy" else "error"
+
+        return {
+            "status": "success",
+            "overall_status": overall_status,
+            "vector_database": {"status": vdb_status, "error": vdb_error},
+            "image_collection": {"status": image_status, "error": image_error},
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "overall_status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+        }
 
 
 @app.get("/count-documents")
@@ -612,22 +617,6 @@ async def list_content(
         # Get documents if requested
         if content_type in ["document", "documents", "both"]:
             documents = get_ragme().list_documents(limit=1000, offset=0)
-            print(f"Backend: Retrieved {len(documents)} documents from vector database")
-
-            # Log chunked documents for debugging
-            chunked_docs = [
-                doc
-                for doc in documents
-                if doc.get("metadata", {}).get("is_chunk")
-                or doc.get("metadata", {}).get("is_chunked")
-            ]
-            if chunked_docs:
-                print(f"Backend: Found {len(chunked_docs)} chunked documents:")
-                for doc in chunked_docs:
-                    print(
-                        f"  - ID: {doc.get('id')}, URL: {doc.get('url')}, chunk_index: {doc.get('metadata', {}).get('chunk_index')}, total_chunks: {doc.get('metadata', {}).get('total_chunks')}"
-                    )
-
             for doc in documents:
                 doc["content_type"] = "document"
             all_items.extend(documents)
@@ -734,7 +723,7 @@ async def update_mcp_server_config(config: McpServerConfigList):
 
 
 @app.post("/summarize-document")
-async def summarize_document(input_data: SummarizeInput):
+async def summarize_document(input_data: SummarizeInput, request: Request):
     """
     Summarize a document or image using the RagMe agent.
 
@@ -744,6 +733,12 @@ async def summarize_document(input_data: SummarizeInput):
     Returns:
         dict: Summarized content
     """
+    # Log the raw request data
+    body = await request.body()
+    print(f"🌐 REST API - Raw request body: {body}")
+    print(f"🌐 REST API - Request headers: {request.headers}")
+    print(f"🌐 REST API - Received input_data: {input_data}")
+    print(f"🌐 REST API - force_refresh parameter: {input_data.force_refresh}")
     try:
         # Get all documents and images
         all_items = []
@@ -812,19 +807,24 @@ async def summarize_document(input_data: SummarizeInput):
                     ]
 
                     if pdf_images:
-                        # Check if summary already exists in the first image's metadata
+                        # Check if summary already exists in the first image's metadata (unless force refresh is requested)
                         first_image_metadata = pdf_images[0].get("metadata", {})
                         existing_summary = first_image_metadata.get("ai_summary")
 
-                        if existing_summary:
+                        if existing_summary and not input_data.force_refresh:
                             print(
-                                f"Using cached summary for image stack: {pdf_filename}"
+                                f"📋 RETRIEVED cached AI summary for image stack: {pdf_filename}"
                             )
                             return {
                                 "status": "success",
                                 "summary": existing_summary,
                                 "cached": True,
                             }
+
+                        if input_data.force_refresh and existing_summary:
+                            print(
+                                f"🔄 FORCE REFRESH requested for image stack: {pdf_filename} - regenerating AI summary"
+                            )
 
                         # Create comprehensive summary for the image stack
                         summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
@@ -867,15 +867,18 @@ async def summarize_document(input_data: SummarizeInput):
                         try:
                             first_image_id = pdf_images[0].get("id")
                             if first_image_id:
+                                print(
+                                    f"💾 STORING new AI summary for image stack (PDF: {pdf_filename}, image_id: {first_image_id})"
+                                )
                                 image_vdb.update_image_metadata(
                                     first_image_id, {"ai_summary": summary_text}
                                 )
                                 print(
-                                    f"Stored AI summary in image stack metadata for PDF: {pdf_filename}"
+                                    f"✅ SUCCESSFULLY stored AI summary in image stack metadata for PDF: {pdf_filename}"
                                 )
                         except Exception as e:
                             print(
-                                f"Warning: Failed to store AI summary in image stack metadata: {e}"
+                                f"❌ FAILED to store AI summary in image stack metadata: {e}"
                             )
 
                         return {
@@ -895,35 +898,85 @@ async def summarize_document(input_data: SummarizeInput):
                     }
 
         print(f"Number of grouped items: {len(grouped_items)}")
+        print(f"Number of original items: {len(all_items)}")
+        print(f"Looking for document ID: {document_id} (type: {type(document_id)})")
 
         # Search for the document in grouped items
+        document = None
         for item in grouped_items:
             item_id = item.get("id")
             # Convert Weaviate UUID to string for comparison
             item_id_str = str(item_id) if item_id else None
+            print(
+                f"Checking grouped item ID: {item_id_str} (type: {type(item_id_str)})"
+            )
             if item_id_str == document_id:
                 document = item
                 print(
-                    f"Found item: {item.get('url', 'No URL')} (type: {item.get('content_type', 'unknown')})"
+                    f"Found item in grouped items: {item.get('url', 'No URL')} (type: {item.get('content_type', 'unknown')})"
                 )
                 break
 
+        # If not found in grouped items, try to find in original items
+        if not document:
+            print(
+                f"Document not found in grouped items with ID: {document_id}, trying original items..."
+            )
+            for item in all_items:
+                item_id = item.get("id")
+                item_id_str = str(item_id) if item_id else None
+                print(
+                    f"Checking original item ID: {item_id_str} (type: {type(item_id_str)})"
+                )
+                if item_id_str == document_id:
+                    document = item
+                    print(
+                        f"Found item in original items: {item.get('url', 'No URL')} (type: {item.get('content_type', 'unknown')})"
+                    )
+                    break
+
+        # If still not found, try to find by URL
+        if not document:
+            print(f"Document not found by ID: {document_id}, trying to find by URL...")
+            for item in all_items:
+                item_url = item.get("url", "")
+                if item_url == document_id:
+                    document = item
+                    print(
+                        f"Found item by URL: {item.get('url', 'No URL')} (type: {item.get('content_type', 'unknown')})"
+                    )
+                    break
+
         if not document:
             print(f"Document not found with ID: {document_id}")
-            raise HTTPException(status_code=404, detail="Document not found")
+            return {
+                "status": "error",
+                "summary": f"Document not found for summarization. ID: {document_id}. Please try refreshing the document list or use the Force Reload button.",
+            }
 
-        # Check if summary already exists in metadata
+        # Check if summary already exists in metadata (unless force refresh is requested)
         metadata = document.get("metadata", {})
         existing_summary = metadata.get("ai_summary")
 
-        if existing_summary:
-            print(f"Using cached summary for document: {document_id}")
+        if existing_summary and not input_data.force_refresh:
+            print(
+                f"📋 RETRIEVED cached AI summary for document: {document_id} (content_type: {document.get('content_type', 'unknown')})"
+            )
             return {
                 "status": "success",
                 "summary": existing_summary,
                 "document_id": input_data.document_id,
                 "cached": True,
             }
+
+        if input_data.force_refresh and existing_summary:
+            print(
+                f"🔄 FORCE REFRESH requested for document: {document_id} - regenerating AI summary"
+            )
+        elif input_data.force_refresh:
+            print(
+                f"🔄 FORCE REFRESH requested for document: {document_id} - no cached summary found, generating new one"
+            )
 
         # Handle different content types
         content_type = document.get("content_type", "document")
@@ -950,19 +1003,24 @@ async def summarize_document(input_data: SummarizeInput):
                     ]
 
                     if len(pdf_images) > 1:
-                        # Check if summary already exists in the first image's metadata
+                        # Check if summary already exists in the first image's metadata (unless force refresh is requested)
                         first_image_metadata = pdf_images[0].get("metadata", {})
                         existing_summary = first_image_metadata.get("ai_summary")
 
-                        if existing_summary:
+                        if existing_summary and not input_data.force_refresh:
                             print(
-                                f"Using cached summary for image stack: {pdf_filename}"
+                                f"📋 RETRIEVED cached AI summary for image stack: {pdf_filename}"
                             )
                             return {
                                 "status": "success",
                                 "summary": existing_summary,
                                 "cached": True,
                             }
+
+                        if input_data.force_refresh and existing_summary:
+                            print(
+                                f"🔄 FORCE REFRESH requested for image stack: {pdf_filename} - regenerating AI summary"
+                            )
 
                         # Create comprehensive summary for the image stack
                         summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
@@ -1005,15 +1063,18 @@ async def summarize_document(input_data: SummarizeInput):
                         try:
                             first_image_id = pdf_images[0].get("id")
                             if first_image_id:
+                                print(
+                                    f"💾 STORING new AI summary for image stack (PDF: {pdf_filename}, image_id: {first_image_id})"
+                                )
                                 image_vdb.update_image_metadata(
                                     first_image_id, {"ai_summary": summary_text}
                                 )
                                 print(
-                                    f"Stored AI summary in image stack metadata for PDF: {pdf_filename}"
+                                    f"✅ SUCCESSFULLY stored AI summary in image stack metadata for PDF: {pdf_filename}"
                                 )
                         except Exception as e:
                             print(
-                                f"Warning: Failed to store AI summary in image stack metadata: {e}"
+                                f"❌ FAILED to store AI summary in image stack metadata: {e}"
                             )
 
                         return {
@@ -1045,16 +1106,17 @@ async def summarize_document(input_data: SummarizeInput):
                 image_vdb = create_vector_database(
                     collection_name=image_collection_name
                 )
+                print(
+                    f"💾 STORING new AI summary for single image (image_id: {document_id})"
+                )
                 image_vdb.update_image_metadata(
                     document_id, {"ai_summary": summary_text}
                 )
                 print(
-                    f"Stored AI summary in single image metadata for document: {document_id}"
+                    f"✅ SUCCESSFULLY stored AI summary in single image metadata for document: {document_id}"
                 )
             except Exception as e:
-                print(
-                    f"Warning: Failed to store AI summary in single image metadata: {e}"
-                )
+                print(f"❌ FAILED to store AI summary in single image metadata: {e}")
 
             # Add additional metadata if available
             if metadata.get("file_size"):
@@ -1142,23 +1204,29 @@ async def summarize_document(input_data: SummarizeInput):
                         image_vdb = create_vector_database(
                             collection_name=image_collection_name
                         )
+                        print(
+                            f"💾 STORING new AI summary for image (image_id: {document_id})"
+                        )
                         image_vdb.update_image_metadata(
                             document_id, {"ai_summary": summary_text}
                         )
                         print(
-                            f"Stored AI summary in image metadata for document: {document_id}"
+                            f"✅ SUCCESSFULLY stored AI summary in image metadata for document: {document_id}"
                         )
                     else:
                         # For documents, update in document collection
                         ragme = get_ragme()
+                        print(
+                            f"💾 STORING new AI summary for document (document_id: {document_id})"
+                        )
                         ragme.update_document_metadata(
                             document_id, {"ai_summary": summary_text}
                         )
                         print(
-                            f"Stored AI summary in document metadata for document: {document_id}"
+                            f"✅ SUCCESSFULLY stored AI summary in document metadata for document: {document_id}"
                         )
                 except Exception as e:
-                    print(f"Warning: Failed to store AI summary in metadata: {e}")
+                    print(f"❌ FAILED to store AI summary in metadata: {e}")
                     # Continue without storing if there's an error
 
             except asyncio.TimeoutError:
@@ -1172,9 +1240,15 @@ async def summarize_document(input_data: SummarizeInput):
             "status": "success",
             "summary": summary_text,
             "document_id": input_data.document_id,
+            "cached": False,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        print(f"Error in summarize_document endpoint: {e}")
+        return {
+            "status": "error",
+            "summary": f"Error generating summary: {str(e)}. Please try again or use the Force Reload button.",
+            "document_id": input_data.document_id,
+        }
 
 
 @app.post("/upload-files")
@@ -2071,18 +2145,23 @@ try:
     # Socket event handlers
     @sio.event
     async def connect(sid, environ):
-        print(f"Client connected: {sid}")
+        print(f"🔌 SOCKET CONNECT: Client connected: {sid}")
+        print(f"🔌 SOCKET CONNECT: Environment: {environ}")
 
     @sio.event
     async def disconnect(sid):
-        print(f"Client disconnected: {sid}")
+        print(f"🔌 SOCKET DISCONNECT: Client disconnected: {sid}")
 
     @sio.event
     async def summarize_document(sid, data):
         """Handle document summarization requests from frontend."""
+        print(f"🔌 SOCKET EVENT: summarize_document called with data: {data}")
         try:
             document_id = data.get("documentId")
-            print(f"Received document_id: {document_id}, type: {type(document_id)}")
+            force_refresh = data.get("forceRefresh", False)
+            print(
+                f"Received document_id: {document_id}, type: {type(document_id)}, force_refresh: {force_refresh}"
+            )
             if not document_id:
                 await sio.emit(
                     "document_summarized",
@@ -2122,6 +2201,30 @@ try:
                         ]
 
                         if pdf_images:
+                            # Check if summary already exists in the first image's metadata (unless force refresh is requested)
+                            first_image_metadata = pdf_images[0].get("metadata", {})
+                            existing_summary = first_image_metadata.get("ai_summary")
+
+                            if existing_summary and not force_refresh:
+                                print(
+                                    f"📋 RETRIEVED cached AI summary for image stack: {pdf_filename}"
+                                )
+                                await sio.emit(
+                                    "document_summarized",
+                                    {
+                                        "success": True,
+                                        "summary": existing_summary,
+                                        "cached": True,
+                                    },
+                                    room=sid,
+                                )
+                                return
+
+                            if force_refresh and existing_summary:
+                                print(
+                                    f"🔄 FORCE REFRESH requested for image stack: {pdf_filename} - regenerating AI summary"
+                                )
+
                             # Create comprehensive summary for the image stack
                             summary_text = f"This is an image stack containing {len(pdf_images)} images extracted from the PDF document '{pdf_filename}'.\n\n"
 
@@ -2160,6 +2263,24 @@ try:
 
                             if pdf_images[0].get("metadata", {}).get("date_added"):
                                 summary_text += f"\n**Extracted:** {pdf_images[0]['metadata']['date_added']}"
+
+                            # Store the generated summary in the first image's metadata
+                            try:
+                                first_image_id = pdf_images[0].get("id")
+                                if first_image_id:
+                                    print(
+                                        f"💾 STORING new AI summary for image stack (PDF: {pdf_filename}, image_id: {first_image_id})"
+                                    )
+                                    image_vdb.update_image_metadata(
+                                        first_image_id, {"ai_summary": summary_text}
+                                    )
+                                    print(
+                                        f"✅ SUCCESSFULLY stored AI summary in image stack metadata for PDF: {pdf_filename}"
+                                    )
+                            except Exception as e:
+                                print(
+                                    f"❌ FAILED to store AI summary in image stack metadata: {e}"
+                                )
 
                             await sio.emit(
                                 "document_summarized",
@@ -2264,14 +2385,49 @@ try:
             content_type = document.get("content_type", "document")
 
             if content_type == "image":
-                # For images, create a summary based on metadata and classification
+                # Check if summary already exists in metadata (unless force refresh is requested)
                 metadata = document.get("metadata", {})
+                existing_summary = metadata.get("ai_summary")
+
+                if existing_summary and not force_refresh:
+                    print(
+                        f"📋 RETRIEVED cached AI summary for single image: {document_id}"
+                    )
+                    await sio.emit(
+                        "document_summarized",
+                        {"success": True, "summary": existing_summary, "cached": True},
+                        room=sid,
+                    )
+                    return
+
+                if force_refresh and existing_summary:
+                    print(
+                        f"🔄 FORCE REFRESH requested for single image: {document_id} - regenerating AI summary"
+                    )
+
+                # For images, create a summary based on metadata and classification
                 classification = metadata.get("classification", {})
                 top_prediction = classification.get("top_prediction", {})
                 confidence = top_prediction.get("confidence", 0)
                 label = top_prediction.get("label", "Unknown")
 
                 summary = f"Image Analysis:\n- Filename: {metadata.get('filename', 'Unknown')}\n- File Size: {metadata.get('file_size', 'Unknown')} bytes\n- Classification: {label} (confidence: {confidence:.2%})\n- Date Added: {metadata.get('date_added', 'Unknown')}"
+
+                # Store the generated summary in the image metadata
+                try:
+                    print(
+                        f"💾 STORING new AI summary for single image (image_id: {document_id})"
+                    )
+                    image_vdb.update_image_metadata(
+                        document_id, {"ai_summary": summary}
+                    )
+                    print(
+                        f"✅ SUCCESSFULLY stored AI summary in single image metadata for document: {document_id}"
+                    )
+                except Exception as e:
+                    print(
+                        f"❌ FAILED to store AI summary in single image metadata: {e}"
+                    )
 
                 await sio.emit(
                     "document_summarized",
@@ -2284,7 +2440,9 @@ try:
                     # Call the existing summarize_document endpoint
                     from .api import SummarizeInput
 
-                    input_data = SummarizeInput(document_id=document_id)
+                    input_data = SummarizeInput(
+                        document_id=document_id, force_refresh=force_refresh
+                    )
                     result = await summarize_document(input_data)
 
                     await sio.emit(
@@ -2614,12 +2772,6 @@ async def download_file(document_id: str):
     try:
         # First try to get from text collection
         documents = get_ragme().list_documents(limit=1000, offset=0)
-        print(f"Looking for document with ID: {document_id}")
-        print(f"Number of documents: {len(documents)}")
-
-        # Debug: print all document IDs to see what's available
-        doc_ids = [doc.get("id") for doc in documents]
-        print(f"Available document IDs: {doc_ids}")
 
         document = next(
             (doc for doc in documents if str(doc.get("id")) == document_id), None

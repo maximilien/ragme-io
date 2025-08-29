@@ -108,7 +108,7 @@ start_core_services() {
 
     # Start local_agent.py
     echo "Starting local_agent.py..."
-    uv run python -m src.ragme.agents.local_agent > logs/agent.log 2>&1 &
+    uv run python -m src.ragme.agents.run_local_agent > logs/agent.log 2>&1 &
     echo $! >> .pid
     sleep 3
 }

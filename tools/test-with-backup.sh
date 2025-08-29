@@ -94,8 +94,9 @@ setup_test_environment() {
     if [ -f "tests/integration/config_manager.py" ]; then
         print_status "Using existing config manager for test setup..."
         
-        # Run the setup using Python
-        python3 -c "
+        # Run the setup using Python from virtual environment
+        source .venv/bin/activate
+        python -c "
 import sys
 sys.path.append('tests/integration')
 from config_manager import setup_test_config
@@ -128,23 +129,40 @@ restore_environment() {
     if [ -f "tests/integration/config_manager.py" ]; then
         print_status "Using existing config manager for restoration..."
         
-        # Run the teardown using Python
-        python3 -c "
+        # Run the teardown using Python with better error handling
+        source .venv/bin/activate
+        python -c "
 import sys
 sys.path.append('tests/integration')
-from config_manager import teardown_test_config
-if teardown_test_config():
-    print('✅ Test configuration teardown successful')
-    exit(0)
-else:
-    print('❌ Test configuration teardown failed')
+try:
+    from config_manager import teardown_test_config
+    if teardown_test_config():
+        print('✅ Test configuration teardown successful')
+        exit(0)
+    else:
+        print('❌ Test configuration teardown failed')
+        exit(1)
+except Exception as e:
+    print(f'❌ Error during teardown: {e}')
     exit(1)
 "
         
-        if [ $? -eq 0 ]; then
+        teardown_exit_code=$?
+        if [ $teardown_exit_code -eq 0 ]; then
             print_status "✅ Environment restoration completed"
         else
-            print_warning "⚠️ Environment restoration had issues, manual check may be needed"
+            print_warning "⚠️ Environment restoration had issues, attempting manual fallback..."
+            
+            # Manual restoration as fallback
+            if [ -f "$ENV_BACKUP" ]; then
+                cp "$ENV_BACKUP" .env
+                print_status "✅ Restored .env from backup"
+            fi
+            
+            if [ -f "$CONFIG_BACKUP" ]; then
+                cp "$CONFIG_BACKUP" config.yaml
+                print_status "✅ Restored config.yaml from backup"
+            fi
         fi
     else
         print_error "❌ config_manager.py not found, attempting manual restoration..."

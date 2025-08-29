@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       // Get the current active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
+
       if (!tab) {
         throw new Error('No active tab found');
       }
@@ -42,4 +42,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   captureButton.addEventListener('click', captureCurrentPage);
-}); 
+});

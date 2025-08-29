@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ New Features (Latest Release)
 
+- **🔄 AI Summary Force Refresh**: Added force refresh button next to AI Summary titles allowing users to regenerate summaries on demand. Features include proper HTTP request handling, UI state management, and visual feedback during regeneration. Bypasses cached summaries to generate fresh content! ⭐ **NEW!**
 - **🧠 AI Summary Caching**: Intelligent caching system that stores AI-generated summaries in document metadata to prevent redundant generation. Features include automatic cache checking, visual "Cached Summary" indicators, and seamless integration with both document and image collections! ⭐ **NEW!**
 - **⏳ Frontend Progress Indicator**: Added a spinning wheel progress indicator next to the "Add Content" button that shows during document and image processing. Provides visual feedback for upload, text extraction, AI analysis, and OCR stages. The "Add Content" button is disabled during processing with automatic timeout protection! ⭐ **NEW!**
 - **🖼️ PDF Image Extraction Bug Fixes**: Fixed three critical bugs with PDF image extraction: missing date/time information, storage integration issues, and "Unknown Image" display in AI summaries. Extracted images now have proper metadata, are stored correctly, and show meaningful filenames! ⭐ **FIXED!**
