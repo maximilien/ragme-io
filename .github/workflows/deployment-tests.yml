@@ -1,0 +1,224 @@
+name: Deployment Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'deployment/**'
+      - 'src/**'
+      - 'frontend/**'
+      - 'requirements.txt'
+      - 'config.yaml.example'
+      - '.github/workflows/deployment-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'deployment/**'
+      - 'src/**'
+      - 'frontend/**'
+      - 'requirements.txt'
+      - 'config.yaml.example'
+
+env:
+  REGISTRY: localhost:5001
+  CLUSTER_NAME: ragme-ci-cluster
+
+jobs:
+  deployment-unit-tests:
+    name: Deployment Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        
+    - name: Install Python dependencies
+      run: |
+        uv pip install --system -r requirements.txt
+        uv pip install --system -r requirements-test.txt
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install Go dependencies
+      working-directory: deployment/operator
+      run: |
+        go mod download
+        go mod verify
+        
+    - name: Run deployment unit tests
+      run: ./test.sh deployment-unit
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: deployment-unit-test-results
+        path: |
+          deployment/tests/unit/test-results.xml
+          deployment/operator/cover.out
+
+  deployment-integration-tests:
+    name: Deployment Integration Tests
+    runs-on: ubuntu-latest
+    needs: deployment-unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        
+    - name: Install Python dependencies
+      run: |
+        uv pip install --system -r requirements.txt
+        uv pip install --system -r requirements-test.txt
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+        
+    - name: Install Kind
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+        
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        
+    - name: Create .env file
+      run: |
+        cp env.example .env
+        echo "OPENAI_API_KEY=fake-key-for-testing" >> .env
+        
+    - name: Run deployment integration tests
+      run: ./test.sh deployment-integration
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: deployment-integration-test-results
+        path: |
+          deployment/tests/integration/test-results.xml
+          
+    - name: Cleanup
+      if: always()
+      run: |
+        kind delete cluster --name $CLUSTER_NAME || true
+        podman system prune -af || true
+
+  container-build-test:
+    name: Container Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+        
+    - name: Create .env file
+      run: |
+        cp env.example .env
+        echo "OPENAI_API_KEY=fake-key-for-testing" >> .env
+        
+    - name: Test container builds
+      run: |
+        chmod +x deployment/scripts/build-containers.sh
+        cd deployment/scripts
+        ./build-containers.sh
+        
+    - name: Verify built images
+      run: |
+        podman images | grep ragme-api
+        podman images | grep ragme-mcp
+        podman images | grep ragme-agent
+        podman images | grep ragme-frontend
+        
+    - name: Test image functionality (basic checks)
+      run: |
+        # Test that containers can start (dry run)
+        podman run --rm ragme-api:latest python --version
+        podman run --rm ragme-frontend:latest node --version
+
+  operator-tests:
+    name: Operator Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install dependencies
+      working-directory: deployment/operator
+      run: |
+        go mod download
+        go mod verify
+        
+    - name: Run Go fmt
+      working-directory: deployment/operator
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Go files are not formatted. Please run 'go fmt ./...'"
+          gofmt -s -l .
+          exit 1
+        fi
+        
+    - name: Run Go vet
+      working-directory: deployment/operator
+      run: go vet ./...
+      
+    - name: Run Go tests
+      working-directory: deployment/operator
+      run: go test -v ./... -coverprofile=coverage.out
+      
+    - name: Upload coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: operator-coverage
+        path: deployment/operator/coverage.out
+        
+    - name: Build operator binary
+      working-directory: deployment/operator
+      run: |
+        make build
+        ./bin/manager --help

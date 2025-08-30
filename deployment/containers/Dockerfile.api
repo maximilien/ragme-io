@@ -1,0 +1,53 @@
+# RAGme API Service Dockerfile
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libmagic1 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for dependency management
+RUN pip install uv
+
+# Copy dependency files
+COPY requirements.txt .
+COPY pyproject.toml .
+
+# Install Python dependencies
+RUN uv pip install --system -r requirements.txt
+
+# Copy source code
+COPY src/ src/
+COPY config.yaml.example config.yaml
+
+# Create necessary directories
+RUN mkdir -p logs watch_directory minio_data
+
+# Expose API port
+EXPOSE 8021
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8021/health || exit 1
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV RAGME_API_PORT=8021
+
+# Start API service
+CMD ["uvicorn", "src.ragme.apis.api:app", "--host", "0.0.0.0", "--port", "8021"]

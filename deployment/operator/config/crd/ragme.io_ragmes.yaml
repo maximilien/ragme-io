@@ -1,0 +1,213 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ragmes.ragme.io
+spec:
+  group: ragme.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              version:
+                type: string
+                description: RAGme version to deploy
+              images:
+                type: object
+                properties:
+                  registry:
+                    type: string
+                    description: Container registry URL
+                  repository:
+                    type: string
+                    description: Repository name
+                  tag:
+                    type: string
+                    description: Image tag
+                  pullPolicy:
+                    type: string
+                    description: Image pull policy
+              replicas:
+                type: object
+                properties:
+                  api:
+                    type: integer
+                    minimum: 1
+                    description: Number of API replicas
+                  mcp:
+                    type: integer
+                    minimum: 1
+                    description: Number of MCP replicas
+                  agent:
+                    type: integer
+                    minimum: 1
+                    maximum: 1
+                    description: Number of Agent replicas (must be 1)
+                  frontend:
+                    type: integer
+                    minimum: 1
+                    description: Number of Frontend replicas
+              storage:
+                type: object
+                properties:
+                  minio:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        description: Enable MinIO storage
+                      storageSize:
+                        type: string
+                        description: MinIO storage size
+                      accessKey:
+                        type: string
+                        description: MinIO access key
+                      secretKey:
+                        type: string
+                        description: MinIO secret key
+                  sharedVolume:
+                    type: object
+                    properties:
+                      size:
+                        type: string
+                        description: Shared volume size
+                      storageClass:
+                        type: string
+                        description: Storage class for shared volume
+              vectorDB:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: ["weaviate", "milvus"]
+                    description: Vector database type
+                  weaviate:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        description: Enable Weaviate
+                      storageSize:
+                        type: string
+                        description: Weaviate storage size
+                  milvus:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        description: Enable Milvus
+                      uri:
+                        type: string
+                        description: Milvus URI
+                      token:
+                        type: string
+                        description: Milvus token
+              externalAccess:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: ["NodePort", "LoadBalancer", "Ingress"]
+                    description: External access type
+                  ingress:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        description: Enable ingress
+                      host:
+                        type: string
+                        description: Ingress host
+                      tlsEnabled:
+                        type: boolean
+                        description: Enable TLS
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: Current deployment phase
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+              services:
+                type: object
+                properties:
+                  api:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      replicas:
+                        type: integer
+                      url:
+                        type: string
+                  mcp:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      replicas:
+                        type: integer
+                      url:
+                        type: string
+                  agent:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      replicas:
+                        type: integer
+                  frontend:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      replicas:
+                        type: integer
+                      url:
+                        type: string
+                  minio:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      replicas:
+                        type: integer
+                      url:
+                        type: string
+                  weaviate:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+                      replicas:
+                        type: integer
+                      url:
+                        type: string
+  scope: Namespaced
+  names:
+    plural: ragmes
+    singular: ragme
+    kind: RAGme
+    shortNames:
+    - rm

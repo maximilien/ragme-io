@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragme-frontend
+  namespace: ragme
+  labels:
+    app: ragme
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ragme
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: ragme
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: ragme-frontend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8020
+          name: http
+        env:
+        - name: RAGME_FRONTEND_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_FRONTEND_PORT
+        - name: RAGME_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_API_URL
+        - name: NODE_ENV
+          value: "production"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8020
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8020
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-frontend
+  namespace: ragme
+  labels:
+    app: ragme
+    component: frontend
+spec:
+  selector:
+    app: ragme
+    component: frontend
+  ports:
+  - name: http
+    port: 8020
+    targetPort: 8020
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-frontend-nodeport
+  namespace: ragme
+  labels:
+    app: ragme
+    component: frontend
+spec:
+  selector:
+    app: ragme
+    component: frontend
+  ports:
+  - name: http
+    port: 8020
+    targetPort: 8020
+    nodePort: 30020
+  type: NodePort
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ragme-frontend-ingress
+  namespace: ragme
+  labels:
+    app: ragme
+    component: frontend
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: ragme.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ragme-frontend
+            port:
+              number: 8020

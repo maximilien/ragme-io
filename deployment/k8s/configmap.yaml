@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ragme-config
+  namespace: ragme
+  labels:
+    app: ragme
+data:
+  # RAGme Configuration
+  RAGME_API_PORT: "8021"
+  RAGME_MCP_PORT: "8022"
+  RAGME_FRONTEND_PORT: "8020"
+  
+  # Service URLs (internal cluster communication)
+  RAGME_API_URL: "http://ragme-api:8021"
+  RAGME_MCP_URL: "http://ragme-mcp:8022"
+  
+  # Vector Database Configuration
+  VECTOR_DB_TYPE: "milvus"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-docs"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-docs"
+  
+  # MinIO Configuration
+  MINIO_ENDPOINT: "ragme-minio:9000"
+  
+  # Application Configuration
+  APPLICATION_NAME: "RAGme Kubernetes"
+  APPLICATION_VERSION: "1.0.0"
+  APPLICATION_TITLE: "RAGme AI Assistant"
+  APPLICATION_DESCRIPTION: "AI-powered document and image processing assistant"
+  
+  # Watch Directory
+  WATCH_DIRECTORY: "/app/watch_directory"
+  MINIO_LOCAL_PATH: "/app/minio_data"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ragme-secrets
+  namespace: ragme
+  labels:
+    app: ragme
+type: Opaque
+stringData:
+  # Required secrets - update these values
+  OPENAI_API_KEY: "your-openai-api-key-here"
+  
+  # Optional secrets for external services
+  WEAVIATE_API_KEY: "your-weaviate-api-key"
+  WEAVIATE_URL: "your-weaviate-url"
+  MILVUS_URI: "your-milvus-uri"
+  MILVUS_TOKEN: "your-milvus-token"
+  
+  # MinIO credentials
+  MINIO_ACCESS_KEY: "minioadmin"
+  MINIO_SECRET_KEY: "minioadmin"
+  
+  # S3 credentials (if using S3 instead of MinIO)
+  S3_ENDPOINT: "your-s3-endpoint"
+  S3_ACCESS_KEY: "your-s3-access-key"
+  S3_SECRET_KEY: "your-s3-secret-key"
+  S3_BUCKET_NAME: "your-s3-bucket"
+  S3_REGION: "us-east-1"

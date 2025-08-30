@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragme-api
+  namespace: ragme
+  labels:
+    app: ragme
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ragme
+      component: api
+  template:
+    metadata:
+      labels:
+        app: ragme
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: ragme-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8021
+          name: http
+        env:
+        - name: RAGME_API_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_API_PORT
+        - name: RAGME_MCP_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_MCP_URL
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: OPENAI_API_KEY
+        - name: VECTOR_DB_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_TYPE
+        - name: VECTOR_DB_TEXT_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_TEXT_COLLECTION_NAME
+        - name: VECTOR_DB_IMAGE_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_IMAGE_COLLECTION_NAME
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: MINIO_ENDPOINT
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: MINIO_SECRET_KEY
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: watch-directory
+          mountPath: /app/watch_directory
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8021
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8021
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: watch-directory
+        persistentVolumeClaim:
+          claimName: ragme-shared-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-api
+  namespace: ragme
+  labels:
+    app: ragme
+    component: api
+spec:
+  selector:
+    app: ragme
+    component: api
+  ports:
+  - name: http
+    port: 8021
+    targetPort: 8021
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-api-nodeport
+  namespace: ragme
+  labels:
+    app: ragme
+    component: api
+spec:
+  selector:
+    app: ragme
+    component: api
+  ports:
+  - name: http
+    port: 8021
+    targetPort: 8021
+    nodePort: 30021
+  type: NodePort
