@@ -1,6 +1,45 @@
-# Troubleshooting Guide
+# 🔧 RAGme Troubleshooting Guide
 
-This guide covers common issues and their solutions for RAGme AI.
+This comprehensive troubleshooting guide covers common issues, their solutions, and debugging techniques for RAGme.
+
+## 🚨 Common Issues
+
+### Environment Variable Configuration Not Taking Effect
+
+**Problem**: Changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) doesn't take effect after restart.
+
+**Symptoms**:
+- Application still shows old name/title after switching `.env` files
+- Still connecting to old vector database collection
+- Environment changes appear ignored
+
+**Solution**: ✅ **FIXED!** This was a critical bug that has been resolved. The system now properly reads and applies all environment variable changes:
+
+1. **Verify configuration loading**:
+   ```bash
+   ./tools/config-validator.sh
+   ```
+
+2. **Check environment variables are loaded**:
+   ```bash
+   python3 -c "
+   from src.ragme.utils.config_manager import config
+   print(f'App name: {config.get(\"application.name\")}')
+   print(f'DB type: {config.get(\"vector_databases.default\")}')
+   "
+   ```
+
+3. **Proper environment switching**:
+   ```bash
+   ./stop.sh
+   cp .env.app.viewfinder-ai .env  # or your desired environment
+   ./start.sh
+   ```
+
+**What was fixed**:
+- Environment variable syntax in config.yaml (changed from `{$VAR}` to `${VAR}`)
+- Dynamic VECTOR_DB_TYPE selection and mapping
+- Proper configuration loading and substitution
 
 ## 🚨 Common Issues
 
@@ -97,7 +136,354 @@ This tool provides detailed information about:
 Cannot connect to http://localhost:8020
 ```
 
+**Solutions**:
+1. **Check if frontend service is running**:
+   ```bash
+   ./stop.sh status
+   ```
+
+2. **Restart frontend service**:
+   ```bash
+   ./start.sh restart-frontend
+   ```
+
+3. **Compile frontend after configuration changes**:
+   ```bash
+   ./start.sh compile-frontend
+   ```
+
+4. **Check port conflicts**:
+   ```bash
+   lsof -i :8020
+   ```
+
 **Note**: The frontend port can be customized using the `RAGME_FRONTEND_PORT` environment variable.
+
+### Service Startup Issues
+
+**Problem**: Services fail to start or crash immediately.
+
+**Solutions**:
+1. **Check service logs**:
+   ```bash
+   ./tools/tail-logs.sh all
+   ```
+
+2. **Check port availability**:
+   ```bash
+   lsof -i :8020  # Frontend
+   lsof -i :8021  # API
+   lsof -i :8022  # MCP
+   lsof -i :9000  # MinIO
+   ```
+
+3. **Kill conflicting processes**:
+   ```bash
+   kill -9 <PID>
+   ```
+
+4. **Restart all services**:
+   ```bash
+   ./stop.sh
+   ./start.sh
+   ```
+
+### Storage Service Issues
+
+**Problem**: MinIO or S3 storage service problems.
+
+**Symptoms**:
+- File upload failures
+- Storage connection errors
+- Missing files in storage
+
+**Solutions**:
+1. **Check MinIO health**:
+   ```bash
+   ./tools/storage.sh health
+   ```
+
+2. **Restart MinIO service**:
+   ```bash
+   ./stop.sh minio
+   ./start.sh minio
+   ```
+
+3. **Check MinIO console**: http://localhost:9001
+   - Default credentials: minioadmin / minioadmin
+
+4. **Verify bucket exists**:
+   ```bash
+   ./tools/storage.sh buckets
+   ```
+
+5. **List stored files**:
+   ```bash
+   ./tools/storage.sh list
+   ```
+
+### Document Processing Issues
+
+**Problem**: Documents not being processed or indexed correctly.
+
+**Solutions**:
+1. **Check document processing logs**:
+   ```bash
+   ./tools/tail-logs.sh api
+   ```
+
+2. **Verify vector database health**:
+   ```bash
+   ./tools/vdb.sh health
+   ```
+
+3. **Check document collection**:
+   ```bash
+   ./tools/vdb.sh virtual-structure
+   ```
+
+4. **Test document upload**:
+   ```bash
+   curl -X POST http://localhost:8021/upload-documents \
+     -F "file=@test.pdf"
+   ```
+
+### Image Processing Issues
+
+**Problem**: Images not being processed or AI classification failing.
+
+**Solutions**:
+1. **Check image processing dependencies**:
+   ```bash
+   pip list | grep -E "(torch|easyocr|opencv)"
+   ```
+
+2. **Install missing dependencies**:
+   ```bash
+   pip install ragme-ai[ml]
+   ```
+
+3. **Check image collection**:
+   ```bash
+   ./tools/vdb.sh image-groups
+   ```
+
+4. **Verify image upload endpoint**:
+   ```bash
+   curl -X POST http://localhost:8021/upload-images \
+     -F "file=@test.jpg"
+   ```
+
+### PDF Image Extraction Issues
+
+**Problem**: Images not being extracted from PDFs.
+
+**Solutions**:
+1. **Check PyMuPDF installation**:
+   ```bash
+   pip list | grep pymupdf
+   ```
+
+2. **Verify PDF processing logs**:
+   ```bash
+   ./tools/tail-logs.sh api | grep -i pdf
+   ```
+
+3. **Check extraction configuration**:
+   ```bash
+   python3 -c "
+   from src.ragme.utils.config_manager import config
+   print(config.get('pdf_image_extraction'))
+   "
+   ```
+
+### Performance Issues
+
+**Problem**: Slow query responses or poor search results.
+
+**Solutions**:
+1. **Optimize query threshold**:
+   ```bash
+   ./tools/optimize.sh query-threshold
+   ```
+
+2. **Check vector database performance**:
+   ```bash
+   ./tools/vdb.sh health
+   ```
+
+3. **Monitor system resources**:
+   ```bash
+   top
+   htop
+   ```
+
+4. **Check document chunking**:
+   ```bash
+   ./tools/vdb.sh document-groups
+   ```
+
+### Configuration Issues
+
+**Problem**: Configuration not being applied correctly.
+
+**Solutions**:
+1. **Validate configuration**:
+   ```bash
+   ./tools/config-validator.sh
+   ```
+
+2. **Check configuration loading**:
+   ```bash
+   python3 -c "
+   from src.ragme.utils.config_manager import config
+   print('Configuration loaded successfully')
+   print(f'App name: {config.get(\"application.name\")}')
+   "
+   ```
+
+3. **Verify environment variables**:
+   ```bash
+   env | grep RAGME
+   env | grep VECTOR_DB
+   ```
+
+## 🔍 Debugging Techniques
+
+### Log Analysis
+
+**Monitor all service logs**:
+```bash
+./tools/tail-logs.sh all
+```
+
+**Monitor specific service**:
+```bash
+./tools/tail-logs.sh api        # API logs
+./tools/tail-logs.sh mcp        # MCP logs
+./tools/tail-logs.sh frontend   # Frontend logs
+./tools/tail-logs.sh minio      # MinIO logs
+```
+
+**Enable debug logging**:
+```bash
+export RAGME_DEBUG=true
+./start.sh
+```
+
+### Health Checks
+
+**System health check**:
+```bash
+# Check all services
+./stop.sh status
+
+# Check vector database
+./tools/vdb.sh health
+
+# Check storage
+./tools/storage.sh health
+
+# Check configuration
+./tools/config-validator.sh
+```
+
+### Performance Monitoring
+
+**Query performance**:
+```bash
+# Optimize query threshold
+./tools/optimize.sh query-threshold
+
+# Monitor query performance
+./tools/vdb.sh virtual-structure
+```
+
+**System performance**:
+```bash
+# Monitor CPU and memory
+top
+htop
+
+# Monitor disk usage
+df -h
+du -sh minio_data/
+```
+
+## 🛠️ Recovery Procedures
+
+### Complete System Reset
+
+**Reset all data and configuration**:
+```bash
+# Stop all services
+./stop.sh
+
+# Clear data directories
+rm -rf minio_data/
+rm -rf watch_directory/*
+rm -f milvus_demo.db
+
+# Reset configuration
+cp env.example .env
+cp config.yaml.example config.yaml
+
+# Restart services
+./start.sh
+```
+
+### Vector Database Reset
+
+**Reset vector database data**:
+```bash
+# For Milvus
+rm -f milvus_demo.db
+
+# For Weaviate Local
+./tools/weaviate-local.sh reset
+
+# For Weaviate Cloud
+# Delete and recreate collection via Weaviate Console
+```
+
+### Storage Reset
+
+**Reset storage data**:
+```bash
+# Clear MinIO data
+rm -rf minio_data/
+
+# Restart MinIO
+./stop.sh minio
+./start.sh minio
+```
+
+## 📞 Getting Help
+
+### Before Asking for Help
+
+1. **Check this troubleshooting guide**
+2. **Review recent logs**: `./tools/tail-logs.sh all`
+3. **Run health checks**: `./tools/vdb.sh health && ./tools/storage.sh health`
+4. **Verify configuration**: `./tools/config-validator.sh`
+
+### Support Channels
+
+- **GitHub Issues**: [Create an issue](https://github.com/maximilien/ragme-io/issues)
+- **GitHub Discussions**: [Join discussions](https://github.com/maximilien/ragme-io/discussions)
+- **Documentation**: [docs/](docs/) directory
+
+### Information to Include
+
+When reporting issues, please include:
+
+1. **RAGme version**: Check `config.yaml` or git commit
+2. **Operating system**: `uname -a`
+3. **Python version**: `python3 --version`
+4. **Vector database type**: `echo $VECTOR_DB_TYPE`
+5. **Error logs**: Output from `./tools/tail-logs.sh all`
+6. **Configuration**: Relevant parts of `config.yaml` (remove sensitive data)
+7. **Steps to reproduce**: Detailed steps to reproduce the issue
 
 **Solution**:
 1. **Check if frontend is running**:

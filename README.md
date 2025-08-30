@@ -23,7 +23,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ## 🆕 Latest Updates
 
-### ✨ New Features (Latest Release)
+### ✨ Recent Features (Last 2 Weeks)
 
 - **🔄 AI Summary Force Refresh**: Added force refresh button next to AI Summary titles allowing users to regenerate summaries on demand. Features include proper HTTP request handling, UI state management, and visual feedback during regeneration. Bypasses cached summaries to generate fresh content! ⭐ **NEW!**
 - **🧠 AI Summary Caching**: Intelligent caching system that stores AI-generated summaries in document metadata to prevent redundant generation. Features include automatic cache checking, visual "Cached Summary" indicators, and seamless integration with both document and image collections! ⭐ **NEW!**
@@ -32,49 +32,19 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection. Tests multiple query scenarios and automatically updates `config.yaml` with the best performing threshold! ⭐ **NEW!**
 - **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**
 - **📄 Robust PDF Processing**: Enhanced PDF processing with multiple library fallbacks (PyMuPDF, pdfplumber, PyPDF2) to handle corrupted PDFs and "EOF marker not found" errors. Automatic PDF repair and graceful error handling! ⭐ **NEW!**
-- **🖼️ PDF Image Extraction**: Automatically extract and process images from PDF documents using PyMuPDF. Extracted images are processed with AI classification, OCR text extraction, and stored in the image collection with rich metadata including page numbers and PDF source information! ⭐ **NEW!**
-- **📚 Image Stacking in Document List**: Group extracted images from the same PDF into a single stack item for better user experience. Features include stack badges showing image count, dropdown selection for individual images, and dynamic content updates for all sections (OCR text, AI summary, metadata). Perfect for PDFs with many images! ⭐ **NEW!**
-- **🎨 UI Height and Notification Fixes**: Fixed pagination container height and corrected notification system for better user experience. Load More button now shows proper loading messages! ⭐ **FIXED!**
-- **⚙️ Enhanced Settings UI**: Complete redesign of the Settings modal with organized tabbed interface (General, Interface, Documents, Chat) featuring all configurable options from config.yaml, improved spacing, and proper vector database display ⭐ **NEW!**
-- **🎤 Voice-to-Text Input**: Microphone button for voice input using browser's Web Speech API. Click the microphone button to speak your queries instead of typing! ⭐ **NEW!**
-- **🖼️ AI-Powered Image Support**: Complete image processing pipeline with PyTorch ResNet50 classification, EXIF metadata extraction, and intelligent agent tools. Upload images via drag-and-drop interface and query them using natural language! ⭐ **NEW!**
-- **💾 S3-Compatible File Storage**: MinIO-based storage service for document and image persistence with support for multiple storage backends (MinIO, S3, Local). Automatic bucket management, presigned URLs, and comprehensive file operations! ⭐ **NEW!**
-- **🎯 Enhanced AI Image Summaries**: Fixed image summary generation to show rich classification data with confidence scores and file information. Images now display meaningful summaries like "Yorkshire terrier with 95.1% confidence" ⭐ **FIXED!**
-- **🧹 Clean PyTorch Codebase**: Removed all TensorFlow dependencies and updated to PyTorch-only implementation with proper dependency management ⭐ **CLEANED!**
-- **🔧 Enhanced VDB Management**: Improved `vdb.sh` tool with virtual structure commands (`virtual-structure`, `document-groups`, `image-groups`) and comprehensive document deletion (`delete-document`) that removes all chunks and extracted images ⭐ **ENHANCED!**
-- **🔄 Environment Switching Fix**: Fixed critical bug where changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) wasn't taking effect after restart. Now seamlessly switch between different application environments (e.g., RAGme ↔ Viewfinder.ai) ⭐ **FIXED!**
-- **🤖 Three-Agent Architecture**: Sophisticated agent system with intelligent query routing and specialized processing ⭐ **NEW!**
-- **🎛️ Comprehensive Configuration System**: Complete `config.yaml` based configuration for easy client customization and deployment
-- **🔐 MCP Servers Integration & Authentication**: Complete MCP server management with authentication flow and security controls
-- **🔧 MCP Server Tools**: Configure and enable/disable MCP tool servers with a convenient toolbox button
-- **💡 Recent Prompts & Ideas**: Quick access to sample prompts and recent chat history with a convenient popup button
-- **🧪 Enhanced Testing Framework**: Comprehensive test suite with subcommands for unit, API, MCP, and integration tests
-- **🧹 Smart Test Cleanup**: Integration tests now properly clean up test documents from vector database
-- **🖼️ Image Collection Testing**: Complete integration test coverage for image collections including listing, adding, checking, and deleting images
-- **💾 Save Chat Responses**: Save individual AI responses as markdown files with smart filename generation
-- **📧 Email Chat Responses**: Send AI responses via email with pre-filled subject and content
-- **📄 Smart Document Chunking**: Large documents are automatically split into manageable chunks while preserving readability
-- **🎯 Enhanced Document Management**: Grouped document display with chunk counts and improved deletion functionality
-- **📊 Interactive Visualizations**: D3.js-powered charts with click-to-scroll functionality and responsive resizing
-- **🔄 Real-time Refresh**: Improved document list and visualization synchronization
-- **🗑️ Bulk Document Operations**: Delete entire chunked documents with a single click
-- **🔍 Pattern-Based Document Deletion**: Delete documents matching regex patterns
-- **📱 Responsive Design**: Better mobile and desktop experience with collapsible sidebars
-- **🔗 Enhanced URL-Based Document Deletion**: Improved document deletion by URL with support for various formats (full URLs, filenames, file:// URLs), confirmation prompts for destructive operations, and proper error handling
-- **⚠️ Destructive Operation Confirmation**: All destructive operations (delete document, delete collection, etc.) now require user confirmation before execution to prevent accidental data loss
+
+> **📚 For complete feature history and detailed documentation, see the [docs/](docs/) directory.**
 
 ## 📚 Documentation
 
 📖 **Complete documentation is available in the [docs/](docs/) directory:**
 
-- **[📋 Project Overview](docs/PRESENTATION.md)** - Complete project overview with examples
-- **[🎛️ Configuration Guide](docs/CONFIG.md)** - Comprehensive configuration system for client customization ⭐ **NEW!**
-- **[🤖 Agent Architecture](docs/AGENT_REFACTOR.md)** - Three-agent architecture design and implementation ⭐ **NEW!**
-- **[💾 Storage Service](docs/STORAGE_SERVICE.md)** - S3-compatible file storage service with MinIO ⭐ **NEW!**
-- **[🔧 Vector Database Abstraction](docs/VECTOR_DB_ABSTRACTION.md)** - Guide to the vector database agnostic architecture  
-- **[🎯 Optimization Tools](docs/OPTIMIZER.md)** - Query threshold optimization and performance tuning ⭐ **NEW!**
-- **[🤝 Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute to the project
-- **[📖 Documentation Index](docs/README.md)** - Full documentation structure
+- **[📖 User Guide](docs/USER_GUIDE.md)** - Complete user guide with installation, configuration, and usage
+- **[🎛️ Configuration Reference](docs/CONFIGURATION.md)** - Detailed configuration options and examples
+- **[🏗️ Architecture Guide](docs/ARCHITECTURE.md)** - System architecture, three-agent system, and technical design
+- **[🛠️ Development Guide](docs/DEVELOPMENT.md)** - Development setup, testing, and contribution guidelines
+- **[🔧 Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues, solutions, and debugging techniques
+- **[📖 Documentation Index](docs/README.md)** - Documentation overview and navigation
 
 ## 🚀 Quick Start
 
