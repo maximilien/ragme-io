@@ -44,6 +44,30 @@ class TestConfigManager:
         self.modified_config = None
         self.env_modified = False
 
+    def _find_latest_backup(self, pattern: str) -> Path | None:
+        """
+        Find the latest backup file matching the pattern.
+
+        Args:
+            pattern: Glob pattern to match backup files
+
+        Returns:
+            Path to the latest backup file, or None if not found
+        """
+        try:
+            backup_files = list(Path(".").glob(pattern))
+            if backup_files:
+                # Return the most recent backup file
+                latest = max(backup_files, key=lambda x: x.stat().st_mtime)
+                print(f"  🔍 Found backup file: {latest}")
+                return latest
+            else:
+                print(f"  🔍 No backup files found matching pattern: {pattern}")
+                return None
+        except Exception as e:
+            print(f"  ⚠️ Error finding backup files: {e}")
+            return None
+
     def backup_config(self) -> bool:
         """
         Backup the original config.yaml file.
@@ -69,6 +93,114 @@ class TestConfigManager:
         except Exception as e:
             print(f"❌ Failed to backup config.yaml: {e}")
             return False
+
+    def cleanup_test_collections(self) -> bool:
+        """
+        Clean up test collections before running tests.
+
+        This ensures the test collections are empty when tests start.
+
+        Returns:
+            True if cleanup was successful, False otherwise
+        """
+        try:
+            print("🧹 Cleaning up test collections before tests...")
+
+            # Import here to avoid circular imports
+            import sys
+            from pathlib import Path
+
+            # Add src to path for imports
+            src_path = Path(__file__).parent.parent.parent / "src"
+            sys.path.insert(0, str(src_path))
+
+            from ragme.utils.config_manager import config
+            from ragme.vdbs.vdb_management import VDBManager
+
+            # Force reload the config to ensure we have the test collection names
+            try:
+                config.reload()
+                print("  🔄 Reloaded config to ensure test collection names are used")
+            except Exception as e:
+                print(f"  ⚠️ Warning: Could not reload config: {e}")
+
+            # Ensure environment variables are set before creating VDBManager
+            import os
+
+            os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = self.test_collection_name
+            os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = (
+                self.test_image_collection_name
+            )
+            print("  🔧 Set environment variables for test collections")
+            print(
+                f"  🔧 VECTOR_DB_TEXT_COLLECTION_NAME={os.environ.get('VECTOR_DB_TEXT_COLLECTION_NAME')}"
+            )
+            print(
+                f"  🔧 VECTOR_DB_IMAGE_COLLECTION_NAME={os.environ.get('VECTOR_DB_IMAGE_COLLECTION_NAME')}"
+            )
+
+            # Create VDB manager with test configuration
+            manager = VDBManager()
+
+            # Force reload configuration to ensure test collection names are used
+            manager.reload_config()
+
+            # Verify we're using the correct collection names
+            config_info = manager.show_config()
+            print(f"  📋 Using text collection: {config_info['text_collection']}")
+            print(f"  📋 Using image collection: {config_info['image_collection']}")
+
+            # Safety check: ensure we're not cleaning up main collections
+            if (
+                config_info["text_collection"] != self.test_collection_name
+                or config_info["image_collection"] != self.test_image_collection_name
+            ):
+                print("  ⚠️ Warning: VDBManager is not using test collections!")
+                print(
+                    f"     Expected: {self.test_collection_name}, {self.test_image_collection_name}"
+                )
+                print(
+                    f"     Actual: {config_info['text_collection']}, {config_info['image_collection']}"
+                )
+                print("  🛑 Skipping cleanup to avoid affecting main collections")
+                manager.cleanup()
+                return True
+
+            # Clean up text collection
+            print(f"  🧹 Cleaning up text collection: {self.test_collection_name}")
+            text_result = manager.delete_text_collection_content()
+            if text_result["status"] == "success":
+                print(f"    ✅ {text_result['message']}")
+            else:
+                print(
+                    f"    ⚠️ Text collection cleanup: {text_result.get('error', 'Unknown error')}"
+                )
+
+            # Clean up image collection
+            print(
+                f"  🧹 Cleaning up image collection: {self.test_image_collection_name}"
+            )
+            image_result = manager.delete_image_collection_content()
+            if image_result["status"] == "success":
+                print(f"    ✅ {image_result['message']}")
+            else:
+                print(
+                    f"    ⚠️ Image collection cleanup: {image_result.get('error', 'Unknown error')}"
+                )
+
+            # Clean up VDB resources
+            manager.cleanup()
+
+            print("✅ Test collections cleaned up successfully")
+            return True
+
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to cleanup test collections: {e}")
+            import traceback
+
+            traceback.print_exc()
+            # Don't fail the test setup if cleanup fails
+            return True
 
     def backup_and_modify_env_file(self) -> bool:
         """
@@ -266,37 +398,36 @@ class TestConfigManager:
             True if restoration was successful, False otherwise
         """
         try:
-            if not self.backup_config_path.exists():
-                print(f"Warning: Backup file {self.backup_config_path} does not exist")
-                # Try to find any backup file with similar name
-                backup_files = list(Path(".").glob("config.yaml.backup_*"))
-                if backup_files:
-                    # Use the most recent backup file
-                    most_recent_backup = max(
-                        backup_files, key=lambda x: x.stat().st_mtime
-                    )
-                    print(f"Found alternative backup file: {most_recent_backup}")
-                    shutil.copy2(most_recent_backup, self.original_config_path)
-                    print("✅ Restored config.yaml from alternative backup")
-                    # Clean up the alternative backup
-                    most_recent_backup.unlink()
-                    self.cleanup()
-                    return True
-                else:
-                    print("No backup files found, cannot restore config.yaml")
-                    return False
+            print("  🔄 Attempting to restore config.yaml...")
 
-            # Restore original config
-            shutil.copy2(self.backup_config_path, self.original_config_path)
-            print("✅ Restored config.yaml from backup")
+            # First try to find the exact backup files created by test-with-backup.sh
+            # These are created with timestamped names like config.yaml.backup_20250831_104752
+            timestamped_backup = self._find_latest_backup("config.yaml.backup_*")
+            if timestamped_backup:
+                print(f"  📁 Found timestamped backup file: {timestamped_backup}")
+                shutil.copy2(timestamped_backup, self.original_config_path)
+                print("  ✅ Restored config.yaml from timestamped backup")
+                # Don't delete the backup file - let test-with-backup.sh handle cleanup
+                return True
 
-            # Clean up temp files but keep backup for now
-            self.cleanup()
+            # Fall back to the config manager's own backup
+            if self.backup_config_path.exists():
+                print(f"  📁 Found config manager backup: {self.backup_config_path}")
+                shutil.copy2(self.backup_config_path, self.original_config_path)
+                print("  ✅ Restored config.yaml from config manager backup")
+                return True
 
-            return True
+            print("  ⚠️ No backup files found, cannot restore config.yaml")
+            # List what files are actually present for debugging
+            config_backups = list(Path(".").glob("config.yaml*"))
+            if config_backups:
+                print(
+                    f"  📋 Available config files: {[f.name for f in config_backups]}"
+                )
+            return False
 
         except Exception as e:
-            print(f"❌ Failed to restore config.yaml: {e}")
+            print(f"  ❌ Failed to restore config.yaml: {e}")
             return False
 
     def restore_env_file(self) -> bool:
@@ -311,117 +442,31 @@ class TestConfigManager:
                 print("🔧 .env file was not modified, nothing to restore")
                 return True  # Nothing to restore
 
+            # First try to find the exact backup files created by test-with-backup.sh
+            # These are created with timestamped names like .env.backup_20250831_104752
+            timestamped_backup = self._find_latest_backup(".env.backup_*")
+            if timestamped_backup:
+                print(f"  📁 Found timestamped .env backup file: {timestamped_backup}")
+                shutil.copy2(timestamped_backup, self.env_file_path)
+                print("  ✅ Restored original .env file from timestamped backup")
+                # Don't delete the backup file - let test-with-backup.sh handle cleanup
+                self.env_modified = False
+                return True
+
+            # Fall back to the config manager's own backup
             if self.env_backup_path.exists():
                 # Restore from backup
                 shutil.copy2(self.env_backup_path, self.env_file_path)
                 self.env_backup_path.unlink()
-                print("🔧 Restored original .env file from backup")
+                print("🔧 Restored original .env file from config manager backup")
                 self.env_modified = False
                 return True
-            else:
-                print(f"⚠️ .env backup file {self.env_backup_path} not found")
 
-                # If no backup exists but we modified the file, try to restore by removing the test collection name
-                if self.env_file_path.exists():
-                    try:
-                        with open(self.env_file_path) as f:
-                            env_content = f.read()
-
-                        # Remove the test collection name lines
-                        original_content = re.sub(
-                            rf"^VECTOR_DB_TEXT_COLLECTION_NAME={re.escape(self.test_collection_name)}\n?",
-                            "",
-                            env_content,
-                            flags=re.M,
-                        )
-                        original_content = re.sub(
-                            rf"^VECTOR_DB_IMAGE_COLLECTION_NAME={re.escape(self.test_image_collection_name)}\n?",
-                            "",
-                            original_content,
-                            flags=re.M,
-                        )
-
-                        # Check if we need to restore the original collection names
-                        # If the original content doesn't have VECTOR_DB_TEXT_COLLECTION_NAME, add it back
-                        if not re.search(
-                            r"^VECTOR_DB_TEXT_COLLECTION_NAME=", original_content, re.M
-                        ):
-                            # Add the original collection name back (assuming it was "RagMeDocs" based on the issue)
-                            # We'll add it in the Vector Database Configuration section
-                            if re.search(
-                                r"^# Vector Database Configuration",
-                                original_content,
-                                re.M,
-                            ):
-                                # Insert after the Vector Database Configuration comment
-                                original_content = re.sub(
-                                    r"(^# Vector Database Configuration\n)",
-                                    r"\1VECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs\n",
-                                    original_content,
-                                    flags=re.M,
-                                )
-                            else:
-                                # Add at the end if no Vector Database Configuration section
-                                original_content += "\n# Vector Database Configuration\nVECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs\n"
-
-                            print(
-                                "🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs to .env file"
-                            )
-
-                        # Check if we need to restore the original image collection name
-                        if not re.search(
-                            r"^VECTOR_DB_IMAGE_COLLECTION_NAME=", original_content, re.M
-                        ):
-                            # Add the original image collection name back (assuming it was "RagMeImages")
-                            if re.search(
-                                r"^# Vector Database Configuration",
-                                original_content,
-                                re.M,
-                            ):
-                                # Insert after the Vector Database Configuration comment
-                                original_content = re.sub(
-                                    r"(^# Vector Database Configuration\n)",
-                                    r"\1VECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs\nVECTOR_DB_IMAGE_COLLECTION_NAME=RagMeImages\n",
-                                    original_content,
-                                    flags=re.M,
-                                )
-                            else:
-                                # Add at the end if no Vector Database Configuration section
-                                original_content += "\n# Vector Database Configuration\nVECTOR_DB_TEXT_COLLECTION_NAME=RagMeDocs\nVECTOR_DB_IMAGE_COLLECTION_NAME=RagMeImages\n"
-
-                            print(
-                                "🔧 Restored VECTOR_DB_IMAGE_COLLECTION_NAME=RagMeImages to .env file"
-                            )
-
-                        # Write back the cleaned content
-                        with open(self.env_file_path, "w") as f:
-                            f.write(original_content)
-
-                        print(
-                            "🔧 Restored .env file by removing test collection names and restoring original"
-                        )
-                        self.env_modified = False
-                        return True
-                    except Exception as e:
-                        print(
-                            f"❌ Failed to restore .env file by removing test collection name: {e}"
-                        )
-                        # Mark as restored to avoid repeated warnings
-                        self.env_modified = False
-                        return False
-                else:
-                    print("⚠️ .env file does not exist, nothing to restore")
-                    # Mark as restored to avoid repeated warnings
-                    self.env_modified = False
-                    return True
+            print("⚠️ No .env backup files found")
+            return False
 
         except Exception as e:
-            print(f"❌ Error restoring .env file: {e}")
-            import traceback
-
-            traceback.print_exc()
-            # Mark as restored to avoid repeated warnings
-            self.env_modified = False
+            print(f"❌ Failed to restore .env file: {e}")
             return False
 
     def cleanup(self):
@@ -472,6 +517,12 @@ class TestConfigManager:
             self.restore_config()
             return False
 
+        # Clean up test collections after config is set up
+        if not self.cleanup_test_collections():
+            # Try to restore if cleanup failed
+            self.restore_config()
+            return False
+
         print("✅ Configuration setup completed successfully")
         return True
 
@@ -483,6 +534,10 @@ class TestConfigManager:
             True if teardown was successful, False otherwise
         """
         print("🧹 Cleaning up configuration after integration tests...")
+
+        # Clean up test collections BEFORE restoring config
+        # This ensures we're cleaning up the test collections, not the main ones
+        self.cleanup_test_collections_after_tests()
 
         # Always try to restore both config and .env file
         config_success = self.restore_config()
@@ -503,6 +558,92 @@ class TestConfigManager:
                 print("  - Failed to restore .env file")
             print("⚠️ Please check your configuration files manually")
             return False
+
+    def cleanup_test_collections_after_tests(self) -> bool:
+        """
+        Clean up test collections after tests complete.
+
+        This ensures the test collections are cleaned up even if tests fail.
+
+        Returns:
+            True if cleanup was successful, False otherwise
+        """
+        try:
+            print("🧹 Cleaning up test collections after tests...")
+
+            # Import here to avoid circular imports
+            import sys
+            from pathlib import Path
+
+            # Add src to path for imports
+            src_path = Path(__file__).parent.parent.parent / "src"
+            sys.path.insert(0, str(src_path))
+
+            from ragme.utils.config_manager import config
+            from ragme.vdbs.vdb_management import VDBManager
+
+            # Force reload the config to ensure we have the test collection names
+            try:
+                config.reload()
+                print("  🔄 Reloaded config to ensure test collection names are used")
+            except Exception as e:
+                print(f"  ⚠️ Warning: Could not reload config: {e}")
+
+            # Create VDB manager with test configuration
+            manager = VDBManager()
+
+            # Verify we're using the correct collection names
+            config_info = manager.show_config()
+            print(f"  📋 Using text collection: {config_info['text_collection']}")
+            print(f"  📋 Using image collection: {config_info['image_collection']}")
+
+            # Only proceed if we're using test collections
+            if (
+                config_info["text_collection"] != self.test_collection_name
+                or config_info["image_collection"] != self.test_image_collection_name
+            ):
+                print("  ⚠️ Warning: VDBManager is not using test collections!")
+                print(
+                    f"     Expected: {self.test_collection_name}, {self.test_image_collection_name}"
+                )
+                print(
+                    f"     Actual: {config_info['text_collection']}, {config_info['image_collection']}"
+                )
+                print("  🛑 Skipping cleanup to avoid affecting main collections")
+                return True
+
+            # Clean up text collection
+            print(f"  🧹 Cleaning up text collection: {self.test_collection_name}")
+            text_result = manager.delete_text_collection_content()
+            if text_result["status"] == "success":
+                print(f"    ✅ {text_result['message']}")
+            else:
+                print(
+                    f"    ⚠️ Text collection cleanup: {text_result.get('error', 'Unknown error')}"
+                )
+
+            # Clean up image collection
+            print(
+                f"  🧹 Cleaning up image collection: {self.test_image_collection_name}"
+            )
+            image_result = manager.delete_image_collection_content()
+            if image_result["status"] == "success":
+                print(f"    ✅ {image_result['message']}")
+            else:
+                print(
+                    f"    ⚠️ Image collection cleanup: {image_result.get('error', 'Unknown error')}"
+                )
+
+            # Clean up VDB resources
+            manager.cleanup()
+
+            print("✅ Test collections cleaned up after tests")
+            return True
+
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to cleanup test collections after tests: {e}")
+            # Don't fail the teardown if cleanup fails
+            return True
 
     def get_test_collection_name(self) -> str:
         """Get the test text collection name."""

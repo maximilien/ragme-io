@@ -232,6 +232,12 @@ JSON response:"""
             bool: True if confirmation is required
         """
         # Check if confirmation bypass is enabled
+        # Force reload config to ensure we get the latest settings
+        try:
+            config.reload()
+        except Exception as e:
+            logger.warning(f"Could not reload config: {e}")
+
         if config.is_feature_enabled("bypass_delete_confirmation"):
             return False
 

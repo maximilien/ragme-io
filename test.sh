@@ -311,7 +311,7 @@ run_integration_tests() {
         
         if [ -f "./tools/test-integration-agents.sh" ]; then
             print_status "Running integration test suite (API and Agent tests)..."
-            if ./tools/test-integration-agents.sh --all; then
+            if ./tools/test-integration-agents.sh --all --start-services; then
                 print_status "✓ Integration tests passed"
             else
                 print_error "Integration tests failed"
@@ -333,17 +333,17 @@ run_agent_tests() {
     # Don't override with fake keys like we do for unit tests
     print_status "Using API keys from .env file for agent integration tests..."
     
-    if [ -f "./tools/test-integration-agents.sh" ]; then
-        print_status "Running agent integration test suite..."
-        if ./tools/test-integration-agents.sh --agents; then
-            print_status "✓ Agent integration tests passed"
+            if [ -f "./tools/test-integration-agents.sh" ]; then
+            print_status "Running agent integration test suite..."
+            if ./tools/test-integration-agents.sh --agents --start-services; then
+                print_status "✓ Agent integration tests passed"
+            else
+                print_error "Agent integration tests failed"
+                exit 1
+            fi
         else
-            print_error "Agent integration tests failed"
-            exit 1
+            print_warning "tools/test-integration-agents.sh not found, skipping agent tests"
         fi
-    else
-        print_warning "tools/test-integration-agents.sh not found, skipping agent tests"
-    fi
     
     print_header "Agent Integration Tests Completed Successfully! 🎉"
 }
@@ -428,4 +428,5 @@ if [ "$RUN_DEPLOYMENT_INTEGRATION_TESTS" = true ]; then
     run_deployment_integration_tests
 fi
 
-print_status "All requested tests completed!" 
+print_status "All requested tests completed!"
+exit 0 

@@ -717,8 +717,14 @@ class TestAgentsIntegration:
         """Test the complete scenario from start to finish."""
         print("Starting complete agent integration test scenario...")
 
-        # Reset agent confirmation state to ensure clean start
-        self.agent.reset_confirmation_state()
+        # Reset agent state completely to ensure clean start
+        self.agent.cleanup()
+        # Force reload the configuration to ensure test settings are applied
+        from ragme.utils.config_manager import config
+
+        config.reload()
+        # Reinitialize the agent after cleanup
+        self.agent = RagMeAgent(self.ragme)
 
         # Step 0: Empty collection
         print("Step 0: Verifying empty collection...")

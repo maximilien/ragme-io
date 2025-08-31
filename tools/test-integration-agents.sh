@@ -66,7 +66,9 @@ check_api_keys() {
     # Load environment variables from .env file if it exists
     if [ -f ".env" ]; then
         print_status "Loading environment variables from .env file..."
-        export $(grep -v '^#' .env | xargs)
+        set -a
+        source .env
+        set +a
     fi
     
     # Check for OpenAI API key
@@ -137,7 +139,7 @@ run_integration_tests() {
     print_status "Running $test_type integration tests..."
     
     # Run the integration test runner
-    if python tests/integration/run_integration_tests.py --$test_type; then
+    if uv run python tests/integration/run_integration_tests.py --$test_type; then
         print_success "$test_type integration tests passed!"
         return 0
     else
@@ -151,7 +153,7 @@ run_all_integration_tests() {
     print_status "Running all integration tests..."
     
     # Run the integration test runner
-    if python tests/integration/run_integration_tests.py --all; then
+    if uv run python tests/integration/run_integration_tests.py --all; then
         print_success "All integration tests passed!"
         return 0
     else
@@ -166,7 +168,7 @@ run_pytest_tests() {
     
     print_status "Running $test_type integration tests with pytest..."
     
-    if python tests/integration/run_integration_tests.py --$test_type --pytest; then
+    if uv run python tests/integration/run_integration_tests.py --$test_type --pytest; then
         print_success "$test_type pytest integration tests passed!"
         return 0
     else
@@ -303,6 +305,7 @@ main() {
         print_warning "Services are not running. Please start them first:"
         print_warning "  ./start.sh"
         print_warning "Or use --start-services flag to start them automatically."
+        print_warning "Note: When using test-with-backup.sh, services are managed automatically."
         exit 1
     fi
     

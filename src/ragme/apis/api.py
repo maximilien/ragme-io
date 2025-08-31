@@ -1923,7 +1923,7 @@ async def get_frontend_config():
                 "title": app_config.get("title", "RAGme.io Assistant"),
                 "version": app_config.get("version", "1.0.0"),
             },
-            "vector_database": vector_db_info,
+            "vector_databases": vector_db_info,
             "storage": storage_config,
             "frontend": frontend_config,
             "client": client_config,

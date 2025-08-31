@@ -1,11 +1,9 @@
 #!/bin/bash
-
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
-# Test Wrapper with Environment Backup/Restore
-# This script backs up the current .env and config.yaml, sets up test collections,
-# runs the specified tests, and restores the original configuration regardless of outcome.
+# Test runner with environment backup and restoration
+# This script ensures that tests run in isolation without affecting the main environment
 
 set -e
 
@@ -16,8 +14,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Function to print colored output
 print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
 print_warning() {
@@ -29,158 +32,200 @@ print_error() {
 }
 
 print_header() {
-    echo -e "${BLUE}[TEST]${NC} $1"
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}========================================${NC}"
 }
 
+# Function to show usage
 print_help() {
-    echo -e "${BLUE}RAGme Test Wrapper with Environment Backup${NC}"
+    echo "Usage: $0 <test_type>"
     echo ""
-    echo "Usage: ./tools/test-with-backup.sh [TEST_TYPE]"
-    echo ""
-    echo "This script will:"
-    echo "  1. Backup current .env and config.yaml"
-    echo "  2. Set collections to test_integration and test_integration_images"
-    echo "  3. Run the specified tests"
-    echo "  4. Restore original configuration (regardless of test outcome)"
-    echo ""
-    echo "Test Types:"
-    echo "  integration     Run full integration tests"
+    echo "Test types:"
+    echo "  integration      Run full integration tests"
     echo "  integration-fast Run fast integration tests"
     echo "  agents          Run agent integration tests"
+    echo "  help            Show this help message"
+    echo ""
+    echo "This script will:"
+    echo "  1. Stop all RAGme services"
+    echo "  2. Backup your current environment (.env and config.yaml)"
+    echo "  3. Modify configuration for test collections"
+    echo "  4. Run the specified tests"
+    echo "  5. Restore your original environment"
+    echo "  6. Restart services"
     echo ""
     echo "Examples:"
-    echo "  ./tools/test-with-backup.sh integration     # Run full integration tests"
-    echo "  ./tools/test-with-backup.sh integration-fast # Run fast integration tests"
-    echo "  ./tools/test-with-backup.sh agents          # Run agent tests"
-    echo ""
+    echo "  $0 integration-fast  # Run fast integration tests"
+    echo "  $0 integration       # Run full integration tests"
+    echo "  $0 agents           # Run agent tests"
 }
 
-# Configuration
-TEST_COLLECTION_NAME="test_integration"
-TEST_IMAGE_COLLECTION_NAME="test_integration_images"
-BACKUP_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-ENV_BACKUP=".env.backup_${BACKUP_TIMESTAMP}"
-CONFIG_BACKUP="config.yaml.backup_${BACKUP_TIMESTAMP}"
+# Generate timestamped backup names
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+ENV_BACKUP=".env.backup_${TIMESTAMP}"
+CONFIG_BACKUP="config.yaml.backup_${TIMESTAMP}"
+
+# Function to stop all RAGme services
+stop_services() {
+    print_status "Stopping all RAGme services..."
+    if [ -f "./stop.sh" ]; then
+        ./stop.sh > /dev/null 2>&1 || true
+        print_success "Services stopped"
+    else
+        print_warning "stop.sh not found, services may still be running"
+    fi
+    
+    # Wait a moment for services to fully stop
+    sleep 2
+}
+
+# Function to start RAGme services
+start_services() {
+    print_status "Starting RAGme services..."
+    if [ -f "./start.sh" ]; then
+        ./start.sh > /dev/null 2>&1 &
+        print_success "Services started in background"
+    else
+        print_warning "start.sh not found, please start services manually"
+    fi
+}
 
 # Function to backup current environment
 backup_environment() {
-    print_header "Backing up current environment..."
+    print_status "Backing up current environment..."
     
     # Backup .env file
     if [ -f ".env" ]; then
         cp .env "$ENV_BACKUP"
-        print_status "✅ Backed up .env to $ENV_BACKUP"
+        print_success "Backed up .env to $ENV_BACKUP"
     else
-        print_warning "⚠️ .env file not found, will create one for tests"
+        print_warning ".env file not found"
     fi
     
     # Backup config.yaml
     if [ -f "config.yaml" ]; then
         cp config.yaml "$CONFIG_BACKUP"
-        print_status "✅ Backed up config.yaml to $CONFIG_BACKUP"
+        print_success "Backed up config.yaml to $CONFIG_BACKUP"
     else
-        print_error "❌ config.yaml not found!"
-        return 1
+        print_warning "config.yaml not found"
     fi
     
-    print_status "✅ Environment backup completed"
+    return 0
 }
 
 # Function to setup test environment
 setup_test_environment() {
-    print_header "Setting up test environment..."
+    print_status "Setting up test environment..."
     
-    # Use the existing config manager to handle the setup
-    if [ -f "tests/integration/config_manager.py" ]; then
-        print_status "Using existing config manager for test setup..."
-        
-        # Run the setup using Python from virtual environment
-        source .venv/bin/activate
-        python -c "
-import sys
-sys.path.append('tests/integration')
-from config_manager import setup_test_config
-if setup_test_config():
-    print('✅ Test configuration setup successful')
-    exit(0)
-else:
-    print('❌ Test configuration setup failed')
-    exit(1)
-"
-        
-        if [ $? -eq 0 ]; then
-            print_status "✅ Test environment setup completed"
-            return 0
-        else
-            print_error "❌ Test environment setup failed"
-            return 1
-        fi
+    # Create test configuration by copying existing config and modifying collection names
+    if [ -f "config.yaml" ]; then
+        # Copy existing config and modify only the collection names
+        cp config.yaml config.yaml.test_temp
+        # Replace environment variable references with test collection names using sed
+        sed -i.bak 's/\${VECTOR_DB_TEXT_COLLECTION_NAME}/test_integration/g' config.yaml.test_temp
+        sed -i.bak 's/\${VECTOR_DB_IMAGE_COLLECTION_NAME}/test_integration_images/g' config.yaml.test_temp
+        # Remove backup files created by sed
+        rm -f config.yaml.test_temp.bak
     else
-        print_error "❌ config_manager.py not found in tests/integration/"
-        return 1
+        # Create new config if it doesn't exist
+        cat > config.yaml.test_temp << 'EOF'
+# Test configuration for integration tests
+# This ensures tests use separate collections
+
+vector_db:
+  type: "weaviate"
+  weaviate:
+    url: "${WEAVIATE_URL}"
+    api_key: "${WEAVIATE_API_KEY}"
+    collections:
+      - name: "test_integration"
+      - name: "test_integration_images"
+
+# Test-specific settings
+features:
+  bypass_delete_confirmation: true
+  enable_test_mode: true
+
+# Use test collections
+test_collections:
+  text_collection: "test_integration"
+  image_collection: "test_integration_images"
+EOF
     fi
+
+    # Replace config.yaml with test configuration
+    cp config.yaml.test_temp config.yaml
+    print_success "Test configuration applied (preserved existing settings)"
+    
+    # Create test .env file by copying existing .env and modifying collection names
+    if [ -f ".env" ]; then
+        # Copy existing .env and modify only the collection names
+        cp .env .env.test_temp
+        
+        # Check if the variables exist and replace them, or add them if they don't exist
+        if grep -q "VECTOR_DB_TEXT_COLLECTION_NAME=" .env.test_temp; then
+            # Variable exists, replace it
+            sed -i.bak 's/VECTOR_DB_TEXT_COLLECTION_NAME=.*/VECTOR_DB_TEXT_COLLECTION_NAME=test_integration/' .env.test_temp
+        else
+            # Variable doesn't exist, add it
+            echo "VECTOR_DB_TEXT_COLLECTION_NAME=test_integration" >> .env.test_temp
+        fi
+        
+        if grep -q "VECTOR_DB_IMAGE_COLLECTION_NAME=" .env.test_temp; then
+            # Variable exists, replace it
+            sed -i.bak 's/VECTOR_DB_IMAGE_COLLECTION_NAME=.*/VECTOR_DB_IMAGE_COLLECTION_NAME=test_integration_images/' .env.test_temp
+        else
+            # Variable doesn't exist, add it
+            echo "VECTOR_DB_IMAGE_COLLECTION_NAME=test_integration_images" >> .env.test_temp
+        fi
+        
+        # Remove backup files created by sed
+        rm -f .env.test_temp.bak
+    else
+        # Create new .env if it doesn't exist
+        cat > .env.test_temp << 'EOF'
+# Test environment variables
+VECTOR_DB_TYPE=weaviate
+VECTOR_DB_TEXT_COLLECTION_NAME=test_integration
+VECTOR_DB_IMAGE_COLLECTION_NAME=test_integration_images
+WEAVIATE_URL=${WEAVIATE_URL}
+WEAVIATE_API_KEY=${WEAVIATE_API_KEY}
+OPENAI_API_KEY=${OPENAI_API_KEY}
+EOF
+    fi
+
+    # Replace .env with test environment
+    cp .env.test_temp .env
+    print_success "Test environment applied (preserved existing variables)"
+    
+    return 0
 }
 
-# Function to restore original environment
+# Function to restore environment
 restore_environment() {
-    print_header "Restoring original environment..."
+    print_status "Restoring original environment..."
     
-    # Use the existing config manager to handle the restoration
-    if [ -f "tests/integration/config_manager.py" ]; then
-        print_status "Using existing config manager for restoration..."
-        
-        # Run the teardown using Python with better error handling
-        source .venv/bin/activate
-        python -c "
-import sys
-sys.path.append('tests/integration')
-try:
-    from config_manager import teardown_test_config
-    if teardown_test_config():
-        print('✅ Test configuration teardown successful')
-        exit(0)
-    else:
-        print('❌ Test configuration teardown failed')
-        exit(1)
-except Exception as e:
-    print(f'❌ Error during teardown: {e}')
-    exit(1)
-"
-        
-        teardown_exit_code=$?
-        if [ $teardown_exit_code -eq 0 ]; then
-            print_status "✅ Environment restoration completed"
-        else
-            print_warning "⚠️ Environment restoration had issues, attempting manual fallback..."
-            
-            # Manual restoration as fallback
-            if [ -f "$ENV_BACKUP" ]; then
-                cp "$ENV_BACKUP" .env
-                print_status "✅ Restored .env from backup"
-            fi
-            
-            if [ -f "$CONFIG_BACKUP" ]; then
-                cp "$CONFIG_BACKUP" config.yaml
-                print_status "✅ Restored config.yaml from backup"
-            fi
-        fi
+    # Restore .env file
+    if [ -f "$ENV_BACKUP" ]; then
+        cp "$ENV_BACKUP" .env
+        print_success "Restored .env from $ENV_BACKUP"
     else
-        print_error "❌ config_manager.py not found, attempting manual restoration..."
-        
-        # Manual restoration as fallback
-        if [ -f "$ENV_BACKUP" ]; then
-            cp "$ENV_BACKUP" .env
-            print_status "✅ Restored .env from backup"
-        fi
-        
-        if [ -f "$CONFIG_BACKUP" ]; then
-            cp "$CONFIG_BACKUP" config.yaml
-            print_status "✅ Restored config.yaml from backup"
-        fi
+        print_warning "No .env backup found"
+    fi
+    
+    # Restore config.yaml
+    if [ -f "$CONFIG_BACKUP" ]; then
+        cp "$CONFIG_BACKUP" config.yaml
+        print_success "Restored config.yaml from $CONFIG_BACKUP"
+    else
+        print_warning "No config.yaml backup found"
     fi
     
     # Clean up backup files
     cleanup_backup_files
+    
+    return 0
 }
 
 # Function to cleanup backup files
@@ -198,23 +243,31 @@ cleanup_backup_files() {
         print_status "🗑️ Removed $CONFIG_BACKUP"
     fi
     
-    # Clean up any leftover backup files from previous runs (including timestamped ones)
-    for backup_file in .env.backup_* config.yaml.backup_*; do
-        if [ -f "$backup_file" ]; then
-            rm "$backup_file"
-            print_status "🗑️ Removed leftover backup: $backup_file"
-        fi
-    done
-    
-    # Also clean up any config manager backup files
-    if [ -f "config.yaml.test_backup" ]; then
-        rm "config.yaml.test_backup"
-        print_status "🗑️ Removed config manager backup: config.yaml.test_backup"
+    # Clean up test temp files
+    if [ -f "config.yaml.test_temp" ]; then
+        rm "config.yaml.test_temp"
+        print_status "🗑️ Removed config.yaml.test_temp"
     fi
     
+    if [ -f ".env.test_temp" ]; then
+        rm ".env.test_temp"
+        print_status "🗑️ Removed .env.test_temp"
+    fi
+    
+    # Clean up any integration backup files that might have been left behind
     if [ -f ".env.integration_backup" ]; then
         rm ".env.integration_backup"
-        print_status "🗑️ Removed config manager backup: .env.integration_backup"
+        print_status "🗑️ Removed .env.integration_backup"
+    fi
+    
+    if [ -f "config.yaml.test_backup" ]; then
+        rm "config.yaml.test_backup"
+        print_status "🗑️ Removed config.yaml.test_backup"
+    fi
+    
+    if [ -f "config.yaml.test_temp" ]; then
+        rm "config.yaml.test_temp"
+        print_status "🗑️ Removed config.yaml.test_temp"
     fi
 }
 
@@ -248,6 +301,7 @@ run_tests() {
 cleanup_on_exit() {
     print_warning "🛑 Interrupted! Restoring environment..."
     restore_environment
+    start_services
     exit 1
 }
 
@@ -283,20 +337,27 @@ main() {
     print_header "Starting test run with environment backup for: $test_type"
     echo "================================================================"
     
-    # Step 1: Backup current environment
+    # Step 1: Stop all services
+    if ! stop_services; then
+        print_error "❌ Failed to stop services"
+        exit 1
+    fi
+    
+    # Step 2: Backup current environment
     if ! backup_environment; then
         print_error "❌ Failed to backup environment"
         exit 1
     fi
     
-    # Step 2: Setup test environment
+    # Step 3: Setup test environment
     if ! setup_test_environment; then
         print_error "❌ Failed to setup test environment"
         restore_environment
+        start_services
         exit 1
     fi
     
-    # Step 3: Run tests
+    # Step 4: Run tests
     print_header "Running tests..."
     test_exit_code=0
     if run_tests "$test_type"; then
@@ -307,7 +368,7 @@ main() {
         # Don't exit here - we still want to restore the environment
     fi
     
-    # Step 4: Restore environment (regardless of test outcome)
+    # Step 5: Restore environment (regardless of test outcome)
     restore_exit_code=0
     if restore_environment; then
         print_status "✅ Environment restoration completed successfully"
@@ -316,10 +377,17 @@ main() {
         restore_exit_code=1
     fi
     
+    # Step 6: Start services
+    if ! start_services; then
+        print_warning "⚠️ Failed to start services"
+        restore_exit_code=1
+    fi
+    
     # Final status
     if [ $test_exit_code -eq 0 ] && [ $restore_exit_code -eq 0 ]; then
         print_header "🎉 Test run completed successfully!"
         print_status "Environment has been restored to original state"
+        print_status "Services have been restarted"
         exit 0
     elif [ $test_exit_code -eq 0 ]; then
         print_header "⚠️ Tests passed but environment restoration had issues"
