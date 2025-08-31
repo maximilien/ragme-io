@@ -44,7 +44,9 @@ print_help() {
     echo "  integration Run only integration tests (end-to-end system tests)"
     echo "  integration-fast Run fast integration tests (minimal testing)"
     echo "  agents      Run only agent integration tests (RagMeAgent testing)"
-    echo "  all         Run all tests (unit + api + mcp + integration)"
+    echo "  deployment-unit Run deployment unit tests (container and k8s config validation)"
+    echo "  deployment-integration Run deployment integration tests (kind cluster deployment)"
+    echo "  all         Run all tests (unit + api + mcp + integration + deployment)"
     echo "  help        Show this help message"
     echo ""
     echo "For integration tests with environment backup/restore:"
@@ -59,6 +61,8 @@ print_help() {
     echo "  ./test.sh integration  # Run only integration tests"
     echo "  ./test.sh integration-fast # Run fast integration tests"
     echo "  ./test.sh agents       # Run only agent integration tests"
+    echo "  ./test.sh deployment-unit # Run deployment unit tests"
+    echo "  ./test.sh deployment-integration # Run deployment integration tests"
     echo "  ./test.sh all          # Run all tests"
     echo "  ./test.sh              # Run unit tests (default)"
     echo ""
@@ -93,6 +97,16 @@ print_help() {
     echo "    - Agent query processing"
     echo "    - Document management via agents"
     echo "    - MCP server integration"
+    echo ""
+    echo "  Deployment Unit Tests:"
+    echo "    - Container configuration validation"
+    echo "    - Kubernetes manifest validation"
+    echo "    - Operator Go unit tests"
+    echo ""
+    echo "  Deployment Integration Tests:"
+    echo "    - Kind cluster deployment testing"
+    echo "    - Container build and deployment"
+    echo "    - Operator functionality testing"
 }
 
 # Initialize variables
@@ -106,6 +120,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=false
         RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
         ;;
     "api")
         RUN_UNIT_TESTS=false
@@ -113,6 +129,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=false
         RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
         ;;
     "mcp")
         RUN_UNIT_TESTS=false
@@ -120,6 +138,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=true
         RUN_INTEGRATION_TESTS=false
         RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
         ;;
     "integration")
         RUN_UNIT_TESTS=false
@@ -127,6 +147,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=true
         RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
         ;;
     "integration-fast")
         RUN_UNIT_TESTS=false
@@ -134,6 +156,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=true
         RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
         RUN_FAST_INTEGRATION=true
         ;;
     "agents")
@@ -142,6 +166,26 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=false
         RUN_INTEGRATION_TESTS=false
         RUN_AGENT_TESTS=true
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
+        ;;
+    "deployment-unit")
+        RUN_UNIT_TESTS=false
+        RUN_API_TESTS=false
+        RUN_MCP_TESTS=false
+        RUN_INTEGRATION_TESTS=false
+        RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=true
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
+        ;;
+    "deployment-integration")
+        RUN_UNIT_TESTS=false
+        RUN_API_TESTS=false
+        RUN_MCP_TESTS=false
+        RUN_INTEGRATION_TESTS=false
+        RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=true
         ;;
     "most")
         RUN_UNIT_TESTS=true
@@ -149,6 +193,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=true
         RUN_INTEGRATION_TESTS=true
         RUN_AGENT_TESTS=false
+        RUN_DEPLOYMENT_UNIT_TESTS=false
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=false
         ;;
     "all")
         RUN_UNIT_TESTS=true
@@ -156,6 +202,8 @@ case "${1:-unit}" in
         RUN_MCP_TESTS=true
         RUN_INTEGRATION_TESTS=true
         RUN_AGENT_TESTS=true
+        RUN_DEPLOYMENT_UNIT_TESTS=true
+        RUN_DEPLOYMENT_INTEGRATION_TESTS=true
         ;;
     "help"|"-h"|"--help")
         print_help
@@ -178,9 +226,13 @@ run_unit_tests() {
     export WEAVIATE_API_KEY=fake-weaviate-key
     export WEAVIATE_URL=fake-weaviate-url.com
 
+    # Install dev dependencies and run unit tests
+    print_status "Installing dev dependencies..."
+    uv add --dev pytest pytest-cov pytest-asyncio requests-mock
+    
     # Run unit tests with the correct PYTHONPATH and robustly suppress Pydantic deprecation warnings
     # Exclude API and MCP specific tests
-    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run --active python -m pytest -v \
+    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run python -m pytest -v \
         tests/test_common.py \
         tests/test_ragme.py \
         tests/test_ragme_agent.py \
@@ -207,7 +259,7 @@ run_api_tests() {
     export WEAVIATE_URL=fake-weaviate-url.com
 
     # Run API-specific tests
-    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run --active python -m pytest -v \
+    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run python -m pytest -v \
         tests/test_api.py \
         -k "api"
     
@@ -224,7 +276,7 @@ run_mcp_tests() {
     export WEAVIATE_URL=fake-weaviate-url.com
 
     # Run MCP-specific tests
-    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run --active python -m pytest -v \
+    PYTHONWARNINGS="ignore:PydanticDeprecatedSince20" PYTHONPATH=src uv run python -m pytest -v \
         tests/ \
         -k "mcp"
     
@@ -296,6 +348,51 @@ run_agent_tests() {
     print_header "Agent Integration Tests Completed Successfully! 🎉"
 }
 
+# Function to run deployment unit tests
+run_deployment_unit_tests() {
+    print_header "Running Deployment Unit Tests..."
+    
+    # Python deployment unit tests
+    print_status "Running Python deployment unit tests..."
+    PYTHONPATH=src uv run python -m pytest -v deployment/tests/unit/ -k "not integration"
+    
+    # Go operator unit tests
+    print_status "Running Go operator unit tests..."
+    cd deployment/operator
+    # Skip integration tests that require kubebuilder tools
+    if command -v kubebuilder >/dev/null 2>&1; then
+        go test -v ./internal/controller/... -short
+    else
+        print_warning "kubebuilder not found, skipping Go integration tests"
+        # Run only unit tests that don't require kubebuilder
+        go test -v ./internal/controller/... -short -run "Test.*Unit" || true
+    fi
+    cd ../..
+    
+    print_header "Deployment Unit Tests Completed Successfully! 🎉"
+}
+
+# Function to run deployment integration tests
+run_deployment_integration_tests() {
+    print_header "Running Deployment Integration Tests..."
+    
+    # Python deployment integration tests
+    print_status "Running Python deployment integration tests..."
+    PYTHONPATH=src uv run python -m pytest -v deployment/tests/integration/ -k "integration"
+    
+    # Go operator integration tests (if available)
+    print_status "Running Go operator integration tests..."
+    cd deployment/operator
+    if [ -d "test/integration" ]; then
+        go test -v ./test/integration/... -timeout=10m
+    else
+        print_warning "No Go integration tests found, skipping..."
+    fi
+    cd ../..
+    
+    print_header "Deployment Integration Tests Completed Successfully! 🎉"
+}
+
 # Run unit tests if requested
 if [ "$RUN_UNIT_TESTS" = true ]; then
     run_unit_tests
@@ -319,6 +416,16 @@ fi
 # Run agent tests if requested
 if [ "$RUN_AGENT_TESTS" = true ]; then
     run_agent_tests
+fi
+
+# Run deployment unit tests if requested
+if [ "$RUN_DEPLOYMENT_UNIT_TESTS" = true ]; then
+    run_deployment_unit_tests
+fi
+
+# Run deployment integration tests if requested
+if [ "$RUN_DEPLOYMENT_INTEGRATION_TESTS" = true ]; then
+    run_deployment_integration_tests
 fi
 
 print_status "All requested tests completed!" 

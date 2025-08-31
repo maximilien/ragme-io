@@ -21,11 +21,13 @@ pymilvus>=2.4.4
 
 exif
 
-# OCR dependencies
+# OCR dependencies - using lighter alternatives
 pytesseract>=0.3.10
 Pillow>=10.0.0
-opencv-python>=4.8.0
-easyocr>=1.7.0
+# opencv-python-headless instead of opencv-python to reduce size
+opencv-python-headless>=4.8.0
+# Consider removing easyocr if not essential, as it's very large
+# easyocr>=1.7.0
 
 # HEIC support
 pillow-heif>=0.15.0

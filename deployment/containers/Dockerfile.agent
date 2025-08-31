@@ -1,0 +1,57 @@
+# RAGme Local Agent Dockerfile
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies and clean up in the same layer
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libmagic1 \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && apt-get autoremove -y
+
+# Install uv for dependency management
+RUN pip install uv && rm -rf ~/.cache/pip
+
+# Copy dependency files
+COPY requirements.txt .
+COPY pyproject.toml .
+
+# Install Python dependencies and clean up caches
+RUN uv pip install --system -r requirements.txt \
+    && rm -rf ~/.cache/uv \
+    && rm -rf ~/.cache/pip \
+    && find /usr/local/lib/python3.11/site-packages -name "*.pyc" -delete \
+    && find /usr/local/lib/python3.11/site-packages -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# Copy source code
+COPY src/ src/
+COPY config.yaml.example config.yaml
+
+# Create necessary directories and make watch directory a volume mount point
+RUN mkdir -p logs minio_data
+VOLUME ["/app/watch_directory"]
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV WATCH_DIRECTORY=/app/watch_directory
+
+# Health check - check if the agent is processing files
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.path.append('/app'); from src.ragme.agents.run_local_agent import check_health; check_health()" || exit 1
+
+# Start local agent
+CMD ["python", "-m", "src.ragme.agents.run_local_agent"]

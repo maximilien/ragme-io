@@ -396,3 +396,106 @@ backup:
   storage:
     type: "local"  # Options: local, s3, gcs
     path: "backups/"
+
+# Deployment Configuration
+deployment:
+  # Deployment mode: local, docker, kubernetes
+  mode: "local"
+  
+  # Container configuration
+  containers:
+    registry: "${CONTAINER_REGISTRY:-localhost:5001}"
+    repository: "ragme"
+    tag: "${CONTAINER_TAG:-latest}"
+    pull_policy: "IfNotPresent"
+    
+  # Kubernetes deployment configuration
+  kubernetes:
+    # Cluster configuration
+    cluster:
+      name: "${K8S_CLUSTER_NAME:-ragme-cluster}"
+      namespace: "${K8S_NAMESPACE:-ragme}"
+      
+    # Service replicas
+    replicas:
+      api: 2
+      mcp: 2
+      agent: 1  # Must be 1 for file monitoring
+      frontend: 2
+      
+    # Resource requirements
+    resources:
+      api:
+        requests:
+          memory: "512Mi"
+          cpu: "500m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+      mcp:
+        requests:
+          memory: "512Mi"
+          cpu: "500m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+      agent:
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      frontend:
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      minio:
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      weaviate:
+        requests:
+          memory: "1Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "1000m"
+          
+    # Storage configuration
+    storage:
+      # Shared volume for watch directory
+      shared_volume:
+        size: "5Gi"
+        storage_class: "${K8S_STORAGE_CLASS:-standard}"
+        
+      # MinIO storage
+      minio:
+        enabled: true
+        storage_size: "10Gi"
+        
+      # Vector database storage
+      vector_db:
+        storage_size: "2Gi"
+        
+    # External access configuration
+    external_access:
+      type: "${K8S_ACCESS_TYPE:-NodePort}"  # Options: NodePort, LoadBalancer, Ingress
+      ingress:
+        enabled: false
+        host: "${K8S_INGRESS_HOST:-ragme.local}"
+        tls_enabled: false
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: "/"
+          
+    # Operator configuration
+    operator:
+      enabled: true
+      image: "${RAGME_OPERATOR_IMAGE:-ragme-operator:latest}"
+      namespace: "${K8S_OPERATOR_NAMESPACE:-ragme-operator-system}"

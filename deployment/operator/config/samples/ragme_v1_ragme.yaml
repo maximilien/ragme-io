@@ -1,0 +1,88 @@
+apiVersion: ragme.io/v1
+kind: RAGme
+metadata:
+  name: ragme-sample
+  namespace: ragme
+spec:
+  version: "latest"
+  
+  images:
+    registry: "localhost:5001"
+    repository: "ragme"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  
+  replicas:
+    api: 2
+    mcp: 2
+    agent: 1
+    frontend: 2
+  
+  storage:
+    minio:
+      enabled: true
+      storageSize: "10Gi"
+      accessKey: "minioadmin"
+      secretKey: "minioadmin"
+    sharedVolume:
+      size: "5Gi"
+      storageClass: "standard"
+  
+  vectorDB:
+    type: "weaviate"
+    weaviate:
+      enabled: true
+      storageSize: "2Gi"
+    milvus:
+      enabled: false
+  
+  resources:
+    api:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    mcp:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    frontend:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    agent:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    minio:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    weaviate:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+  
+  externalAccess:
+    type: "NodePort"
+    ingress:
+      enabled: false
+      host: "ragme.local"
+      tlsEnabled: false
