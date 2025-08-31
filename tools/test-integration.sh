@@ -446,7 +446,24 @@ fast_integration_test() {
     
     # Wait for services to be ready (longer wait to ensure collections are created)
     echo -e "\n${BLUE}⏳ Waiting for services to be ready...${NC}"
-    sleep 10  # Increased wait time to ensure collections are created
+    sleep 10  # Initial wait time to ensure collections are created
+    
+    # Poll API until it's ready
+    local max_attempts=30
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s --max-time 5 "$API_URL/health" > /dev/null 2>&1; then
+            echo -e "  ${GREEN}✅ API is ready after $attempt attempts${NC}"
+            break
+        fi
+        echo -e "  ${YELLOW}⏳ Waiting for API to be ready... (attempt $attempt/$max_attempts)${NC}"
+        sleep 2
+        ((attempt++))
+    done
+    
+    if [ $attempt -gt $max_attempts ]; then
+        echo -e "  ${RED}❌ API failed to become ready after $max_attempts attempts${NC}"
+    fi
     
     # Show test plan
     echo -e "\n${BLUE}📋 Fast Integration Test Plan (11 tests):${NC}"
@@ -511,13 +528,14 @@ fast_integration_test() {
     # Test 4: Check collection after URL
     ((current_test++))
     echo -e "\n${BLUE}📋 Fast Test $current_test/$total_tests: Check Collection After URL${NC}"
-    sleep 2
+    sleep 5  # Increased wait time for URL processing
     response=$(curl -s --max-time 10 "$API_URL/list-documents?limit=10" 2>/dev/null || echo "{}")
     
     if echo "$response" | grep -q "status.*success"; then
         echo -e "  ${GREEN}✅ Collection check after URL: PASS${NC}"
     else
         echo -e "  ${RED}❌ Collection check after URL: FAIL${NC}"
+        echo -e "  ${YELLOW}📥 Response: $(echo "$response" | head -c 100)...${NC}"
         all_tests_passed=false
     fi
     

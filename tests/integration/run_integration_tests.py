@@ -118,7 +118,6 @@ def check_api_keys():
 
 def check_services_available():
     """Check if required services are running."""
-    import requests
 
     services = {"API": "http://localhost:8021", "MCP": "http://localhost:8022"}
 
@@ -157,19 +156,38 @@ def run_api_tests():
     print("RUNNING API INTEGRATION TESTS")
     print("=" * 60)
 
-    # Setup test configuration
-    if not setup_test_config():
-        print("❌ Failed to setup test configuration")
-        return False
+    # Set environment variables early to ensure they're used by all components
+    original_text_collection = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
+    original_image_collection = os.environ.get("VECTOR_DB_IMAGE_COLLECTION_NAME")
 
-    # Set environment variable for test collection to ensure it overrides config
-    original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
     os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
     from tests.integration.config_manager import get_test_image_collection_name
 
     os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = get_test_image_collection_name()
+
     print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
     print(f"🔧 Set VECTOR_DB_IMAGE_COLLECTION_NAME={get_test_image_collection_name()}")
+
+    # Verify environment variables are set correctly
+    actual_text = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
+    actual_image = os.environ.get("VECTOR_DB_IMAGE_COLLECTION_NAME")
+
+    if actual_text != get_test_collection_name():
+        print("❌ ERROR: Text collection env var not set correctly!")
+        print(f"   Expected: {get_test_collection_name()}")
+        print(f"   Actual: {actual_text}")
+        return False
+
+    if actual_image != get_test_image_collection_name():
+        print("❌ ERROR: Image collection env var not set correctly!")
+        print(f"   Expected: {get_test_image_collection_name()}")
+        print(f"   Actual: {actual_image}")
+        return False
+
+    # Setup test configuration
+    if not setup_test_config():
+        print("❌ Failed to setup test configuration")
+        return False
 
     # Force reload of config module to pick up new environment variables
     try:
@@ -200,6 +218,54 @@ def run_api_tests():
             print("✅ Backend services restarted successfully")
             # Wait for services to be ready
             time.sleep(3)
+
+            # Verify the API is using the correct test collections
+            try:
+                import requests
+
+                response = requests.get("http://localhost:8021/config", timeout=10)
+                if response.status_code == 200:
+                    config_data = response.json()
+                    api_collections = (
+                        config_data.get("config", {})
+                        .get("vector_databases", {})
+                        .get("collections", [])
+                    )
+
+                    text_collection = None
+                    image_collection = None
+
+                    for col in api_collections:
+                        if col.get("type") == "text":
+                            text_collection = col.get("name")
+                        elif col.get("type") == "image":
+                            image_collection = col.get("name")
+
+                    expected_text = get_test_collection_name()
+                    expected_image = get_test_image_collection_name()
+
+                    if text_collection != expected_text:
+                        print("❌ ERROR: API is not using test text collection!")
+                        print(f"   Expected: {expected_text}")
+                        print(f"   API reports: {text_collection}")
+                        return False
+
+                    if image_collection != expected_image:
+                        print("❌ ERROR: API is not using test image collection!")
+                        print(f"   Expected: {expected_image}")
+                        print(f"   API reports: {image_collection}")
+                        return False
+
+                    print(
+                        f"✅ API verified to use test collections: {text_collection}, {image_collection}"
+                    )
+                else:
+                    print(
+                        f"⚠️ Warning: Could not verify API config (status {response.status_code})"
+                    )
+            except Exception as e:
+                print(f"⚠️ Warning: Could not verify API config: {e}")
+
         else:
             print(f"❌ Failed to restart backend services: {result.stderr}")
             return False
@@ -271,19 +337,28 @@ def run_api_tests():
                 test_instance.ragme.cleanup()
     finally:
         # Always restore configuration and environment
-        if "original_collection_name" in locals():
-            if original_collection_name is not None:
-                os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = original_collection_name
+        if "original_text_collection" in locals():
+            if original_text_collection is not None:
+                os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = original_text_collection
                 print(
-                    f"🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME={original_collection_name}"
+                    f"🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME={original_text_collection}"
                 )
             else:
                 os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
                 print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
 
-        # Remove test image collection name
-        os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
-        print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
+        if "original_image_collection" in locals():
+            if original_image_collection is not None:
+                os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = (
+                    original_image_collection
+                )
+                print(
+                    f"🔧 Restored VECTOR_DB_IMAGE_COLLECTION_NAME={original_image_collection}"
+                )
+            else:
+                os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
+                print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
+
         teardown_test_config()
 
 
@@ -293,19 +368,38 @@ async def run_agent_tests():
     print("RUNNING AGENT INTEGRATION TESTS")
     print("=" * 60)
 
-    # Setup test configuration
-    if not setup_test_config():
-        print("❌ Failed to setup test configuration")
-        return False
+    # Set environment variables early to ensure they're used by all components
+    original_text_collection = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
+    original_image_collection = os.environ.get("VECTOR_DB_IMAGE_COLLECTION_NAME")
 
-    # Set environment variable for test collection to ensure it overrides config
-    original_collection_name = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
     os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = get_test_collection_name()
     from tests.integration.config_manager import get_test_image_collection_name
 
     os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = get_test_image_collection_name()
+
     print(f"🔧 Set VECTOR_DB_TEXT_COLLECTION_NAME={get_test_collection_name()}")
     print(f"🔧 Set VECTOR_DB_IMAGE_COLLECTION_NAME={get_test_image_collection_name()}")
+
+    # Verify environment variables are set correctly
+    actual_text = os.environ.get("VECTOR_DB_TEXT_COLLECTION_NAME")
+    actual_image = os.environ.get("VECTOR_DB_IMAGE_COLLECTION_NAME")
+
+    if actual_text != get_test_collection_name():
+        print("❌ ERROR: Text collection env var not set correctly!")
+        print(f"   Expected: {get_test_collection_name()}")
+        print(f"   Actual: {actual_text}")
+        return False
+
+    if actual_image != get_test_image_collection_name():
+        print("❌ ERROR: Image collection env var not set correctly!")
+        print(f"   Expected: {get_test_image_collection_name()}")
+        print(f"   Actual: {actual_image}")
+        return False
+
+    # Setup test configuration
+    if not setup_test_config():
+        print("❌ Failed to setup test configuration")
+        return False
 
     # Force reload of config module to pick up new environment variables
     try:
@@ -336,6 +430,54 @@ async def run_agent_tests():
             print("✅ Backend services restarted successfully")
             # Wait for services to be ready
             time.sleep(3)
+
+            # Verify the API is using the correct test collections
+            try:
+                import requests
+
+                response = requests.get("http://localhost:8021/config", timeout=10)
+                if response.status_code == 200:
+                    config_data = response.json()
+                    api_collections = (
+                        config_data.get("config", {})
+                        .get("vector_databases", {})
+                        .get("collections", [])
+                    )
+
+                    text_collection = None
+                    image_collection = None
+
+                    for col in api_collections:
+                        if col.get("type") == "text":
+                            text_collection = col.get("name")
+                        elif col.get("type") == "image":
+                            image_collection = col.get("name")
+
+                    expected_text = get_test_collection_name()
+                    expected_image = get_test_image_collection_name()
+
+                    if text_collection != expected_text:
+                        print("❌ ERROR: API is not using test text collection!")
+                        print(f"   Expected: {expected_text}")
+                        print(f"   API reports: {text_collection}")
+                        return False
+
+                    if image_collection != expected_image:
+                        print("❌ ERROR: API is not using test image collection!")
+                        print(f"   Expected: {expected_image}")
+                        print(f"   API reports: {image_collection}")
+                        return False
+
+                    print(
+                        f"✅ API verified to use test collections: {text_collection}, {image_collection}"
+                    )
+                else:
+                    print(
+                        f"⚠️ Warning: Could not verify API config (status {response.status_code})"
+                    )
+            except Exception as e:
+                print(f"⚠️ Warning: Could not verify API config: {e}")
+
         else:
             print(f"❌ Failed to restart backend services: {result.stderr}")
             return False
@@ -414,19 +556,28 @@ async def run_agent_tests():
                 test_instance.ragme.cleanup()
     finally:
         # Always restore configuration and environment
-        if "original_collection_name" in locals():
-            if original_collection_name is not None:
-                os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = original_collection_name
+        if "original_text_collection" in locals():
+            if original_text_collection is not None:
+                os.environ["VECTOR_DB_TEXT_COLLECTION_NAME"] = original_text_collection
                 print(
-                    f"🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME={original_collection_name}"
+                    f"🔧 Restored VECTOR_DB_TEXT_COLLECTION_NAME={original_text_collection}"
                 )
             else:
                 os.environ.pop("VECTOR_DB_TEXT_COLLECTION_NAME", None)
                 print("🔧 Removed VECTOR_DB_TEXT_COLLECTION_NAME from environment")
 
-        # Remove test image collection name
-        os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
-        print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
+        if "original_image_collection" in locals():
+            if original_image_collection is not None:
+                os.environ["VECTOR_DB_IMAGE_COLLECTION_NAME"] = (
+                    original_image_collection
+                )
+                print(
+                    f"🔧 Restored VECTOR_DB_IMAGE_COLLECTION_NAME={original_image_collection}"
+                )
+            else:
+                os.environ.pop("VECTOR_DB_IMAGE_COLLECTION_NAME", None)
+                print("🔧 Removed VECTOR_DB_IMAGE_COLLECTION_NAME from environment")
+
         teardown_test_config()
 
 

@@ -42,6 +42,12 @@ class VDBManager:
         self.image_collection_name = self.config_manager.get_image_collection_name()
         self.vdb = None
 
+    def reload_config(self):
+        """Reload configuration and update collection names."""
+        self.config_manager.reload()
+        self.text_collection_name = self.config_manager.get_text_collection_name()
+        self.image_collection_name = self.config_manager.get_image_collection_name()
+
     def _get_vdb(self):
         """Get or create VDB instance."""
         if self.vdb is None:

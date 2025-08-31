@@ -373,8 +373,8 @@ storage:
   
   minio:
     endpoint: "localhost:9000"
-    access_key: "minioadmin"
-    secret_key: "minioadmin"
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
     secure: false  # Set to true for HTTPS
     bucket_name: "ragme-storage"
     region: "us-east-1"
