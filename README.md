@@ -46,6 +46,45 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **[🔧 Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues, solutions, and debugging techniques
 - **[📖 Documentation Index](docs/README.md)** - Documentation overview and navigation
 
+## ☸️ Kubernetes Deployment ⭐ **NEW!**
+
+RAGme now supports full Kubernetes deployment with containerization, orchestration, and a custom operator:
+
+- **🐳 Containerized Services** - All RAGme services packaged as containers
+- **⚓ Kubernetes Manifests** - Production-ready deployment configurations  
+- **🎛️ Custom Operator** - Declarative RAGme management with Go-based operator
+- **🚀 One-Click Deployment** - Deploy to local Kind cluster with single command
+
+### Quick Kubernetes Setup
+
+```bash
+# Deploy to local Kind cluster
+cd deployment
+./deploy.sh
+
+# Access services
+# Frontend: http://localhost:30020
+# API: http://localhost:30021
+# MinIO Console: http://localhost:30901
+```
+
+### Advanced Deployment Options
+
+```bash
+# Use RAGme Operator for declarative management
+kubectl apply -f deployment/operator/config/samples/ragme_v1_ragme.yaml
+
+# Production deployment with custom configuration
+kubectl apply -f my-production-ragme.yaml
+```
+
+**📚 Complete Kubernetes Documentation:**
+- **[🚀 Deployment Guide](deployment/README.md)** - Complete Kubernetes deployment guide
+- **[🐳 Containerization](docs/DEPLOYMENT_CONTAINERS.md)** - Container build and management
+- **[⚓ Kubernetes Manifests](docs/DEPLOYMENT_KUBERNETES.md)** - Kubernetes resource definitions
+- **[🎛️ Operator Guide](docs/DEPLOYMENT_OPERATOR.md)** - Custom operator usage and development
+- **[🔧 Troubleshooting](docs/DEPLOYMENT_TROUBLESHOOTING.md)** - Common issues and solutions
+
 ## 🚀 Quick Start
 
 ### Requirements

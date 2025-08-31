@@ -1,0 +1,126 @@
+# RAGme Docker Compose for Local Development and Testing
+version: '3.8'
+
+services:
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: ragme-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Weaviate Vector Database (Optional)
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.25.0
+    container_name: ragme-weaviate
+    ports:
+      - "8080:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-openai,generative-openai'
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    profiles:
+      - weaviate
+
+  # RAGme API Service
+  ragme-api:
+    build:
+      context: ../../
+      dockerfile: deployment/containers/Dockerfile.api
+    container_name: ragme-api
+    ports:
+      - "8021:8021"
+    environment:
+      - RAGME_API_PORT=8021
+      - RAGME_MCP_URL=http://ragme-mcp:8022
+      - MINIO_ENDPOINT=minio:9000
+    depends_on:
+      - minio
+    volumes:
+      - watch_directory:/app/watch_directory
+      - logs:/app/logs
+    env_file:
+      - ../../.env
+
+  # RAGme MCP Service
+  ragme-mcp:
+    build:
+      context: ../../
+      dockerfile: deployment/containers/Dockerfile.mcp
+    container_name: ragme-mcp
+    ports:
+      - "8022:8022"
+    environment:
+      - RAGME_MCP_PORT=8022
+      - RAGME_API_URL=http://ragme-api:8021
+      - MINIO_ENDPOINT=minio:9000
+    depends_on:
+      - minio
+    volumes:
+      - watch_directory:/app/watch_directory
+      - logs:/app/logs
+    env_file:
+      - ../../.env
+
+  # RAGme Local Agent
+  ragme-agent:
+    build:
+      context: ../../
+      dockerfile: deployment/containers/Dockerfile.agent
+    container_name: ragme-agent
+    environment:
+      - RAGME_API_URL=http://ragme-api:8021
+      - RAGME_MCP_URL=http://ragme-mcp:8022
+      - WATCH_DIRECTORY=/app/watch_directory
+      - MINIO_ENDPOINT=minio:9000
+    depends_on:
+      - ragme-api
+      - ragme-mcp
+    volumes:
+      - watch_directory:/app/watch_directory
+      - logs:/app/logs
+    env_file:
+      - ../../.env
+
+  # RAGme Frontend Service
+  ragme-frontend:
+    build:
+      context: ../../
+      dockerfile: deployment/containers/Dockerfile.frontend
+    container_name: ragme-frontend
+    ports:
+      - "8020:8020"
+    environment:
+      - RAGME_FRONTEND_PORT=8020
+      - RAGME_API_URL=http://ragme-api:8021
+    depends_on:
+      - ragme-api
+    volumes:
+      - logs:/app/logs
+
+volumes:
+  minio_data:
+  weaviate_data:
+  watch_directory:
+  logs:
+
+networks:
+  default:
+    name: ragme-network

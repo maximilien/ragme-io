@@ -1,0 +1,66 @@
+# RAGme Kubernetes Operator
+
+This directory contains the RAGme Kubernetes Operator, which provides declarative management of RAGme deployments.
+
+## About
+
+The RAGme Operator is built using the Operator SDK and Kubebuilder framework. It extends Kubernetes with custom resources to manage RAGme deployments declaratively.
+
+### Features
+
+- **Custom Resource Definition (CRD)** for RAGme instances
+- **Controller** for reconciling desired vs actual state
+- **Automated deployment** of all RAGme services
+- **Storage management** for persistent volumes
+- **Service configuration** and networking
+- **Scaling and resource management**
+
+### Resources Managed
+
+The operator manages these Kubernetes resources:
+- Deployments (API, MCP, Agent, Frontend, MinIO, Weaviate)
+- Services (ClusterIP and NodePort for external access)
+- ConfigMaps (Application configuration)
+- Secrets (API keys and sensitive data)
+- PersistentVolumeClaims (Storage for data persistence)
+
+## Development
+
+Built with:
+- Go 1.21+
+- Kubebuilder v3
+- Controller Runtime v0.16
+- Kubernetes API v0.28
+
+### Build and Test
+
+```bash
+# Build the operator
+make build
+
+# Run tests
+make test
+
+# Build container image
+make container-build IMG=ragme-operator:latest
+```
+
+## Deployment
+
+### Install CRDs and Operator
+
+```bash
+# Install CRDs
+make install
+
+# Deploy operator
+make deploy
+```
+
+### Create RAGme Instance
+
+```bash
+kubectl apply -f config/samples/ragme_v1_ragme.yaml
+```
+
+For more information, see the [Operator Guide](../../docs/DEPLOYMENT_OPERATOR.md).

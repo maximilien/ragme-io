@@ -1,0 +1,59 @@
+# RAGme MCP Service Dockerfile  
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies and clean up in the same layer
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libmagic1 \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && apt-get autoremove -y
+
+# Install uv for dependency management
+RUN pip install uv && rm -rf ~/.cache/pip
+
+# Copy dependency files
+COPY requirements.txt .
+COPY pyproject.toml .
+
+# Install Python dependencies and clean up caches
+RUN uv pip install --system -r requirements.txt \
+    && rm -rf ~/.cache/uv \
+    && rm -rf ~/.cache/pip \
+    && find /usr/local/lib/python3.11/site-packages -name "*.pyc" -delete \
+    && find /usr/local/lib/python3.11/site-packages -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# Copy source code
+COPY src/ src/
+COPY config.yaml.example config.yaml
+
+# Create necessary directories
+RUN mkdir -p logs watch_directory minio_data
+
+# Expose MCP port
+EXPOSE 8022
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8022/health || exit 1
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV RAGME_MCP_PORT=8022
+
+# Start MCP service
+CMD ["uvicorn", "src.ragme.apis.mcp:app", "--host", "0.0.0.0", "--port", "8022"]

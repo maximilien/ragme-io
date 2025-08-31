@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ragme
+
+resources:
+- namespace.yaml
+- configmap.yaml
+- shared-storage.yaml
+- minio-deployment.yaml
+- weaviate-deployment.yaml
+- api-deployment.yaml
+- mcp-deployment.yaml
+- agent-deployment.yaml
+- frontend-deployment.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app: ragme
+  version: v1
+
+# Images that can be customized
+images:
+- name: ragme-api
+  newTag: latest
+- name: ragme-mcp
+  newTag: latest
+- name: ragme-agent
+  newTag: latest
+- name: ragme-frontend
+  newTag: latest
+
+# ConfigMap generators for deployment-specific config
+configMapGenerator:
+- name: ragme-deployment-config
+  literals:
+  - DEPLOYMENT_MODE=kubernetes
+  - CLUSTER_NAME=ragme-cluster
+
+# Patches for different environments
+patchesStrategicMerge: []
+
+# Replicas for different environments
+replicas:
+- name: ragme-api
+  count: 2
+- name: ragme-mcp
+  count: 2
+- name: ragme-frontend
+  count: 2
+- name: ragme-agent
+  count: 1
