@@ -713,6 +713,184 @@ class TestAgentsIntegration:
         print("Skipping image addition via agent (requires URL-based images)")
         print("The API test covers full image collection operations")
 
+    async def test_step_4b_image_query_intelligence(self):
+        """Step 4b: Test image query intelligence."""
+        print("Testing image query intelligence...")
+
+        # Add a test image to the collection
+        print("Adding a test image to the collection...")
+        image_path = self.test_image_path
+        if not os.path.exists(image_path):
+            pytest.skip(f"Test image not found: {image_path}")
+
+        with open(image_path, "rb") as image_file:
+            files = {"file": ("test_image.jpg", image_file, "image/jpeg")}
+            add_response = self.session.post(
+                f"{self.mcp_url}/tool/process_image", files=files, timeout=60
+            )
+
+        if add_response.status_code == 200:
+            add_result = add_response.json()
+            if add_result.get("success", False):
+                print("✅ Test image added successfully via MCP")
+            else:
+                print(
+                    f"⚠️ Failed to add test image: {add_result.get('error', 'Unknown error')}"
+                )
+                pytest.fail("Failed to add test image for query intelligence test")
+        else:
+            print(
+                f"⚠️ MCP server returned status {add_response.status_code} for image upload"
+            )
+            pytest.fail("Failed to add test image for query intelligence test")
+
+        # Wait a moment for the image to be processed
+        time.sleep(2)
+
+        # List images to verify it was added
+        print("Listing images to verify addition...")
+        list_response = await self.agent.run("list all images in the image collection")
+        assert (
+            "test_image.jpg" in list_response.lower()
+            or "afbeeldingen" in list_response.lower()
+            or "geen afbeeldingen" in list_response.lower()
+        ), f"Should indicate test image in collection, got: {list_response}"
+
+        # Query for the test image
+        print("Querying for the test image...")
+        query_response = await self.agent.run("describe the test image")
+        assert (
+            "test_image.jpg" in query_response.lower()
+            or "afbeeldingen" in query_response.lower()
+            or "geen afbeeldingen" in query_response.lower()
+        ), f"Should return information about the test image, got: {query_response}"
+
+        # Query for a non-existent image
+        print("Querying for a non-existent image...")
+        non_existent_query_response = await self.agent.run(
+            "describe a non-existent image"
+        )
+        assert (
+            "does not appear to be well-documented"
+            in non_existent_query_response.lower()
+            or "no information" in non_existent_query_response.lower()
+            or "not available" in non_existent_query_response.lower()
+        ), (
+            f"Should indicate no information about non-existent image, got: {non_existent_query_response}"
+        )
+
+        # Delete the test image
+        print("Deleting the test image...")
+        documents = self.ragme.list_documents()
+        image_docs = [
+            doc for doc in documents if doc.get("filename", "").endswith(".jpg")
+        ]
+        if image_docs:
+            doc_id = image_docs[0]["id"]
+            delete_query = f"delete document {doc_id}"
+            delete_response = await self.agent.run(delete_query)
+
+            success_evaluation = await self.evaluate_response_with_llm(
+                delete_response, "success", "Image deletion"
+            )
+            confirmation_evaluation = await self.evaluate_response_with_llm(
+                delete_response, "confirmation_needed", "Image deletion"
+            )
+
+            if not (success_evaluation or confirmation_evaluation):
+                raise AssertionError(
+                    f"Image deletion should be successful or require confirmation, got: {delete_response}"
+                )
+
+            # Verify deletion
+            print("Listing images to verify deletion...")
+            list_response = await self.agent.run(
+                "list all images in the image collection"
+            )
+            assert (
+                "test_image.jpg" not in list_response.lower()
+                and "afbeeldingen" not in list_response.lower()
+                and "geen afbeeldingen" not in list_response.lower()
+            ), (
+                f"Should indicate test image not in collection after deletion, got: {list_response}"
+            )
+
+        print("✅ Image query intelligence test passed!")
+
+    async def test_step_4c_yorkshire_terrier_image_query(self):
+        """Step 4c: Test intelligent image query routing with Yorkshire terrier fixture."""
+        print("Testing intelligent image query routing with Yorkshire terrier...")
+
+        # First, add the Yorkshire terrier image to the collection
+        print("Adding Yorkshire terrier image to collection...")
+        image_path = "tests/fixtures/images/yorkshire-terrier.jpg"
+        assert os.path.exists(image_path), f"Test image not found: {image_path}"
+
+        # Add image via API (since agents don't handle file uploads)
+        with open(image_path, "rb") as f:
+            files = {"file": ("yorkshire-terrier.jpg", f, "image/jpeg")}
+            response = self.session.post(
+                "http://localhost:8000/images/add",
+                files=files,
+                data={"collection_name": self.image_collection_name},
+            )
+            assert response.status_code == 200, f"Failed to add image: {response.text}"
+            add_result = response.json()
+            assert add_result["status"] == "success", (
+                f"Image addition failed: {add_result}"
+            )
+
+        # Wait a moment for processing
+        time.sleep(2)
+
+        # Test intelligent routing for image queries
+        print("Testing 'show me a dog' query...")
+        image_query = "show me a dog"
+        response = await self.agent.run(image_query)
+
+        # Verify the response contains image-specific content
+        assert "[IMAGE:" in response, f"Response should contain image tags: {response}"
+        assert "yorkshire" in response.lower() or "terrier" in response.lower(), (
+            f"Response should mention Yorkshire terrier: {response}"
+        )
+
+        # Verify it's not a generic text response
+        generic_responses = [
+            "a dog is a domesticated mammal",
+            "dogs come in various breeds",
+            "you can find images of dogs on websites",
+        ]
+        for generic in generic_responses:
+            assert generic.lower() not in response.lower(), (
+                f"Response should not be generic text: {response}"
+            )
+
+        print("✅ Intelligent image query routing working correctly!")
+
+        # Clean up the test image
+        print("Cleaning up test image...")
+        list_response = self.session.get(
+            "http://localhost:8000/images/list",
+            params={"collection_name": self.image_collection_name},
+        )
+        if list_response.status_code == 200:
+            images = list_response.json().get("images", [])
+            for img in images:
+                if "yorkshire" in img.get("filename", "").lower():
+                    delete_response = self.session.delete(
+                        "http://localhost:8000/images/delete",
+                        params={
+                            "collection_name": self.image_collection_name,
+                            "image_id": img["id"],
+                        },
+                    )
+                    if delete_response.status_code == 200:
+                        print(f"✅ Cleaned up test image: {img['filename']}")
+                    else:
+                        print(f"⚠️ Failed to clean up test image: {img['filename']}")
+
+        print("Step 4c: Yorkshire terrier image query test completed!")
+
     async def test_complete_scenario(self):
         """Test the complete scenario from start to finish."""
         print("Starting complete agent integration test scenario...")
@@ -745,6 +923,14 @@ class TestAgentsIntegration:
         # Step 4: Image collection operations
         print("Step 4: Testing image collection operations...")
         await self.test_step_4_image_collection_operations()
+
+        # Step 4b: Image query intelligence
+        print("Step 4b: Testing image query intelligence...")
+        await self.test_step_4b_image_query_intelligence()
+
+        # Step 4c: Yorkshire terrier image query test
+        print("Step 4c: Testing Yorkshire terrier image query...")
+        await self.test_step_4c_yorkshire_terrier_image_query()
 
         print("Complete agent integration test scenario passed!")
 

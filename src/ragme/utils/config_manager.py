@@ -533,15 +533,34 @@ class ConfigManager:
             if "top_k" in settings:
                 current_config["query"]["top_k"] = settings["top_k"]
 
-            if "text_rerank_top_k" in settings:
-                current_config["query"]["text_rerank_top_k"] = settings[
-                    "text_rerank_top_k"
-                ]
-
+            # Update relevance thresholds
             if "relevance_thresholds" in settings:
                 current_config["query"]["relevance_thresholds"] = settings[
                     "relevance_thresholds"
                 ]
+
+            # Update rerank settings (nested structure)
+            if "rerank" in settings:
+                if "rerank" not in current_config["query"]:
+                    current_config["query"]["rerank"] = {}
+
+                rerank_settings = settings["rerank"]
+
+                # Update text reranking settings
+                if "text" in rerank_settings:
+                    if "text" not in current_config["query"]["rerank"]:
+                        current_config["query"]["rerank"]["text"] = {}
+                    current_config["query"]["rerank"]["text"].update(
+                        rerank_settings["text"]
+                    )
+
+                # Update image reranking settings
+                if "image" in rerank_settings:
+                    if "image" not in current_config["query"]["rerank"]:
+                        current_config["query"]["rerank"]["image"] = {}
+                    current_config["query"]["rerank"]["image"].update(
+                        rerank_settings["image"]
+                    )
 
             # Write the updated config back to file
             config_path = Path("config.yaml")
@@ -553,6 +572,74 @@ class ConfigManager:
 
         except Exception as e:
             raise Exception(f"Failed to update query settings: {str(e)}") from e
+
+    def get_query_config(self) -> dict[str, Any]:
+        """
+        Get query configuration with proper defaults and nested structure handling.
+
+        Returns:
+            dict: Query configuration with defaults applied
+        """
+        query_config = self.config.get("query", {})
+
+        # Ensure nested structure exists with defaults
+        if "rerank" not in query_config:
+            query_config["rerank"] = {}
+
+        if "text" not in query_config["rerank"]:
+            query_config["rerank"]["text"] = {"enabled": False, "top_k": 3}
+
+        if "image" not in query_config["rerank"]:
+            query_config["rerank"]["image"] = {"enabled": True, "top_k": 10}
+
+        if "relevance_thresholds" not in query_config:
+            query_config["relevance_thresholds"] = {"text": 0.4, "image": 0.3}
+
+        # Ensure top_k exists
+        if "top_k" not in query_config:
+            query_config["top_k"] = 5
+
+        return query_config
+
+    def get_query_top_k(self) -> int:
+        """Get the top_k setting for queries."""
+        return self.get_query_config().get("top_k", 5)
+
+    def get_query_text_rerank_enabled(self) -> bool:
+        """Get whether text reranking is enabled."""
+        return (
+            self.get_query_config()
+            .get("rerank", {})
+            .get("text", {})
+            .get("enabled", False)
+        )
+
+    def get_query_text_rerank_top_k(self) -> int:
+        """Get the top_k setting for text reranking."""
+        return self.get_query_config().get("rerank", {}).get("text", {}).get("top_k", 3)
+
+    def get_query_image_rerank_enabled(self) -> bool:
+        """Get whether image reranking is enabled."""
+        return (
+            self.get_query_config()
+            .get("rerank", {})
+            .get("image", {})
+            .get("enabled", True)
+        )
+
+    def get_query_image_rerank_top_k(self) -> int:
+        """Get the top_k setting for image reranking."""
+        return (
+            self.get_query_config().get("rerank", {}).get("image", {}).get("top_k", 10)
+        )
+
+    def get_query_text_relevance_threshold(self) -> float:
+        """Get the text relevance threshold."""
+        return self.get_query_config().get("relevance_thresholds", {}).get("text", 0.4)
+
+    def get_query_image_relevance_threshold(self) -> float:
+        """Get the image relevance threshold."""
+        return self.get_query_config().get("relevance_thresholds", {}).get("image", 0.3)
 
     def __str__(self) -> str:
         """String representation of the configuration."""
