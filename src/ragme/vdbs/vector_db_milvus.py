@@ -282,7 +282,7 @@ class MilvusVectorDatabase(VectorDatabase):
     def search_image_collection(
         self, query: str, limit: int = 5
     ) -> list[dict[str, Any]]:
-        """Search only the image collection using metadata."""
+        """Search only the image collection using comprehensive metadata."""
         if not self.has_image_collection():
             return []
 
@@ -294,7 +294,7 @@ class MilvusVectorDatabase(VectorDatabase):
             # Generate embedding for query
             query_embedding = self._get_text_embedding(query)
 
-            # Search image collection
+            # Search image collection with comprehensive metadata
             response = self.client.search(
                 collection_name=self.image_collection.name,
                 data=[query_embedding],
@@ -304,7 +304,35 @@ class MilvusVectorDatabase(VectorDatabase):
                 output_fields=["id", "url", "text", "metadata"],
             )
 
-            return self._convert_milvus_search_response(response)
+            results = self._convert_milvus_search_response(response)
+
+            # Post-process results to enhance relevance using metadata
+            enhanced_results = []
+            for result in results:
+                metadata = result.get("metadata", {})
+                if isinstance(metadata, str):
+                    import json
+
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+                # Calculate additional relevance score based on metadata
+                relevance_score = self._calculate_metadata_relevance(query, metadata)
+                if relevance_score > 0:
+                    # Boost the score if metadata is highly relevant
+                    original_score = result.get("score", 0)
+                    result["score"] = min(1.0, original_score + relevance_score * 0.2)
+
+                enhanced_results.append(result)
+
+            # Sort by enhanced scores
+            enhanced_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+            # logger.info(f"Milvus image search found {len(enhanced_results)} results for query: '{query}'") # Original code had this line commented out
+            return enhanced_results
+
         except Exception as e:
             warnings.warn(f"Error searching image collection in Milvus: {e}")
             return []
@@ -617,3 +645,64 @@ class MilvusVectorDatabase(VectorDatabase):
             results.append(result)
 
         return results
+
+    def _calculate_metadata_relevance(self, query: str, metadata: dict) -> float:
+        """
+        Calculate additional relevance score based on metadata content.
+
+        Args:
+            query (str): The search query
+            metadata (dict): Image metadata
+
+        Returns:
+            float: Additional relevance score (0.0 to 1.0)
+        """
+        try:
+            query_lower = query.lower()
+            relevance_score = 0.0
+
+            # Check filename relevance
+            filename = metadata.get("filename", "").lower()
+            if filename:
+                query_words = query_lower.split()
+                for word in query_words:
+                    if len(word) > 2 and word in filename:
+                        relevance_score += 0.3
+                        break
+
+            # Check AI classification relevance
+            classification = metadata.get("classification", {})
+            top_prediction = classification.get("top_prediction", {})
+            label = top_prediction.get("label", "").lower()
+            if label:
+                query_words = query_lower.split()
+                for word in query_words:
+                    if len(word) > 2 and word in label:
+                        relevance_score += 0.4
+                        break
+
+            # Check OCR text relevance
+            ocr_text = metadata.get("ocr_text", "").lower()
+            if ocr_text:
+                query_words = query_lower.split()
+                for word in query_words:
+                    if len(word) > 2 and word in ocr_text:
+                        relevance_score += 0.2
+                        break
+
+            # Check EXIF data relevance
+            exif = metadata.get("exif", {})
+            if exif:
+                # Check location, camera info, etc.
+                location = exif.get("location", "").lower()
+                if location:
+                    query_words = query_lower.split()
+                    for word in query_words:
+                        if len(word) > 2 and word in location:
+                            relevance_score += 0.1
+                            break
+
+            return min(1.0, relevance_score)
+
+        except Exception:
+            return 0.0

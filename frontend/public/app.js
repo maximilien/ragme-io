@@ -28,7 +28,16 @@ class RAGmeAssistant {
             autoSaveChats: true,
             copyUploadedDocs: false,
             copyUploadedImages: false,
-            mcpToolsEnabled: false // Default to disabled, will be overridden by configuration
+            mcpToolsEnabled: false, // Default to disabled, will be overridden by configuration
+            
+            // Query settings
+            topK: 5,
+            textRerankTopK: 3,
+            textRerankWithLLM: false,
+            imageRerankTopK: 10,
+            imageRerankWithLLM: true,
+            textRelevanceThreshold: 0.4,
+            imageRelevanceThreshold: 0.3
         };
 
         // Pagination state
@@ -268,13 +277,36 @@ class RAGmeAssistant {
                 if (this.config.query) {
                     const queryConfig = this.config.query;
                     this.settings.topK = queryConfig.top_k || this.settings.topK;
-                    this.settings.textRerankTopK = queryConfig.text_rerank_top_k || this.settings.textRerankTopK;
-                    this.settings.textRelevanceThreshold = queryConfig.text_relevance_threshold || this.settings.textRelevanceThreshold;
-                    this.settings.imageRelevanceThreshold = queryConfig.image_relevance_threshold || this.settings.imageRelevanceThreshold;
+                    
+                    // Handle nested rerank configuration
+                    if (queryConfig.rerank) {
+                        const rerankConfig = queryConfig.rerank;
+                        
+                        // Text reranking settings
+                        if (rerankConfig.text) {
+                            this.settings.textRerankTopK = rerankConfig.text.top_k || this.settings.textRerankTopK;
+                            this.settings.textRerankWithLLM = rerankConfig.text.enabled !== undefined ? rerankConfig.text.enabled : this.settings.textRerankWithLLM;
+                        }
+                        
+                        // Image reranking settings
+                        if (rerankConfig.image) {
+                            this.settings.imageRerankTopK = rerankConfig.image.top_k || this.settings.imageRerankTopK;
+                            this.settings.imageRerankWithLLM = rerankConfig.image.enabled !== undefined ? rerankConfig.image.enabled : this.settings.imageRerankWithLLM;
+                        }
+                    }
+                    
+                    // Handle relevance thresholds
+                    if (queryConfig.relevance_thresholds) {
+                        this.settings.textRelevanceThreshold = queryConfig.relevance_thresholds.text || this.settings.textRelevanceThreshold;
+                        this.settings.imageRelevanceThreshold = queryConfig.relevance_thresholds.image || this.settings.imageRelevanceThreshold;
+                    }
 
                     console.log('Loaded query settings from config:', {
                         topK: this.settings.topK,
                         textRerankTopK: this.settings.textRerankTopK,
+                        textRerankWithLLM: this.settings.textRerankWithLLM,
+                        imageRerankTopK: this.settings.imageRerankTopK,
+                        imageRerankWithLLM: this.settings.imageRerankWithLLM,
                         textRelevanceThreshold: this.settings.textRelevanceThreshold,
                         imageRelevanceThreshold: this.settings.imageRelevanceThreshold
                     });
@@ -2463,10 +2495,13 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Populate query settings
         document.getElementById('topK').value = this.settings.topK || 5;
         document.getElementById('textRerankTopK').value = this.settings.textRerankTopK || 3;
-        document.getElementById('textRelevanceThreshold').value = this.settings.textRelevanceThreshold || 0.8;
-        document.getElementById('textRelevanceThresholdValue').textContent = this.settings.textRelevanceThreshold || 0.8;
-        document.getElementById('imageRelevanceThreshold').value = this.settings.imageRelevanceThreshold || 0.8;
-        document.getElementById('imageRelevanceThresholdValue').textContent = this.settings.imageRelevanceThreshold || 0.8;
+        document.getElementById('textRerankWithLLM').checked = this.settings.textRerankWithLLM || false;
+        document.getElementById('imageRerankTopK').value = this.settings.imageRerankTopK || 10;
+        document.getElementById('imageRerankWithLLM').checked = this.settings.imageRerankWithLLM || true;
+        document.getElementById('textRelevanceThreshold').value = this.settings.textRelevanceThreshold || 0.4;
+        document.getElementById('textRelevanceThresholdValue').textContent = this.settings.textRelevanceThreshold || 0.4;
+        document.getElementById('imageRelevanceThreshold').value = this.settings.imageRelevanceThreshold || 0.3;
+        document.getElementById('imageRelevanceThresholdValue').textContent = this.settings.imageRelevanceThreshold || 0.3;
 
         // Ensure configuration is loaded
         if (!this.config) {
@@ -2880,6 +2915,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Query settings
         const topK = parseInt(document.getElementById('topK').value);
         const textRerankTopK = parseInt(document.getElementById('textRerankTopK').value);
+        const textRerankWithLLM = document.getElementById('textRerankWithLLM').checked;
+        const imageRerankTopK = parseInt(document.getElementById('imageRerankTopK').value);
+        const imageRerankWithLLM = document.getElementById('imageRerankWithLLM').checked;
         const textRelevanceThreshold = parseFloat(document.getElementById('textRelevanceThreshold').value);
         const imageRelevanceThreshold = parseFloat(document.getElementById('imageRelevanceThreshold').value);
 
@@ -2919,9 +2957,20 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 },
                 body: JSON.stringify({
                     top_k: topK,
-                    text_rerank_top_k: textRerankTopK,
-                    text_relevance_threshold: textRelevanceThreshold,
-                    image_relevance_threshold: imageRelevanceThreshold
+                    rerank: {
+                        text: {
+                            enabled: textRerankWithLLM,
+                            top_k: textRerankTopK
+                        },
+                        image: {
+                            enabled: imageRerankWithLLM,
+                            top_k: imageRerankTopK
+                        }
+                    },
+                    relevance_thresholds: {
+                        text: textRelevanceThreshold,
+                        image: imageRelevanceThreshold
+                    }
                 })
             });
 
@@ -2983,6 +3032,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             return;
         }
 
+        if (imageRerankTopK < 1 || imageRerankTopK > 20) {
+            this.showNotification('error', 'Image Rerank Top K must be between 1 and 20');
+            return;
+        }
+
         if (textRelevanceThreshold < 0.1 || textRelevanceThreshold > 1.0) {
             this.showNotification('error', 'Text relevance threshold must be between 0.1 and 1.0');
             return;
@@ -3016,6 +3070,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Query settings
         this.settings.topK = topK;
         this.settings.textRerankTopK = textRerankTopK;
+        this.settings.textRerankWithLLM = textRerankWithLLM;
+        this.settings.imageRerankTopK = imageRerankTopK;
+        this.settings.imageRerankWithLLM = imageRerankWithLLM;
         this.settings.textRelevanceThreshold = textRelevanceThreshold;
         this.settings.imageRelevanceThreshold = imageRelevanceThreshold;
 
