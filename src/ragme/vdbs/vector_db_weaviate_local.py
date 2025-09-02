@@ -361,11 +361,12 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
     def search_image_collection(
         self, query: str, limit: int = 5
     ) -> list[dict[str, Any]]:
-        """Search only the image collection using metadata.
+        """Search only the image collection using comprehensive metadata.
 
         Strategy:
         - First try to search in filenames (most reliable for image content)
         - Then try hybrid search to leverage both dense and sparse signals
+        - Include AI classification labels and OCR content in search
         - Fallback to BM25 (sparse, robust for plain keywords in metadata)
         - Final fallback to near_text if others are unavailable
         """
@@ -374,22 +375,35 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
 
         collection = self.client.collections.get(self.image_collection.name)
 
-        # First, try to search in filenames using BM25 with specific field targeting
+        # Enhanced search: Try to search across multiple metadata fields
         try:
-            # Use BM25 to search specifically in the filename field
+            # Use BM25 to search across multiple metadata fields for better coverage
             response = collection.query.bm25(
                 query=query,
                 limit=limit,
                 include_vector=False,
-                properties=["metadata.filename"],
+                properties=[
+                    "metadata.filename",
+                    "metadata.classification.top_prediction.label",
+                    "metadata.ocr_text",
+                    "metadata.exif.camera_make",
+                    "metadata.exif.camera_model",
+                    "metadata.exif.date_time",
+                    "metadata.exif.gps_latitude",
+                    "metadata.exif.gps_longitude",
+                    "metadata.exif.location",
+                ],
             )
             results = self._convert_weaviate_response(response)
             if results:
+                logger.info(
+                    f"BM25 multi-field search found {len(results)} results for query: '{query}'"
+                )
                 return results
         except Exception as e:
-            logger.warning(f"BM25 filename search failed: {e}")
+            logger.debug(f"BM25 multi-field search failed: {e}")
 
-        # Try hybrid search with score
+        # Try hybrid search with comprehensive metadata
         try:
             response = collection.query.hybrid(
                 query=query,
@@ -402,6 +416,9 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             )
             results = self._convert_weaviate_response(response)
             if results:
+                logger.info(
+                    f"Hybrid search found {len(results)} results for query: '{query}'"
+                )
                 return results
         except Exception as e:
             logger.warning(f"Hybrid search failed, falling back to BM25: {e}")
@@ -418,6 +435,9 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             )
             results = self._convert_weaviate_response(response)
             if results:
+                logger.info(
+                    f"BM25 general search found {len(results)} results for query: '{query}'"
+                )
                 return results
         except Exception as e:
             logger.warning(f"BM25 failed, falling back to near_text: {e}")
@@ -432,6 +452,12 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                     distance=True,  # Request vector distance
                 ),
             )
+            results = self._convert_weaviate_response(response)
+            if results:
+                logger.info(
+                    f"Near_text search found {len(results)} results for query: '{query}'"
+                )
+                return results
         except Exception as e:
             logger.warning(
                 f"Near_text with metadata failed, falling back to basic: {e}"
@@ -439,7 +465,15 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
             response = collection.query.near_text(
                 query=query, limit=limit, include_vector=False
             )
-        return self._convert_weaviate_response(response)
+            results = self._convert_weaviate_response(response)
+            if results:
+                logger.info(
+                    f"Basic near_text search found {len(results)} results for query: '{query}'"
+                )
+                return results
+
+        logger.warning(f"No search method found results for query: '{query}'")
+        return []
 
     def create_query_agent(self):
         """Create and return a query agent for this vector database."""

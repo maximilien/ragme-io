@@ -730,6 +730,21 @@
                                 <input type="number" id="textRerankTopK" min="1" max="10">
                                 <small>Number of top text results to rerank for better relevance (1-10)</small>
                             </div>
+                            <div class="setting-item">
+                                <label for="textRerankWithLLM">Enable Text Reranking:</label>
+                                <input type="checkbox" id="textRerankWithLLM">
+                                <small>Use LLM to rerank text results for better relevance</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="imageRerankTopK">Image Rerank Top K:</label>
+                                <input type="number" id="imageRerankTopK" min="1" max="20">
+                                <small>Number of top image results to rerank for better relevance (1-20)</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="imageRerankWithLLM">Enable Image Reranking:</label>
+                                <input type="checkbox" id="imageRerankWithLLM">
+                                <small>Use LLM to rerank image results for better relevance</small>
+                            </div>
                         </div>
 
                         <div class="settings-section">

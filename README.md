@@ -32,6 +32,9 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **🎯 Query Threshold Optimizer**: Automated binary search tool to find optimal `text_relevance_threshold` values for your specific document collection. Tests multiple query scenarios and automatically updates `config.yaml` with the best performing threshold! ⭐ **NEW!**
 - **🔧 Watch Directory Duplicate Processing Fix**: Fixed critical bug where large documents added via watch directory were being processed multiple times, creating duplicate files in storage and vector database. Now ensures single document creation with proper chunking! ⭐ **FIXED!**
 - **📄 Robust PDF Processing**: Enhanced PDF processing with multiple library fallbacks (PyMuPDF, pdfplumber, PyPDF2) to handle corrupted PDFs and "EOF marker not found" errors. Automatic PDF repair and graceful error handling! ⭐ **NEW!**
+- **🎯 Intelligent Image Ranking**: Enhanced image relevance scoring with intelligent pre-filtering and improved LLM reranking to exclude irrelevant images. Now properly filters out UI elements, screenshots, and documents when searching for content (e.g., Vectras PDF screenshots won't appear in dog queries)! ⭐ **NEW!**
+- **🔧 Weaviate UUID Bug Fix**: Fixed critical bug where Weaviate UUID objects were causing "'_WeaviateUUIDInt' object is not subscriptable" errors in logging utilities. Now properly handles Weaviate UUID types for safe logging! ⭐ **FIXED!**
+- **⚙️ Configuration Structure Reorganization**: Reorganized the `query` section in `config.yaml` with a nested `rerank` structure for better organization. Updated config manager, QueryAgent, and frontend to use the new nested structure with proper defaults and UI controls for rerank settings. ⭐ **IMPROVED!**
 
 > **📚 For complete feature history and detailed documentation, see the [docs/](docs/) directory.**
 
