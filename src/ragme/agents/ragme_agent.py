@@ -512,6 +512,13 @@ Examples:
                 logger.info("Direct routing to FunctionalAgent for date-based query")
                 return await self.functional_agent.run(query)
 
+            # Intelligent detection: Check if this query would benefit from image search
+            if self._is_query_about_images(query):
+                logger.info(
+                    f"🧠 Intelligent routing: Query '{query}' would benefit from image search"
+                )
+                return await self.query_agent.run(query)
+
             # Use the ReActAgent to intelligently dispatch the query with memory
             # Let the LLM decide which tool to use based on the query content
             logger.info("Using LLM-based routing with ReActAgent")
@@ -591,6 +598,70 @@ Examples:
         except Exception as e:
             logger.error(f"Error getting memory info: {str(e)}")
             return {"memory_type": "ChatMemoryBuffer", "error": str(e)}
+
+    def _is_query_about_images(self, query: str) -> bool:
+        """
+        Intelligently determine if a query would benefit from image search.
+        Uses LLM to analyze query intent rather than simple pattern matching.
+
+        Args:
+            query (str): The user's query
+
+        Returns:
+            bool: True if the query would benefit from image search
+        """
+        logger.info(f"🧠 _is_query_about_images called with query: '{query}'")
+
+        try:
+            # Use LLM to intelligently determine if this query would benefit from images
+            prompt = f"""Analyze this user query and determine if showing images would be helpful.
+
+User Query: "{query}"
+
+Consider the following:
+1. Is the user asking to see or visualize something specific?
+2. Would images help answer their question better than just text?
+3. Are they looking for visual examples, visual identification, or visual confirmation?
+4. Is this a query about appearance, visual characteristics, or visual content?
+5. Would visual examples enhance the user's understanding?
+
+Examples of queries that WOULD benefit from images:
+- "show me a dog" (visual example of what a dog looks like)
+- "what does a car look like" (visual identification)
+- "display the landscape" (visual content)
+- "show me the building" (visual example)
+- "find images of cats" (explicitly asking for images)
+- "what does a Yorkshire terrier look like" (visual identification)
+
+Examples of queries that would NOT benefit from images:
+- "what is a dog" (general information, not visual)
+- "how do dogs behave" (behavioral information)
+- "when were dogs domesticated" (historical information)
+- "why do dogs bark" (explanatory information)
+- "what are the health benefits of owning a dog" (factual information)
+
+Respond with ONLY "YES" if images would be helpful, or "NO" if not.
+"""
+
+            logger.info("🧠 Sending prompt to LLM for image intent detection")
+            response = self.llm.complete(prompt)
+            result = response.text.strip().upper()
+
+            is_about_images = result == "YES"
+            logger.info(
+                f"🧠 LLM determined query '{query}' would benefit from images: {is_about_images}"
+            )
+            logger.info(f"🧠 LLM response: '{response.text.strip()}'")
+            return is_about_images
+
+        except Exception as e:
+            logger.error(f"❌ Error in LLM-based image intent detection: {e}")
+            # If LLM fails, we can't make an intelligent decision, so return False
+            # This is better than falling back to unreliable keyword matching
+            logger.warning(
+                f"🔄 LLM failed, cannot determine image intent for '{query}' - defaulting to False"
+            )
+            return False
 
     def cleanup(self):
         """
