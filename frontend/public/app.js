@@ -5833,11 +5833,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const response = await fetch(this.buildApiUrl('config'));
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'success' && data.config.vector_database) {
+                if (data.status === 'success' && data.config.vector_databases) {
                     this.vectorDbInfo = {
-                        dbType: data.config.vector_database.type,
-                        type: data.config.vector_database.type,
-                        collections: data.config.vector_database.collections || []
+                        dbType: data.config.vector_databases.type,
+                        type: data.config.vector_databases.type,
+                        collections: data.config.vector_databases.collections || []
                     };
                     this.updateVectorDbInfoDisplay();
 
@@ -5868,15 +5868,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const response = await fetch(this.buildApiUrl('config'));
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'success' && data.config.vector_database && data.config.vector_database.type) {
-                    const dbType = data.config.vector_database.type;
+                if (data.status === 'success' && data.config.vector_databases && data.config.vector_databases.type) {
+                    const dbType = data.config.vector_databases.type;
                     vectorDbElement.textContent = dbType;
 
                     // Also update the global vectorDbInfo
                     this.vectorDbInfo = {
                         dbType: dbType,
                         type: dbType,
-                        collections: data.config.vector_database.collections || []
+                        collections: data.config.vector_databases.collections || []
                     };
                 } else {
                     vectorDbElement.textContent = 'Not configured';
