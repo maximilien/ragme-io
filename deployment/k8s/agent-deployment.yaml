@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: agent
-        image: ragme-agent:latest
+        image: localhost/ragme-agent:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: RAGME_API_URL
@@ -43,6 +43,16 @@ spec:
             secretKeyRef:
               name: ragme-secrets
               key: OPENAI_API_KEY
+        - name: WEAVIATE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_URL
+        - name: WEAVIATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_API_KEY
         - name: VECTOR_DB_TYPE
           valueFrom:
             configMapKeyRef:
@@ -80,10 +90,10 @@ spec:
           mountPath: /app/watch_directory
         resources:
           requests:
-            memory: "256Mi"
+            memory: "1Gi"
             cpu: "250m"
           limits:
-            memory: "512Mi"
+            memory: "2Gi"
             cpu: "500m"
         # No health check as this is a background service
       volumes:

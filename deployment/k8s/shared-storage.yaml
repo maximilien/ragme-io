@@ -8,12 +8,12 @@ metadata:
     component: shared-storage
 spec:
   accessModes:
-  - ReadWriteMany  # Shared across multiple pods
+  - ReadWriteOnce  # Changed from ReadWriteMany for local-path compatibility
   resources:
     requests:
       storage: 5Gi
   # For local development, you might need to specify a storage class
-  # storageClassName: "local-path"  # Uncomment for kind/local clusters
+  storageClassName: "standard"  # Use standard storage class for kind clusters
 
 ---
 apiVersion: v1

@@ -102,6 +102,17 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
+# Health check endpoint for Kubernetes probes
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Kubernetes liveness probe."""
+    from datetime import datetime
+    return {
+        "status": "healthy",
+        "service": "ragme-mcp",
+        "timestamp": datetime.now().isoformat()
+    }
+
 
 class ToolResponse(BaseModel):
     success: bool

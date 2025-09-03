@@ -55,8 +55,8 @@ spec:
           httpGet:
             path: /minio/health/ready
             port: 9000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: 30
+          periodSeconds: 10
         resources:
           requests:
             memory: "256Mi"
