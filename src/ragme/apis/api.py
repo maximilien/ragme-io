@@ -1895,7 +1895,7 @@ async def get_frontend_config():
         collections = config.get_collections_config()
         vector_db_info = {
             "type": (
-                db_config.get("type", "weaviate-local")
+                db_config.get("name", db_config.get("type", "weaviate-local"))
                 if db_config
                 else "weaviate-local"
             ),

@@ -26,7 +26,7 @@ interface AppConfig {
     description?: string;
     version?: string;
   };
-  vector_database?: {
+  vector_databases?: {
     type?: string;
     collections?: Array<{ name?: string; type?: string }>;
   };
@@ -902,9 +902,9 @@ io.on('connection', socket => {
 
       // Get vector DB info from the loaded configuration
       const vectorDbInfo = {
-        dbType: appConfig?.vector_database?.type || 'weaviate-local',
-        type: appConfig?.vector_database?.type || 'weaviate-local',
-        collections: appConfig?.vector_database?.collections || [
+        dbType: appConfig?.vector_databases?.type || 'weaviate-local',
+        type: appConfig?.vector_databases?.type || 'weaviate-local',
+        collections: appConfig?.vector_databases?.collections || [
           { name: 'RagMeDocs', type: 'text' },
           { name: 'RagMeImages', type: 'image' },
         ],
@@ -991,7 +991,7 @@ app.get('/api/config', (req, res) => {
       title: appConfig.application?.title || 'RAGme.io Assistant',
       version: appConfig.application?.version || '1.0.0',
     },
-    vector_database: appConfig.vector_database || null,
+    vector_databases: appConfig.vector_databases || null,
     frontend: appConfig.frontend || {},
     client: appConfig.client || {},
     mcp_servers: (appConfig.mcp_servers || []).map(server => ({
