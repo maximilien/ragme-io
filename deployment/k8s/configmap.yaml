@@ -16,7 +16,7 @@ data:
   RAGME_MCP_URL: "http://ragme-mcp:8022"
   
   # Vector Database Configuration
-  VECTOR_DB_TYPE: "milvus"
+  VECTOR_DB_TYPE: "weaviate"
   VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-docs"
   VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-docs"
   
@@ -47,8 +47,8 @@ stringData:
   OPENAI_API_KEY: "your-openai-api-key-here"
   
   # Optional secrets for external services
-  WEAVIATE_API_KEY: "your-weaviate-api-key"
-  WEAVIATE_URL: "your-weaviate-url"
+  WEAVIATE_API_KEY: "your-weaviate-api-key-here"
+  WEAVIATE_URL: "your-weaviate-url-here"
   MILVUS_URI: "your-milvus-uri"
   MILVUS_TOKEN: "your-milvus-token"
   

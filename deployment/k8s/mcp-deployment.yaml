@@ -7,7 +7,7 @@ metadata:
     app: ragme
     component: mcp
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ragme
@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: mcp
-        image: ragme-mcp:latest
+        image: localhost/ragme-mcp:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8022
@@ -41,6 +41,16 @@ spec:
             secretKeyRef:
               name: ragme-secrets
               key: OPENAI_API_KEY
+        - name: WEAVIATE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_URL
+        - name: WEAVIATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_API_KEY
         - name: VECTOR_DB_TYPE
           valueFrom:
             configMapKeyRef:
@@ -84,17 +94,17 @@ spec:
           periodSeconds: 20
         readinessProbe:
           httpGet:
-            path: /ready
+            path: /health
             port: 8022
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
           requests:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "250m"
           limits:
             memory: "1Gi"
-            cpu: "1000m"
+            cpu: "500m"
       volumes:
       - name: logs
         emptyDir: {}

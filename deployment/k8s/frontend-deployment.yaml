@@ -7,7 +7,7 @@ metadata:
     app: ragme
     component: frontend
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ragme
@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ragme-frontend:latest
+        image: localhost/ragme-frontend:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8020
@@ -55,10 +55,10 @@ spec:
           periodSeconds: 5
         resources:
           requests:
-            memory: "256Mi"
+            memory: "1Gi"
             cpu: "250m"
           limits:
-            memory: "512Mi"
+            memory: "2Gi"
             cpu: "500m"
       volumes:
       - name: logs

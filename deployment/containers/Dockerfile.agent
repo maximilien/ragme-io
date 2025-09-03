@@ -38,7 +38,7 @@ RUN uv pip install --system -r requirements.txt \
 
 # Copy source code
 COPY src/ src/
-COPY config.yaml.example config.yaml
+COPY config.yaml.processed config.yaml
 
 # Create necessary directories and make watch directory a volume mount point
 RUN mkdir -p logs minio_data

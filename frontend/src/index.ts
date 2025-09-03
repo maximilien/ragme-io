@@ -257,6 +257,15 @@ app.post('/query', async (req, res) => {
   }
 });
 
+// Health check endpoint for Kubernetes probes
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    service: 'ragme-frontend',
+  });
+});
+
 // Serve the main HTML file
 app.get('/', (req, res) => {
   res.sendFile(path.join(process.cwd(), 'public/index.html'));
