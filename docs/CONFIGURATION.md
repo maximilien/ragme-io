@@ -65,6 +65,85 @@ security:
     allowed_extensions: [".pdf", ".docx", ".txt", ".md", ".json", ".csv"]
 ```
 
+### 🔐 Authentication Configuration ⭐ **NEW!**
+
+RAGme supports OAuth authentication with Google, GitHub, and Apple providers for secure user authentication in production deployments.
+
+```yaml
+authentication:
+  # Bypass login for development/testing (default: false)
+  bypass_login: false
+  
+  # OAuth providers configuration
+  oauth:
+    providers:
+      google:
+        enabled: true
+        client_id: "${GOOGLE_OAUTH_CLIENT_ID}"
+        client_secret: "${GOOGLE_OAUTH_CLIENT_SECRET}"
+        redirect_uri: "${GOOGLE_OAUTH_REDIRECT_URI:-http://localhost:3020/auth/google/callback}"
+        scope: "openid email profile"
+        
+      github:
+        enabled: true
+        client_id: "${GITHUB_OAUTH_CLIENT_ID}"
+        client_secret: "${GITHUB_OAUTH_CLIENT_SECRET}"
+        redirect_uri: "${GITHUB_OAUTH_REDIRECT_URI:-http://localhost:3020/auth/github/callback}"
+        scope: "user:email"
+        
+      apple:
+        enabled: true
+        client_id: "${APPLE_OAUTH_CLIENT_ID}"
+        client_secret: "${APPLE_OAUTH_CLIENT_SECRET}"
+        redirect_uri: "${APPLE_OAUTH_REDIRECT_URI:-http://localhost:3020/auth/apple/callback}"
+        scope: "name email"
+        
+  # Session configuration
+  session:
+    secret_key: "${SESSION_SECRET_KEY:-your-secret-key-change-in-production}"
+    max_age_seconds: 86400  # 24 hours
+    secure: false  # Set to true in production with HTTPS
+    httponly: true
+    samesite: "lax"
+```
+
+#### OAuth Provider Configuration
+
+**Google OAuth:**
+- `client_id`: Your Google OAuth client ID from Google Cloud Console
+- `client_secret`: Your Google OAuth client secret
+- `redirect_uri`: Callback URL for Google OAuth (default: `http://localhost:3020/auth/google/callback`)
+- `scope`: OAuth scopes (default: `openid email profile`)
+
+**GitHub OAuth:**
+- `client_id`: Your GitHub OAuth client ID from GitHub Developer Settings
+- `client_secret`: Your GitHub OAuth client secret
+- `redirect_uri`: Callback URL for GitHub OAuth (default: `http://localhost:3020/auth/github/callback`)
+- `scope`: OAuth scopes (default: `user:email`)
+
+**Apple OAuth:**
+- `client_id`: Your Apple OAuth client ID from Apple Developer Console
+- `client_secret`: Your Apple OAuth client secret
+- `redirect_uri`: Callback URL for Apple OAuth (default: `http://localhost:3020/auth/apple/callback`)
+- `scope`: OAuth scopes (default: `name email`)
+
+#### Session Configuration
+
+- `secret_key`: Secret key for JWT token signing (should be changed in production)
+- `max_age_seconds`: Session duration in seconds (default: 86400 = 24 hours)
+- `secure`: Set to true in production with HTTPS
+- `httponly`: Prevent JavaScript access to cookies (security)
+- `samesite`: CSRF protection setting (default: `lax`)
+
+#### Development Mode
+
+Set `bypass_login: true` to skip authentication during development:
+
+```yaml
+authentication:
+  bypass_login: true  # Skip authentication for development
+```
+
 ### 🗄️ Vector Database Configuration
 ```yaml
 vector_databases:

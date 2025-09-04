@@ -8,6 +8,12 @@ class RAGmeAssistant {
         this.chatHistory = [];
         this.chatSessions = [];
         this.currentChatId = null;
+        
+        // Authentication state
+        this.isAuthenticated = false;
+        this.currentUser = null;
+        this.authProviders = [];
+        this.bypassLogin = false;
         // Default settings - will be overridden by configuration
         this.settings = {
             maxDocuments: 10, // Changed from 50 to 10 (max: 25)
@@ -130,6 +136,10 @@ class RAGmeAssistant {
 
             // Update API configuration from loaded config if available
             this.updateApiConfig();
+
+            // Check authentication status
+            await this.checkAuthenticationStatus();
+            console.log('RAGmeAssistant: Authentication status checked');
 
             this.connectSocket();
             console.log('RAGmeAssistant: Socket connected');
@@ -356,6 +366,201 @@ class RAGmeAssistant {
             }
         } catch (error) {
             console.warn('Failed to load configuration:', error);
+        }
+    }
+
+    // Authentication Methods
+    async checkAuthenticationStatus() {
+        try {
+            // Check for auth=success parameter in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const authSuccess = urlParams.get('auth') === 'success';
+            const token = urlParams.get('token');
+            
+            if (authSuccess && token) {
+                // Store the session token
+                localStorage.setItem('session_token', token);
+                console.log('OAuth authentication successful, stored session token');
+                
+                // Clear the auth parameters from URL
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+            
+            // Get stored token or use cookie
+            const storedToken = localStorage.getItem('session_token');
+            const headers = {};
+            if (storedToken) {
+                headers['Authorization'] = `Bearer ${storedToken}`;
+            }
+            
+            const response = await fetch(this.buildApiUrl('auth/status'), {
+                credentials: 'include',
+                headers: headers
+            });
+            
+            if (response.ok) {
+                const authData = await response.json();
+                this.isAuthenticated = authData.authenticated;
+                this.bypassLogin = authData.bypass_login;
+                this.currentUser = authData.user || null;
+                
+                console.log('Authentication status:', {
+                    isAuthenticated: this.isAuthenticated,
+                    bypassLogin: this.bypassLogin,
+                    user: this.currentUser
+                });
+                
+                // Show login modal if not authenticated and not bypassed
+                if (!this.isAuthenticated && !this.bypassLogin) {
+                    this.showLoginModal();
+                } else {
+                    this.hideLoginModal();
+                    this.updateUserInterface();
+                }
+            } else {
+                console.warn('Failed to check authentication status');
+                // Default to showing login modal if we can't check status
+                this.showLoginModal();
+            }
+        } catch (error) {
+            console.warn('Error checking authentication status:', error);
+            // Default to showing login modal on error
+            this.showLoginModal();
+        }
+    }
+
+    async loadAuthProviders() {
+        try {
+            const response = await fetch(this.buildApiUrl('auth/providers'));
+            if (response.ok) {
+                const data = await response.json();
+                this.authProviders = data.providers || [];
+                this.bypassLogin = data.bypass_login || false;
+                
+                console.log('Auth providers loaded:', this.authProviders);
+                this.renderAuthProviders();
+            }
+        } catch (error) {
+            console.warn('Failed to load auth providers:', error);
+        }
+    }
+
+    showLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.add('show');
+            this.loadAuthProviders();
+        }
+    }
+
+    hideLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    renderAuthProviders() {
+        const providersContainer = document.getElementById('oauthProviders');
+        if (!providersContainer) return;
+
+        providersContainer.innerHTML = '';
+
+        this.authProviders.forEach(provider => {
+            const button = document.createElement('button');
+            button.className = `oauth-provider-btn ${provider.name}`;
+            button.onclick = () => this.initiateOAuthLogin(provider.name);
+            
+            const icon = this.getProviderIcon(provider.name);
+            const displayName = provider.display_name || provider.name;
+            
+            button.innerHTML = `
+                <i class="${icon}"></i>
+                <span>Continue with ${displayName}</span>
+            `;
+            
+            providersContainer.appendChild(button);
+        });
+    }
+
+    getProviderIcon(providerName) {
+        const icons = {
+            google: 'fab fa-google',
+            github: 'fab fa-github',
+            apple: 'fab fa-apple'
+        };
+        return icons[providerName] || 'fas fa-sign-in-alt';
+    }
+
+    initiateOAuthLogin(provider) {
+        console.log(`Initiating OAuth login with ${provider}`);
+        
+        // Show loading state
+        const loadingElement = document.getElementById('loginLoading');
+        const providersElement = document.getElementById('oauthProviders');
+        
+        if (loadingElement) loadingElement.style.display = 'flex';
+        if (providersElement) providersElement.style.display = 'none';
+        
+        // Redirect to OAuth provider
+        window.location.href = this.buildApiUrl(`auth/${provider}/login`);
+    }
+
+    async logout() {
+        try {
+            // Get stored token for logout request
+            const storedToken = localStorage.getItem('session_token');
+            const headers = {};
+            if (storedToken) {
+                headers['Authorization'] = `Bearer ${storedToken}`;
+            }
+            
+            const response = await fetch(this.buildApiUrl('auth/logout'), {
+                method: 'POST',
+                credentials: 'include',
+                headers: headers
+            });
+            
+            if (response.ok) {
+                this.isAuthenticated = false;
+                this.currentUser = null;
+                
+                // Clear stored token
+                localStorage.removeItem('session_token');
+                
+                this.updateUserInterface();
+                this.showLoginModal();
+                this.showNotification('Logged out successfully', 'success');
+            } else {
+                this.showNotification('Failed to logout', 'error');
+            }
+        } catch (error) {
+            console.warn('Error during logout:', error);
+            this.showNotification('Failed to logout', 'error');
+        }
+    }
+
+    updateUserInterface() {
+        // Update header with user info
+        const headerTitle = document.querySelector('.header .title');
+        if (headerTitle && this.currentUser) {
+            headerTitle.textContent = `Welcome, ${this.currentUser.name}`;
+        }
+        
+        // Update hamburger menu with logout option
+        this.updateHamburgerMenu();
+    }
+
+    updateHamburgerMenu() {
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (!logoutBtn) return;
+
+        // Show/hide logout button based on authentication status
+        if (this.isAuthenticated && !this.bypassLogin) {
+            logoutBtn.style.display = 'flex';
+        } else {
+            logoutBtn.style.display = 'none';
         }
     }
 
@@ -819,6 +1024,11 @@ class RAGmeAssistant {
             await this.showSettingsModal();
         });
 
+        // Logout button
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+
         // New chat button
         document.getElementById('newChatBtn').addEventListener('click', () => {
             this.createNewChat();
@@ -1172,11 +1382,17 @@ class RAGmeAssistant {
         // File upload setup
         this.setupFileUpload();
 
-        // Modal overlay click to close
+        // Modal overlay click to close (excluding login modal for security)
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) {
                     const modalId = overlay.id;
+                    
+                    // Prevent closing login modal by clicking outside (security measure)
+                    if (modalId === 'loginModal') {
+                        return;
+                    }
+                    
                     this.hideModal(modalId);
 
                     // Reset document details modal state if it was closed
@@ -1199,6 +1415,9 @@ class RAGmeAssistant {
                 this.forceRefreshSummary();
             }
         });
+
+        // Login modal event listeners - no close button to prevent bypassing authentication
+        // Note: Login modal cannot be closed by clicking outside or X button
 
     }
 

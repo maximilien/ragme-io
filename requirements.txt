@@ -19,6 +19,10 @@ weaviate-client>=4.0.0
 weaviate-client[agents]
 pymilvus>=2.4.4
 
+# OAuth and JWT dependencies
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
 exif
 
 # OCR dependencies - using lighter alternatives
