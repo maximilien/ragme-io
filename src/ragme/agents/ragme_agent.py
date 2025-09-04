@@ -59,9 +59,9 @@ class RagMeAgent:
         llm_config = config.get_llm_config()
         temperature = llm_config.get("temperature", 0.7)
 
-        # Get language settings
-        self.force_english = llm_config.get("force_english", True)
-        self.default_language = llm_config.get("language", "en")
+        # Get language settings from i18n configuration
+        self.preferred_language = config.get_preferred_language()
+        self.language_name = config.get_language_name(self.preferred_language)
 
         # Initialize LLM
         self.llm = OpenAI(model=llm_model, temperature=temperature)
@@ -349,12 +349,8 @@ JSON response:"""
     def _create_agent(self) -> ReActAgent:
         """Create the ReActAgent with memory and dispatch tools."""
 
-        # Build language instruction based on configuration
-        language_instruction = ""
-        if self.force_english:
-            language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-        elif self.default_language != "en":
-            language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+        # Build language instruction based on i18n configuration
+        language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
         system_prompt = f"""You are an intelligent dispatcher agent that MUST use tools to handle user queries. You cannot respond directly to users.{language_instruction}
 

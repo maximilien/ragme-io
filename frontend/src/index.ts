@@ -26,6 +26,10 @@ interface AppConfig {
     description?: string;
     version?: string;
   };
+  i18n?: {
+    preferred_language?: string;
+    preferred_locale?: string;
+  };
   vector_databases?: {
     type?: string;
     collections?: Array<{ name?: string; type?: string }>;

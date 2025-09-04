@@ -52,9 +52,9 @@ class FunctionalAgent:
         llm_config = config.get_llm_config()
         temperature = llm_config.get("temperature", 0.7)
 
-        # Get language settings
-        self.force_english = llm_config.get("force_english", True)
-        self.default_language = llm_config.get("language", "en")
+        # Get language settings from i18n configuration
+        self.preferred_language = config.get_preferred_language()
+        self.language_name = config.get_language_name(self.preferred_language)
 
         self.llm = OpenAI(model=llm_model, temperature=temperature)
         self.agent = self._create_agent()
@@ -63,12 +63,8 @@ class FunctionalAgent:
         """
         Create the functional agent with tools for managing the RagMeDocs collection.
         """
-        # Build language instruction based on configuration
-        language_instruction = ""
-        if self.force_english:
-            language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-        elif self.default_language != "en":
-            language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+        # Build language instruction based on i18n configuration
+        language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
         return FunctionAgent(
             tools=self.tools.get_all_tools(),

@@ -9,6 +9,11 @@ application:
   version: "${APPLICATION_VERSION}"
   title: "${APPLICATION_TITLE}"
   description: "${APPLICATION_DESCRIPTION}"
+
+# Internationalization Configuration
+i18n:
+  preferred_language: "default"  # ISO language code (e.g., "en", "fr", "es", "de") or "default" to auto-detect
+  preferred_locale: "default"    # ISO locale code (e.g., "en_US", "fr_FR", "es_ES", "de_DE") or "default" to auto-detect
   
 # Network Configuration
 network:
