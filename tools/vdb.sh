@@ -61,7 +61,7 @@ main() {
     cd "$PROJECT_ROOT"
     
     # Execute the Python script as a module using uv run
-    uv run python3 -m ragme.vdbs.vdb_management "$@"
+    uv run --active python3 -m ragme.vdbs.vdb_management "$@"
 }
 
 # Handle help command specially for better formatting
