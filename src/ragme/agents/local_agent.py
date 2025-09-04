@@ -229,15 +229,13 @@ class DirectoryMonitor:
                 file_path.is_file()
                 and file_path.suffix.lower() in self.handler.supported_extensions
             ):
-                # Skip files that have been processed recently
+                # Skip files that have been processed (regardless of when)
                 processed_marker = file_path.with_suffix(
                     file_path.suffix + ".processed"
                 )
                 if processed_marker.exists():
-                    marker_age = time.time() - processed_marker.stat().st_mtime
-                    if marker_age < 60:  # Skip if processed within last minute
-                        logging.info(f"Skipping recently processed file: {file_path}")
-                        continue
+                    logging.info(f"Skipping already processed file: {file_path}")
+                    continue
 
                 logging.info(f"Processing existing file: {file_path}")
                 if self.handler.callback:
@@ -278,24 +276,25 @@ class RagMeLocalAgent:
         if not self.mcp_url:
             raise ValueError("RAGME_MCP_URL environment variable is required")
 
-        # Clean up old processed markers on startup
+        # Clean up orphaned processed markers on startup
         self._cleanup_old_processed_markers()
 
     # private methods
 
     def _cleanup_old_processed_markers(self):
-        """Clean up old processed marker files on startup"""
+        """Clean up processed marker files for files that no longer exist"""
         try:
             # Only look for .processed files in the watch directory
             if self.watch_directory.exists():
                 for processed_file in self.watch_directory.rglob("*.processed"):
                     try:
-                        # Check if the marker is old (older than 60 seconds)
-                        marker_age = time.time() - processed_file.stat().st_mtime
-                        if marker_age > 60:
+                        # Check if the original file still exists
+                        # Remove the .processed extension to get the original filename
+                        original_file = processed_file.with_suffix("")
+                        if not original_file.exists():
                             processed_file.unlink(missing_ok=True)
                             logging.info(
-                                f"Cleaned up old processed marker: {processed_file}"
+                                f"Cleaned up orphaned processed marker: {processed_file} (original file no longer exists)"
                             )
                     except Exception as e:
                         logging.warning(
