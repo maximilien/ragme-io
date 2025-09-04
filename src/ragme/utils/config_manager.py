@@ -39,6 +39,11 @@ class ConfigManager:
             dotenv.load_dotenv()
             # Note: Config will be loaded lazily when first accessed
 
+    def reload_config(self) -> None:
+        """Reload the configuration from file."""
+        self._config = None
+        dotenv.load_dotenv()  # Reload environment variables
+
     @property
     def config(self) -> dict[str, Any]:
         """Get the configuration, loading it if necessary."""
@@ -86,12 +91,19 @@ class ConfigManager:
             pattern = r"\$\{([^}]+)\}"
 
             def replace_var(match):
-                var_name = match.group(1)
-                env_value = os.getenv(var_name)
-                if env_value is None:
-                    # Keep the placeholder if environment variable is not set
-                    return match.group(0)
-                return env_value
+                var_expr = match.group(1)
+                # Handle ${VAR:-default} syntax
+                if ":-" in var_expr:
+                    var_name, default_value = var_expr.split(":-", 1)
+                    env_value = os.getenv(var_name)
+                    return env_value if env_value is not None else default_value
+                else:
+                    # Handle ${VAR} syntax
+                    env_value = os.getenv(var_expr)
+                    if env_value is None:
+                        # Keep the placeholder if environment variable is not set
+                        return match.group(0)
+                    return env_value
 
             return re.sub(pattern, replace_var, obj)
         else:
@@ -859,6 +871,36 @@ class ConfigManager:
     def get_query_image_relevance_threshold(self) -> float:
         """Get the image relevance threshold."""
         return self.get_query_config().get("relevance_thresholds", {}).get("image", 0.3)
+
+    def get_authentication_config(self) -> dict[str, Any]:
+        """Get authentication configuration."""
+        return self.get("authentication", {})
+
+    def is_login_bypassed(self) -> bool:
+        """Check if login is bypassed."""
+        return self.get("authentication.bypass_login", False)
+
+    def get_oauth_config(self) -> dict[str, Any]:
+        """Get OAuth configuration."""
+        return self.get("authentication.oauth", {})
+
+    def get_oauth_providers(self) -> dict[str, Any]:
+        """Get OAuth providers configuration."""
+        return self.get("authentication.oauth.providers", {})
+
+    def get_oauth_provider_config(self, provider: str) -> dict[str, Any] | None:
+        """Get configuration for a specific OAuth provider."""
+        providers = self.get_oauth_providers()
+        return providers.get(provider)
+
+    def is_oauth_provider_enabled(self, provider: str) -> bool:
+        """Check if an OAuth provider is enabled."""
+        provider_config = self.get_oauth_provider_config(provider)
+        return provider_config.get("enabled", False) if provider_config else False
+
+    def get_session_config(self) -> dict[str, Any]:
+        """Get session configuration."""
+        return self.get("authentication.session", {})
 
     def __str__(self) -> str:
         """String representation of the configuration."""
