@@ -116,6 +116,100 @@ The configuration system allows you to customize:
 
 **📚 Complete Configuration Guide:** See **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** for detailed configuration options, examples, and best practices.
 
+### 🔐 OAuth Authentication Setup ⭐ **NEW!**
+
+RAGme supports OAuth authentication with Google, GitHub, and Apple providers for secure user authentication in production deployments.
+
+#### OAuth Provider Setup
+
+1. **Google OAuth Setup**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable Google+ API
+   - Create OAuth 2.0 credentials
+   - Add authorized redirect URI: `http://localhost:3020/auth/google/callback` (or your domain)
+
+2. **GitHub OAuth Setup**:
+   - Go to GitHub Settings → Developer settings → OAuth Apps
+   - Create a new OAuth App
+   - Set Authorization callback URL: `http://localhost:3020/auth/github/callback` (or your domain)
+
+3. **Apple OAuth Setup**:
+   - Go to [Apple Developer Console](https://developer.apple.com/)
+   - Create a new App ID and Service ID
+   - Configure Sign in with Apple
+   - Set redirect URI: `http://localhost:3020/auth/apple/callback` (or your domain)
+
+#### Environment Configuration
+
+Add OAuth credentials to your `.env` file:
+
+```bash
+# OAuth Authentication
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3020/auth/google/callback
+
+GITHUB_OAUTH_CLIENT_ID=your-github-oauth-client-id
+GITHUB_OAUTH_CLIENT_SECRET=your-github-oauth-client-secret
+GITHUB_OAUTH_REDIRECT_URI=http://localhost:3020/auth/github/callback
+
+APPLE_OAUTH_CLIENT_ID=your-apple-oauth-client-id
+APPLE_OAUTH_CLIENT_SECRET=your-apple-oauth-client-secret
+APPLE_OAUTH_REDIRECT_URI=http://localhost:3020/auth/apple/callback
+
+SESSION_SECRET_KEY=your-session-secret-key-change-in-production
+```
+
+#### Configuration File
+
+Configure OAuth providers in `config.yaml`:
+
+```yaml
+authentication:
+  # Bypass login for development/testing (default: false)
+  bypass_login: false
+  
+  # OAuth providers configuration
+  oauth:
+    providers:
+      google:
+        enabled: true
+        client_id: "${GOOGLE_OAUTH_CLIENT_ID}"
+        client_secret: "${GOOGLE_OAUTH_CLIENT_SECRET}"
+        redirect_uri: "${GOOGLE_OAUTH_REDIRECT_URI:-http://localhost:3020/auth/google/callback}"
+        scope: "openid email profile"
+        
+      github:
+        enabled: true
+        client_id: "${GITHUB_OAUTH_CLIENT_ID}"
+        client_secret: "${GITHUB_OAUTH_CLIENT_SECRET}"
+        redirect_uri: "${GITHUB_OAUTH_REDIRECT_URI:-http://localhost:3020/auth/github/callback}"
+        scope: "user:email"
+        
+      apple:
+        enabled: true
+        client_id: "${APPLE_OAUTH_CLIENT_ID}"
+        client_secret: "${APPLE_OAUTH_CLIENT_SECRET}"
+        redirect_uri: "${APPLE_OAUTH_REDIRECT_URI:-http://localhost:3020/auth/apple/callback}"
+        scope: "name email"
+        
+  # Session configuration
+  session:
+    secret_key: "${SESSION_SECRET_KEY:-your-secret-key-change-in-production}"
+    max_age_seconds: 86400  # 24 hours
+    secure: false  # Set to true in production with HTTPS
+    httponly: true
+    samesite: "lax"
+```
+
+#### Usage
+
+- **Development**: Set `bypass_login: true` in `config.yaml` to skip authentication
+- **Production**: Configure OAuth providers and set `bypass_login: false`
+- **User Experience**: Users see a login modal on first visit, then seamless access
+- **Logout**: Users can logout via the hamburger menu
+
 ## 🏃‍♂️ Running RAGme
 
 ### Quick Start (All Services)
