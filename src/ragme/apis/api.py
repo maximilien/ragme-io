@@ -11,11 +11,22 @@ from typing import Any
 
 import PyPDF2
 from docx import Document
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    Cookie,
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from ..auth import OAuthManager, SessionManager, UserManager
 from ..ragme import RagMe
 from ..utils.config_manager import config
 from ..utils.storage import StorageService
@@ -97,6 +108,36 @@ def get_storage_service():
     return _storage_service
 
 
+# Authentication managers will be initialized lazily when needed
+_oauth_manager = None
+_session_manager = None
+_user_manager = None
+
+
+def get_oauth_manager():
+    """Get or create OAuthManager instance"""
+    global _oauth_manager
+    if _oauth_manager is None:
+        _oauth_manager = OAuthManager()
+    return _oauth_manager
+
+
+def get_session_manager():
+    """Get or create SessionManager instance"""
+    global _session_manager
+    if _session_manager is None:
+        _session_manager = SessionManager()
+    return _session_manager
+
+
+def get_user_manager():
+    """Get or create UserManager instance"""
+    global _user_manager
+    if _user_manager is None:
+        _user_manager = UserManager()
+    return _user_manager
+
+
 class URLInput(BaseModel):
     """Input model for adding URLs to the RAG system."""
 
@@ -138,6 +179,98 @@ class McpServerConfigList(BaseModel):
     """Input model for multiple MCP server configurations."""
 
     servers: list[McpServerConfig]
+
+
+class OAuthCallbackInput(BaseModel):
+    """Input model for OAuth callback."""
+
+    code: str
+    state: str | None = None
+
+
+class LoginResponse(BaseModel):
+    """Response model for login."""
+
+    success: bool
+    message: str
+    user: dict[str, Any] | None = None
+    token: str | None = None
+
+
+class LogoutResponse(BaseModel):
+    """Response model for logout."""
+
+    success: bool
+    message: str
+
+
+# Authentication dependency
+async def get_current_user(
+    request: Request, token: str | None = Cookie(None)
+) -> dict[str, Any] | None:
+    """
+    Get current authenticated user from session token.
+
+    Args:
+        request: FastAPI request object
+        token: JWT token from cookie
+
+    Returns:
+        User data if authenticated, None otherwise
+    """
+    # Check for token in cookie first
+    session_token = token
+
+    # If no cookie token, check Authorization header
+    if not session_token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            session_token = auth_header[7:]  # Remove "Bearer " prefix
+
+    print(
+        f"DEBUG: get_current_user called with token: {session_token[:20] if session_token else 'None'}..."
+    )
+
+    if not session_token:
+        print("DEBUG: No token provided")
+        return None
+
+    session_manager = get_session_manager()
+    session_data = session_manager.validate_token(session_token)
+    print(f"DEBUG: Session validation result: {session_data is not None}")
+
+    if not session_data:
+        print("DEBUG: Session validation failed")
+        return None
+
+    # Update user activity
+    user_manager = get_user_manager()
+    user_manager.update_user_activity(session_data["user_id"])
+
+    print(f"DEBUG: Returning session data for user: {session_data.get('email')}")
+    return session_data
+
+
+# Authentication required dependency
+async def require_auth(
+    current_user: dict[str, Any] | None = Depends(get_current_user),
+) -> dict[str, Any]:
+    """
+    Require authentication for protected endpoints.
+
+    Args:
+        current_user: Current user from get_current_user dependency
+
+    Returns:
+        User data
+
+    Raises:
+        HTTPException: If user is not authenticated
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    return current_user
 
 
 @app.post("/add-urls")
@@ -2984,6 +3117,172 @@ async def download_file(document_id: str):
     except Exception as e:
         print(f"Error downloading file {document_id}: {str(e)}")
         print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# OAuth Authentication Endpoints
+
+
+@app.get("/auth/providers")
+async def get_auth_providers():
+    """Get available OAuth providers."""
+    try:
+        oauth_manager = get_oauth_manager()
+        enabled_providers = oauth_manager.get_enabled_providers()
+
+        providers_info = []
+        for provider in enabled_providers:
+            oauth_manager.get_provider_config(provider)
+            providers_info.append(
+                {"name": provider, "display_name": provider.title(), "enabled": True}
+            )
+
+        return {
+            "success": True,
+            "providers": providers_info,
+            "bypass_login": config.is_login_bypassed(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/auth/{provider}/login")
+async def oauth_login(provider: str):
+    """Initiate OAuth login flow for a provider."""
+    try:
+        oauth_manager = get_oauth_manager()
+
+        if not oauth_manager.is_provider_enabled(provider):
+            raise HTTPException(
+                status_code=400, detail=f"OAuth provider '{provider}' is not enabled"
+            )
+
+        # Generate authorization URL
+        auth_url = oauth_manager.get_authorization_url(provider)
+
+        return RedirectResponse(url=auth_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/auth/{provider}/callback")
+async def oauth_callback(
+    provider: str, code: str, state: str = None, response: Response = None
+):
+    """Handle OAuth callback from provider."""
+    try:
+        oauth_manager = get_oauth_manager()
+        session_manager = get_session_manager()
+        user_manager = get_user_manager()
+
+        if not oauth_manager.is_provider_enabled(provider):
+            raise HTTPException(
+                status_code=400, detail=f"OAuth provider '{provider}' is not enabled"
+            )
+
+        # Exchange code for token and user info
+        token_data = await oauth_manager.exchange_code_for_token(provider, code, state)
+        user_info = token_data["user_info"]
+
+        # Create or update user
+        user_manager.create_or_update_user(user_info, provider)
+
+        # Create session
+        session_data = session_manager.create_session(user_info, provider)
+        print(
+            f"DEBUG: Created session for user {user_info.get('email')} with token: {session_data['token'][:20]}..."
+        )
+
+        # Set session cookie
+        cookie_config = session_manager.get_session_cookie_config()
+        print(f"DEBUG: Cookie config: {cookie_config}")
+
+        # Set cookie with conditional domain
+        cookie_kwargs = {
+            "key": "session_token",
+            "value": session_data["token"],
+            "max_age": cookie_config["max_age"],
+            "secure": cookie_config["secure"],
+            "httponly": cookie_config["httponly"],
+            "samesite": cookie_config["samesite"],
+            "path": cookie_config["path"],
+        }
+
+        # Only set domain if it's specified
+        if "domain" in cookie_config and cookie_config["domain"]:
+            cookie_kwargs["domain"] = cookie_config["domain"]
+
+        response.set_cookie(**cookie_kwargs)
+        print(
+            f"DEBUG: Set session cookie with path={cookie_config['path']}, domain={'not set' if 'domain' not in cookie_config else cookie_config['domain']}"
+        )
+
+        # Redirect to frontend with success and session token
+        frontend_port = config.get("network.frontend.port", 8020)
+        frontend_url = f"http://localhost:{frontend_port}"
+        return RedirectResponse(
+            url=f"{frontend_url}/?auth=success&token={session_data['token']}"
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/auth/me")
+async def get_current_user_info(
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Get current user information."""
+    try:
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        return {
+            "success": True,
+            "user": {
+                "id": current_user["user_id"],
+                "email": current_user["email"],
+                "name": current_user["name"],
+                "provider": current_user["provider"],
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/auth/logout")
+async def logout(response: Response):
+    """Logout current user."""
+    try:
+        # Clear session cookie
+        response.delete_cookie(key="session_token")
+
+        return {"success": True, "message": "Logged out successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/auth/status")
+async def auth_status(current_user: dict[str, Any] = Depends(get_current_user)):
+    """Check authentication status."""
+    try:
+        if current_user:
+            return {
+                "authenticated": True,
+                "user": {
+                    "id": current_user["user_id"],
+                    "email": current_user["email"],
+                    "name": current_user["name"],
+                    "provider": current_user["provider"],
+                },
+            }
+        else:
+            return {"authenticated": False, "bypass_login": config.is_login_bypassed()}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

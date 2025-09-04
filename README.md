@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ Recent Features (Last 2 Weeks)
 
+- **🔐 OAuth Authentication System**: Complete OAuth authentication system with support for Google, GitHub, and Apple providers. Features include beautiful login modal, JWT-based session management, secure cookie storage, user management, and development bypass mode. All authentication flows are properly implemented with comprehensive error handling and mobile-responsive design! ⭐ **NEW!**
 - **🌍 Internationalization (i18n) Support**: Comprehensive internationalization support ensuring LLM agents respond consistently in the configured language. Features automatic system language detection, 80+ language support, and frontend speech recognition integration. All system prompts now include language specification to prevent mixed-language responses! ⭐ **NEW!**
 - **🔄 AI Summary Force Refresh**: Added force refresh button next to AI Summary titles allowing users to regenerate summaries on demand. Features include proper HTTP request handling, UI state management, and visual feedback during regeneration. Bypasses cached summaries to generate fresh content! ⭐ **NEW!**
 - **🧠 AI Summary Caching**: Intelligent caching system that stores AI-generated summaries in document metadata to prevent redundant generation. Features include automatic cache checking, visual "Cached Summary" indicators, and seamless integration with both document and image collections! ⭐ **NEW!**
@@ -241,6 +242,25 @@ RAGME_MCP_URL=http://localhost:8022
 # Optional: Custom ports for services
 RAGME_API_PORT=8021
 RAGME_MCP_PORT=8022
+
+# OAuth Authentication (Optional - for production deployments)
+# Google OAuth
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3020/auth/google/callback
+
+# GitHub OAuth
+GITHUB_OAUTH_CLIENT_ID=your-github-oauth-client-id
+GITHUB_OAUTH_CLIENT_SECRET=your-github-oauth-client-secret
+GITHUB_OAUTH_REDIRECT_URI=http://localhost:3020/auth/github/callback
+
+# Apple OAuth
+APPLE_OAUTH_CLIENT_ID=your-apple-oauth-client-id
+APPLE_OAUTH_CLIENT_SECRET=your-apple-oauth-client-secret
+APPLE_OAUTH_REDIRECT_URI=http://localhost:3020/auth/apple/callback
+
+# Session Configuration
+SESSION_SECRET_KEY=your-session-secret-key-change-in-production
 RAGME_FRONTEND_PORT=8020
 ```
 
@@ -265,6 +285,7 @@ The configuration system allows you to customize:
 - **🤖 LLM settings** (models, temperature, tokens)
 - **🔧 MCP server configurations** (authentication, enabled services)
 - **🎨 Frontend customization** (UI settings, branding, colors)
+- **🔐 OAuth authentication** (Google, GitHub, Apple providers, session management)
 - **🚩 Feature flags** (enable/disable functionality)
 - **🔒 Security settings** (file upload limits, CSP)
 - **📊 Client branding** (logos, colors, welcome messages)
@@ -339,6 +360,67 @@ frontend:
 - **Visual Feedback**: Clear labels, help text, and proper form validation
 - **Responsive Design**: Works well on both desktop and mobile devices
 - **Consistent Styling**: Matches the overall application design language
+
+### 🔐 OAuth Authentication Setup ⭐ **NEW!**
+
+RAGme now supports OAuth authentication with Google, GitHub, and Apple providers for secure user authentication in production deployments.
+
+#### OAuth Provider Setup
+
+1. **Google OAuth Setup**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable Google+ API
+   - Create OAuth 2.0 credentials
+   - Add authorized redirect URI: `http://localhost:3020/auth/google/callback` (or your domain)
+
+2. **GitHub OAuth Setup**:
+   - Go to GitHub Settings → Developer settings → OAuth Apps
+   - Create a new OAuth App
+   - Set Authorization callback URL: `http://localhost:3020/auth/github/callback` (or your domain)
+
+3. **Apple OAuth Setup**:
+   - Go to [Apple Developer Console](https://developer.apple.com/)
+   - Create a new App ID and Service ID
+   - Configure Sign in with Apple
+   - Set redirect URI: `http://localhost:3020/auth/apple/callback` (or your domain)
+
+#### Configuration
+
+Add OAuth credentials to your `.env` file:
+
+```bash
+# OAuth Authentication
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3020/auth/google/callback
+
+GITHUB_OAUTH_CLIENT_ID=your-github-oauth-client-id
+GITHUB_OAUTH_CLIENT_SECRET=your-github-oauth-client-secret
+GITHUB_OAUTH_REDIRECT_URI=http://localhost:3020/auth/github/callback
+
+APPLE_OAUTH_CLIENT_ID=your-apple-oauth-client-id
+APPLE_OAUTH_CLIENT_SECRET=your-apple-oauth-client-secret
+APPLE_OAUTH_REDIRECT_URI=http://localhost:3020/auth/apple/callback
+
+SESSION_SECRET_KEY=your-session-secret-key-change-in-production
+```
+
+#### Authentication Features
+
+- **🔐 Secure Login**: Beautiful login modal with OAuth provider buttons
+- **🍪 Session Management**: JWT-based sessions with secure cookie storage
+- **👤 User Management**: User data storage and activity tracking
+- **🔄 Development Mode**: Bypass login option for development (`bypass_login: true` in config.yaml)
+- **📱 Mobile Responsive**: Works seamlessly on desktop and mobile devices
+- **🛡️ Security**: CSRF protection, secure cookies, and token validation
+
+#### Usage
+
+- **Development**: Set `bypass_login: true` in `config.yaml` to skip authentication
+- **Production**: Configure OAuth providers and set `bypass_login: false`
+- **User Experience**: Users see a login modal on first visit, then seamless access
+- **Logout**: Users can logout via the hamburger menu
 
 ### Multiple Collections Support (Text + Images)
 

@@ -1788,6 +1788,139 @@ body {
     max-width: 400px;
 }
 
+/* Login Modal Styles */
+.login-modal .modal-content {
+    max-width: 450px;
+    width: 90vw;
+}
+
+.login-content {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.login-welcome {
+    margin-bottom: 2rem;
+}
+
+.login-welcome h4 {
+    color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.login-welcome p {
+    color: #6b7280;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.oauth-providers {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.oauth-provider-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1.5rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    color: #374151;
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.oauth-provider-btn:hover {
+    border-color: #3b82f6;
+    background: #f8fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.oauth-provider-btn:active {
+    transform: translateY(0);
+}
+
+.oauth-provider-btn.google {
+    border-color: #db4437;
+    color: #db4437;
+}
+
+.oauth-provider-btn.google:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+}
+
+.oauth-provider-btn.github {
+    border-color: #333;
+    color: #333;
+}
+
+.oauth-provider-btn.github:hover {
+    background: #f9fafb;
+    border-color: #111;
+    box-shadow: 0 4px 12px rgba(17, 17, 17, 0.15);
+}
+
+.oauth-provider-btn.apple {
+    border-color: #000;
+    color: #000;
+}
+
+.oauth-provider-btn.apple:hover {
+    background: #f9fafb;
+    border-color: #111;
+    box-shadow: 0 4px 12px rgba(17, 17, 17, 0.15);
+}
+
+.oauth-provider-btn i {
+    font-size: 1.25rem;
+}
+
+.login-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem;
+    color: #6b7280;
+}
+
+.login-loading i {
+    font-size: 2rem;
+    color: #3b82f6;
+}
+
+.login-loading p {
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Logout menu item styling */
+#logoutBtn {
+    color: #6b7280;
+}
+
+#logoutBtn:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+#logoutBtn i {
+    color: #9ca3af;
+}
+
 /* Resize divider */
 .resize-divider {
     width: 4px;
