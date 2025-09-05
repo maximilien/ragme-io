@@ -3,6 +3,7 @@
 
 import os
 import tempfile
+import time
 import traceback
 import warnings
 from contextlib import asynccontextmanager
@@ -2268,8 +2269,8 @@ async def reset_chat_session():
 
 # Socket.IO support for real-time communication
 try:
-    import socketio
-    from socketio import AsyncServer
+    import socketio  # type: ignore
+    from socketio import AsyncServer  # type: ignore
 
     # Create Socket.IO server
     sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -3270,9 +3271,12 @@ async def logout(response: Response):
 async def auth_status(current_user: dict[str, Any] = Depends(get_current_user)):
     """Check authentication status."""
     try:
+        bypass_login = config.is_login_bypassed()
+        
         if current_user:
             return {
                 "authenticated": True,
+                "bypass_login": bypass_login,
                 "user": {
                     "id": current_user["user_id"],
                     "email": current_user["email"],
@@ -3281,7 +3285,49 @@ async def auth_status(current_user: dict[str, Any] = Depends(get_current_user)):
                 },
             }
         else:
-            return {"authenticated": False, "bypass_login": config.is_login_bypassed()}
+            return {
+                "authenticated": bypass_login,  # If bypass_login is true, consider user authenticated
+                "bypass_login": bypass_login,
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/auth/debug")
+async def auth_debug(request: Request, token: str | None = Cookie(None)):
+    """Debug authentication information (for troubleshooting)."""
+    try:
+        session_manager = get_session_manager()
+        secret_info = session_manager.get_session_secret_info()
+
+        # Check for token in cookie first
+        session_token = token
+        if not session_token:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                session_token = auth_header[7:]
+
+        debug_info = {
+            "session_secret_info": secret_info,
+            "token_provided": session_token is not None,
+            "token_length": len(session_token) if session_token else 0,
+            "token_prefix": session_token[:20] + "..."
+            if session_token and len(session_token) > 20
+            else session_token,
+            "bypass_login": config.is_login_bypassed(),
+        }
+
+        if session_token:
+            session_data = session_manager.validate_token(session_token)
+            debug_info["token_valid"] = session_data is not None
+            if session_data:
+                debug_info["user_email"] = session_data.get("email")
+                debug_info["expires_at"] = session_data.get("expires_at")
+                debug_info["time_until_expiry"] = (
+                    session_data.get("expires_at", 0) - time.time()
+                )
+
+        return debug_info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

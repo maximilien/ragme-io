@@ -179,3 +179,13 @@ class SessionManager:
             # Don't set domain to allow cookie to work for the specific host
             "path": "/",  # Make cookie available for all paths
         }
+
+    def get_session_secret_info(self) -> dict[str, Any]:
+        """Get session secret information for debugging."""
+        return {
+            "secret_key_length": len(self.secret_key),
+            "secret_key_prefix": self.secret_key[:8] + "..."
+            if len(self.secret_key) > 8
+            else self.secret_key,
+            "max_age_seconds": self.max_age_seconds,
+        }
