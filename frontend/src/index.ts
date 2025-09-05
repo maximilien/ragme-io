@@ -155,9 +155,9 @@ app.use(
         defaultSrc: ["'self'"],
         connectSrc: [
           "'self'",
-          'http://localhost:8021',
-          'ws://localhost:8021',
-          'wss://localhost:8021',
+          RAGME_API_URL,
+          RAGME_API_URL.replace('http://', 'ws://'),
+          RAGME_API_URL.replace('http://', 'wss://'),
         ],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -408,7 +408,7 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
           // Convert buffer to base64 and send as JSON
           const base64Data = file.buffer.toString('base64');
-          const mcpResponse = await fetch('http://localhost:8022/tool/process_pdf_base64', {
+          const mcpResponse = await fetch(`${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_pdf_base64`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -449,7 +449,7 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
           // Convert buffer to base64 and send as JSON
           const base64Data = file.buffer.toString('base64');
-          const mcpResponse = await fetch('http://localhost:8022/tool/process_docx_base64', {
+          const mcpResponse = await fetch(`${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_docx_base64`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -715,7 +715,7 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
     logger.info('Sending request to backend API');
     let result;
     try {
-      const response = await axios.post('http://localhost:8021/upload-images', formData, {
+      const response = await axios.post(`${RAGME_API_URL}/upload-images`, formData, {
         headers: {
           ...formData.getHeaders(),
         },

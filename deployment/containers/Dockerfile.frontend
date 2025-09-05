@@ -34,7 +34,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Set environment variables
 ENV NODE_ENV=production
 ENV RAGME_FRONTEND_PORT=8020
-ENV RAGME_API_URL=http://ragme-api:8021
 
 # Start frontend service
 CMD ["npm", "start"]
