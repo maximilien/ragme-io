@@ -3272,7 +3272,7 @@ async def auth_status(current_user: dict[str, Any] = Depends(get_current_user)):
     """Check authentication status."""
     try:
         bypass_login = config.is_login_bypassed()
-        
+
         if current_user:
             return {
                 "authenticated": True,

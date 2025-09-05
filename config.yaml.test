@@ -1,0 +1,514 @@
+# RAGme AI Configuration File
+# This file contains all configurable settings for RAGme deployment
+# Customize these values for different client deployments and your .env
+# file which will be used to fill the values with format ${ENV_VAR_NAME}
+
+# Application Metadata
+application:
+  name: "${APPLICATION_NAME}"
+  version: "${APPLICATION_VERSION}"
+  title: "${APPLICATION_TITLE}"
+  description: "${APPLICATION_DESCRIPTION}"
+  
+# Network Configuration
+network:
+  # Backend API Configuration
+  api:
+    host: "0.0.0.0"
+    port: 8021
+    cors_origins: ["*"]  # For production, specify actual origins
+    
+  # MCP Server Configuration  
+  mcp:
+    host: "0.0.0.0"
+    port: 8022
+    
+  # Frontend Configuration
+  frontend:
+    port: 3020
+    api_url: "http://localhost:8021"  # Backend API URL for frontend
+    
+  # Socket.IO Configuration
+  socketio:
+    cors_origins: ["*"]
+    methods: ["GET", "POST"]
+
+# Security Configuration
+security:
+  # Content Security Policy for frontend
+  csp:
+    connect_src: ["'self'", "http://localhost:8021", "ws://localhost:8021"]
+  
+  # File upload limits
+  file_upload:
+    max_file_size_mb: 50
+    allowed_extensions: [".pdf", ".docx", ".txt", ".md", ".json", ".csv"]
+
+# Vector Database Configuration
+vector_databases:
+  # Default vector database to use (can be overridden by VECTOR_DB_TYPE environment variable)
+  default: "weaviate-cloud"
+  
+  # Available vector database configurations
+  databases:
+    - name: "weaviate-local"
+      type: "weaviate-local"
+      url: "http://localhost:8080"
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "image"
+      embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
+      text_splitter: "recursive"
+      chunk_size: 1000
+      chunk_overlap: 100
+      chunk_overlap_ratio: 0.2
+      
+    - name: "weaviate-cloud"
+      type: "weaviate"
+      url: "${WEAVIATE_URL}"  # From environment
+      api_key: "${WEAVIATE_API_KEY}"  # From environment
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "image"
+      embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
+      text_splitter: "recursive"
+      chunk_size: 1000
+      chunk_overlap: 100
+      chunk_overlap_ratio: 0.2
+      
+    - name: "milvus-local"
+      type: "milvus"
+      uri: "milvus_demo.db"  # File-based for local development
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "image"
+      embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
+      text_splitter: "recursive"
+      chunk_size: 1000
+      chunk_overlap: 100
+      chunk_overlap_ratio: 0.2
+      
+    - name: "milvus-cloud"
+      type: "milvus"
+      uri: "${MILVUS_URI}"  # From environment
+      token: "${MILVUS_TOKEN}"  # From environment
+      collections:
+        - name: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+          type: "text"
+        - name: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+          type: "image"
+      embedding_model: "text-embedding-3-large"
+      image_embedding_model: "text-embedding-3-large"  # For image metadata embedding
+      text_splitter: "recursive"
+      chunk_size: 1000
+      chunk_overlap: 100
+      chunk_overlap_ratio: 0.2
+
+# Large Language Model Configuration
+llm:
+  # Default LLM settings
+  default_model: "gpt-4o-mini"
+  temperature: 0.7
+  max_tokens: 4000
+  
+  # Language settings
+  language: "en"  # Default language for agent responses (en, fr, es, de, etc.)
+  force_english: true  # Force agents to always respond in English regardless of user's language
+  
+  # Summarization settings
+  summarization:
+    model: "gpt-4o-mini"
+    temperature: 0.1  # Lower temperature for consistent summaries
+    max_tokens: 2000
+
+# Query Configuration
+query:
+  top_k: 5  # Number of most relevant documents to retrieve for queries
+  
+  # Reranking configuration
+  rerank:
+    # Text reranking settings
+    text:
+      enabled: false  # Enable LLM-based reranking for text results
+      top_k: 3  # Number of top text results to rerank with LLM
+    
+    # Image reranking settings  
+    image:
+      enabled: true  # Enable LLM-based reranking for image results
+      top_k: 10  # Number of top image results to rerank with LLM
+  
+  # Relevance thresholds for filtering results
+  relevance_thresholds:
+    text: 0.4  # Minimum similarity score for text documents (0.0 to 1.0)
+    image: 0.3  # Minimum similarity score for image documents (0.0 to 1.0) - Lowered for better coverage
+
+# Agent Configuration
+agents:
+  - name: "ragme-agent"
+    type: "ragme"
+    llm_model: "gpt-4o-mini"
+    system_prompt: >-
+      You are a helpful assistant that can write the contents of urls to text document
+      collections, as well as answering questions about stored documents.
+      
+      IMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query.
+      
+      MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
+      
+  - name: "functional-agent"
+    type: "functional"
+    llm_model: "gpt-4o-mini"
+    
+  - name: "query-agent"
+    type: "query"
+    llm_model: "gpt-4o-mini"
+    
+  - name: "local-agent"
+    type: "local"
+    llm_model: "gpt-4o-mini"
+    watch_directory: "${WATCH_DIRECTORY}"
+    chunk_size: 1000
+    mcp_servers:
+      - name: "local"
+        url: "http://localhost:8022"
+
+# MCP (Model Context Protocol) Server Configuration
+mcp_servers:
+  - name: "Google GDrive"
+    icon: "fab fa-google-drive"
+    authentication_type: "oauth"
+    enabled: false
+    description: "Access and process files from Google Drive"
+    
+  - name: "Dropbox Drive"
+    icon: "fab fa-dropbox"
+    authentication_type: "oauth"
+    enabled: false
+    description: "Access and process files from Dropbox"
+    
+  - name: "Google Mail"
+    icon: "fas fa-envelope"
+    authentication_type: "oauth"
+    enabled: false
+    description: "Process emails and attachments from Gmail"
+    
+  - name: "Twilio"
+    icon: "fas fa-phone"
+    authentication_type: "api_key"
+    enabled: false
+    description: "Send SMS and make calls via Twilio API"
+    
+  - name: "Local Agent"
+    icon: "fas fa-flask"
+    authentication_type: "none"
+    enabled: true
+    url: "http://localhost:8022"
+    description: "Local file processing and monitoring agent"
+
+# Frontend UI Configuration
+frontend:
+  # Default user settings
+  settings:
+    max_documents: 10  # Max documents to list before pagination (default: 10, max: 25)
+    auto_refresh: true
+    refresh_interval_ms: 30000  # 30 seconds
+    max_tokens: 4000
+    temperature: 0.7
+    speech_language: "en-US"  # Language for speech recognition (en-US, fr-FR, es-ES, etc.)
+    
+  # UI behavior and layout settings
+  ui:
+    # Vector DB and Collections display
+    show_vector_db_info: true  # Show/hide "Vector DB and Collections" on top pane
+    
+    # Document list settings
+    document_overview_enabled: true  # Document Overview enabled/disabled (default)
+    document_overview_visible: true  # Document Overview show/hide (default)
+    document_list_collapsed: false  # Document List pane collapse or showing (default)
+    document_list_width: 35  # Document List width size (default 35% of total width)
+    
+    # Chat History settings
+    chat_history_collapsed: false  # Chat History collapse or showing (default)
+    chat_history_width: 10  # Chat History width size (default 10% of total width)
+    
+    # Other UI settings
+    default_date_filter: "current"  # Options: current, month, year, all
+    default_visualization: "graph"  # Options: graph, chart, table
+    visualization_visible: true
+    
+  # Document limits
+  documents:
+    max_display: 25  # Maximum documents to display (limited to 25 for pagination)
+    default_limit: 10  # Default number of documents per page
+    pagination_size: 10  # Number of documents per page (default: 10, max: 25)
+    
+  # Connection settings
+  connection:
+    retry_attempts: 3
+    retry_delay_ms: 5000
+    timeout_ms: 30000
+
+# Logging Configuration
+logging:
+  # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  
+  # Log file configuration
+  files:
+    api: "logs/api.log"
+    mcp: "logs/mcp.log"
+    frontend: "logs/frontend.log"
+    agent: "logs/agent.log"
+
+# Environment Variables Mapping
+# These will be loaded from .env file or environment
+environment:
+  required:
+    - "OPENAI_API_KEY"
+  optional:
+    - "VECTOR_DB_TYPE"
+    - "WEAVIATE_API_KEY"
+    - "WEAVIATE_URL"
+    - "WEAVIATE_LOCAL_URL"
+    - "MILVUS_URI"
+    - "MILVUS_TOKEN"
+    - "RAGME_API_URL"
+    - "RAGME_MCP_URL"
+    - "RAGME_API_PORT"
+    - "RAGME_MCP_PORT"
+    - "RAGME_FRONTEND_PORT"
+
+# Development Configuration
+development:
+  hot_reload: true
+  debug_mode: false
+  mock_external_services: false
+  
+# Production Configuration
+production:
+  hot_reload: false
+  debug_mode: false
+  compress_responses: true
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+  
+# Health Check Configuration
+health_check:
+  enabled: true
+  endpoints:
+    - "/health"
+    - "/ready"
+  timeout_seconds: 30
+
+# Feature Flags
+features:
+  document_summarization: true
+  real_time_updates: true
+  file_upload: true
+  url_crawling: true
+  json_ingestion: true
+  pattern_deletion: true
+  bypass_delete_confirmation: false  # Skip confirmation for delete operations (useful for testing)
+  authentication: false  # Future feature
+  multi_tenant: false    # Future feature
+  mcp_integration: true
+  mcp_tools: true       # Enable/disable MCP Tools UI features and backend service
+
+# PDF Image Extraction Configuration
+pdf_image_extraction:
+  enabled: true  # Enable/disable PDF image extraction
+  min_image_size_kb: 1  # Minimum image size to extract (in KB)
+  max_image_size_mb: 10  # Maximum image size to extract (in MB)
+  supported_formats: ["jpeg", "jpg", "png", "gif", "bmp", "tiff"]  # Supported image formats
+  extract_captions: true  # Try to extract captions from OCR content
+  process_with_ai: true  # Apply AI classification and OCR to extracted images
+
+# Client Customization
+client:
+  # Branding
+  branding:
+    primary_color: "#2563eb"     # Blue
+    secondary_color: "#64748b"   # Slate
+    accent_color: "#10b981"      # Green
+    logo_url: ""                 # Custom logo URL
+    favicon_url: ""              # Custom favicon URL
+    
+  # Custom CSS
+  custom_styles: ""              # Additional CSS for customization
+  
+  # Welcome message
+  welcome_message: "Welcome to RAGme! Upload documents and images or add URLs to get started."
+  
+  # Footer text
+  footer_text: "Powered by RAGme AI"
+  
+  # Contact information
+  support_email: ""
+  support_url: ""
+
+# Monitoring and Analytics
+monitoring:
+  enabled: false
+  metrics:
+    - "document_count"
+    - "query_count"
+    - "response_time"
+    - "error_rate"
+  
+  # External monitoring services
+  services:
+    prometheus:
+      enabled: false
+      port: 9090
+    grafana:
+      enabled: false
+      port: 3000
+
+# Storage Configuration
+storage:
+  type: "minio"  # Options: minio, s3, local
+  
+  # File copy settings
+  copy_uploaded_docs: false      # Copy uploaded documents to storage service
+  copy_uploaded_images: false    # Copy uploaded images to storage service
+  
+  minio:
+    endpoint: "localhost:9000"
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
+    secure: false  # Set to true for HTTPS
+    bucket_name: "ragme-storage"
+    region: "us-east-1"
+  s3:
+    endpoint: "${S3_ENDPOINT}"
+    access_key: "${S3_ACCESS_KEY}"
+    secret_key: "${S3_SECRET_KEY}"
+    bucket_name: "${S3_BUCKET_NAME}"
+    region: "${S3_REGION:-us-east-1}"
+    secure: true
+  local:
+    path: "${MINIO_LOCAL_PATH}"
+
+# Backup Configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM (cron format)
+  retention_days: 30
+  storage:
+    type: "local"  # Options: local, s3, gcs
+    path: "backups/"
+
+# Deployment Configuration
+deployment:
+  # Deployment mode: local, docker, kubernetes
+  mode: "local"
+  
+  # Container configuration
+  containers:
+    registry: "${CONTAINER_REGISTRY:-localhost:5001}"
+    repository: "ragme"
+    tag: "${CONTAINER_TAG:-latest}"
+    pull_policy: "IfNotPresent"
+    
+  # Kubernetes deployment configuration
+  kubernetes:
+    # Cluster configuration
+    cluster:
+      name: "${K8S_CLUSTER_NAME:-ragme-cluster}"
+      namespace: "${K8S_NAMESPACE:-ragme}"
+      
+    # Service replicas
+    replicas:
+      api: 2
+      mcp: 2
+      agent: 1  # Must be 1 for file monitoring
+      frontend: 2
+      
+    # Resource requirements
+    resources:
+      api:
+        requests:
+          memory: "512Mi"
+          cpu: "500m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+      mcp:
+        requests:
+          memory: "512Mi"
+          cpu: "500m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+      agent:
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      frontend:
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      minio:
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      weaviate:
+        requests:
+          memory: "1Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "1000m"
+          
+    # Storage configuration
+    storage:
+      # Shared volume for watch directory
+      shared_volume:
+        size: "5Gi"
+        storage_class: "${K8S_STORAGE_CLASS:-standard}"
+        
+      # MinIO storage
+      minio:
+        enabled: true
+        storage_size: "10Gi"
+        
+      # Vector database storage
+      vector_db:
+        storage_size: "2Gi"
+        
+    # External access configuration
+    external_access:
+      type: "${K8S_ACCESS_TYPE:-NodePort}"  # Options: NodePort, LoadBalancer, Ingress
+      ingress:
+        enabled: false
+        host: "${K8S_INGRESS_HOST:-ragme.local}"
+        tls_enabled: false
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: "/"
+          
+    # Operator configuration
+    operator:
+      enabled: true
+      image: "${RAGME_OPERATOR_IMAGE:-ragme-operator:latest}"
+      namespace: "${K8S_OPERATOR_NAMESPACE:-ragme-operator-system}"
