@@ -137,6 +137,10 @@ class RAGmeAssistant {
             // Update API configuration from loaded config if available
             this.updateApiConfig();
 
+            // Load auth providers first to check bypass_login
+            await this.loadAuthProviders();
+            console.log('RAGmeAssistant: Auth providers loaded');
+
             // Check authentication status
             await this.checkAuthenticationStatus();
             console.log('RAGmeAssistant: Authentication status checked');
@@ -387,6 +391,12 @@ class RAGmeAssistant {
                 window.history.replaceState({}, document.title, newUrl);
             }
             
+            // If bypass_login is true, clear any stored session token to avoid conflicts
+            if (this.bypassLogin) {
+                localStorage.removeItem('session_token');
+                console.log('Bypass login enabled, cleared stored session token before auth check');
+            }
+            
             // Get stored token or use cookie
             const storedToken = localStorage.getItem('session_token');
             const headers = {};
@@ -410,6 +420,19 @@ class RAGmeAssistant {
                     bypassLogin: this.bypassLogin,
                     user: this.currentUser
                 });
+                
+                // Debug: Log the decision logic
+                console.log('Login decision:', {
+                    shouldShowLogin: !this.isAuthenticated && !this.bypassLogin,
+                    isAuthenticated: this.isAuthenticated,
+                    bypassLogin: this.bypassLogin
+                });
+                
+                // If bypass_login is true, clear any stored session token to avoid conflicts
+                if (this.bypassLogin) {
+                    localStorage.removeItem('session_token');
+                    console.log('Bypass login enabled, cleared stored session token');
+                }
                 
                 // Show login modal if not authenticated and not bypassed
                 if (!this.isAuthenticated && !this.bypassLogin) {
