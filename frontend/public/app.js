@@ -205,7 +205,10 @@ class RAGmeAssistant {
 
     updateApiConfig() {
         // Update API configuration from loaded config if available
-        if (this.config && this.config.network && this.config.network.api) {
+        if (this.config && this.config.api_url) {
+            this.apiConfig.baseUrl = this.config.api_url;
+            console.log('API base URL updated from config:', this.apiConfig.baseUrl);
+        } else if (this.config && this.config.network && this.config.network.api) {
             const apiConfig = this.config.network.api;
             if (apiConfig.host && apiConfig.port) {
                 const protocol = apiConfig.ssl ? 'https' : 'http';
@@ -463,6 +466,9 @@ class RAGmeAssistant {
                 
                 console.log('Auth providers loaded:', this.authProviders);
                 this.renderAuthProviders();
+                
+                // Update close button visibility based on bypass login setting
+                this.updateLoginModalCloseButton();
             }
         } catch (error) {
             console.warn('Failed to load auth providers:', error);
@@ -481,6 +487,19 @@ class RAGmeAssistant {
         const modal = document.getElementById('loginModal');
         if (modal) {
             modal.classList.remove('show');
+        }
+    }
+
+    updateLoginModalCloseButton() {
+        const closeButton = document.getElementById('closeLoginModal');
+        if (closeButton) {
+            if (this.bypassLogin) {
+                closeButton.style.display = 'block';
+                console.log('Bypass login enabled - showing close button');
+            } else {
+                closeButton.style.display = 'none';
+                console.log('Bypass login disabled - hiding close button');
+            }
         }
     }
 
@@ -1439,8 +1458,14 @@ class RAGmeAssistant {
             }
         });
 
-        // Login modal event listeners - no close button to prevent bypassing authentication
-        // Note: Login modal cannot be closed by clicking outside or X button
+        // Login modal event listeners
+        // Close button is only available when bypass_login is enabled
+        document.getElementById('closeLoginModal').addEventListener('click', () => {
+            if (this.bypassLogin) {
+                this.hideLoginModal();
+                console.log('Login modal closed via X button (bypass login enabled)');
+            }
+        });
 
     }
 

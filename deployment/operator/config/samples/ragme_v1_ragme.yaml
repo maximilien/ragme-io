@@ -86,3 +86,30 @@ spec:
       enabled: false
       host: "ragme.local"
       tlsEnabled: false
+  
+  authentication:
+    oauth:
+      google:
+        enabled: true
+        clientId: "your-google-oauth-client-id"
+        clientSecret: "your-google-oauth-client-secret"
+        redirectUri: "http://ragme-api:8021/auth/google/callback"
+        scope: "openid email profile"
+      github:
+        enabled: true
+        clientId: "your-github-oauth-client-id"
+        clientSecret: "your-github-oauth-client-secret"
+        redirectUri: "http://ragme-api:8021/auth/github/callback"
+        scope: "user:email"
+      apple:
+        enabled: true
+        clientId: "your-apple-oauth-client-id"
+        clientSecret: "your-apple-oauth-client-secret"
+        redirectUri: "http://ragme-api:8021/auth/apple/callback"
+        scope: "name email"
+    session:
+      secretKey: "ragme-shared-session-secret-key-2025"
+      maxAgeSeconds: 86400
+      secure: false
+      httpOnly: true
+      sameSite: "lax"

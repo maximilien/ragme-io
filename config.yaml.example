@@ -374,7 +374,7 @@ features:
   json_ingestion: true
   pattern_deletion: true
   bypass_delete_confirmation: false  # Skip confirmation for delete operations (useful for testing)
-  authentication: false  # Future feature
+  authentication: true  # OAuth authentication enabled
   multi_tenant: false    # Future feature
   mcp_integration: true
   mcp_tools: true       # Enable/disable MCP Tools UI features and backend service

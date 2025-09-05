@@ -412,17 +412,20 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
           // Convert buffer to base64 and send as JSON
           const base64Data = file.buffer.toString('base64');
-          const mcpResponse = await fetch(`${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_pdf_base64`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filename: file.originalname,
-              content: base64Data,
-              content_type: file.mimetype,
-            }),
-          });
+          const mcpResponse = await fetch(
+            `${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_pdf_base64`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filename: file.originalname,
+                content: base64Data,
+                content_type: file.mimetype,
+              }),
+            }
+          );
 
           logger.info(`MCP response status: ${mcpResponse.status}`);
           if (mcpResponse.ok) {
@@ -453,17 +456,20 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
           // Convert buffer to base64 and send as JSON
           const base64Data = file.buffer.toString('base64');
-          const mcpResponse = await fetch(`${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_docx_base64`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filename: file.originalname,
-              content: base64Data,
-              content_type: file.mimetype,
-            }),
-          });
+          const mcpResponse = await fetch(
+            `${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_docx_base64`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filename: file.originalname,
+                content: base64Data,
+                content_type: file.mimetype,
+              }),
+            }
+          );
 
           logger.info(`MCP response status: ${mcpResponse.status}`);
           if (mcpResponse.ok) {
@@ -1015,7 +1021,7 @@ app.get('/api/config', (req, res) => {
       // Note: authentication_type and url are excluded for security
     })),
     features: appConfig.features || {},
-    api_url: RAGME_API_URL,
+    api_url: process.env.RAGME_API_URL?.includes('ragme-api') ? 'http://localhost:30021' : RAGME_API_URL,
   };
 
   res.json(safeConfig);

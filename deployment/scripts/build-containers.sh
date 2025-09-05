@@ -57,7 +57,7 @@ if [ -f ".env" ]; then
     set +a
     
     # Create a processed config.yaml for the build using sed
-    cp config.yaml.example config.yaml.processed
+    cp config.yaml config.yaml.processed
     
     # Replace environment variables in the config file
     if [ -n "$APPLICATION_NAME" ]; then
@@ -108,8 +108,8 @@ if [ -f ".env" ]; then
     
     print_status "Config processed with environment variables"
 else
-    print_warning "No .env file found, using config.yaml.example as-is"
-    cp config.yaml.example config.yaml.processed
+    print_warning "No .env file found, using config.yaml as-is"
+    cp config.yaml config.yaml.processed
 fi
 
 print_status "Building RAGme containers with Podman..."

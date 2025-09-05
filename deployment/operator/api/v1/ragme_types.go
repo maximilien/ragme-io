@@ -27,6 +27,9 @@ type RAGmeSpec struct {
 
 	// External access configuration
 	ExternalAccess RAGmeExternalAccess `json:"externalAccess,omitempty"`
+
+	// Authentication configuration
+	Authentication RAGmeAuthentication `json:"authentication,omitempty"`
 }
 
 // DeepCopyInto copies the receiver into the given *RAGmeSpec
@@ -38,6 +41,7 @@ func (r *RAGmeSpec) DeepCopyInto(out *RAGmeSpec) {
 	r.VectorDB.DeepCopyInto(&out.VectorDB)
 	r.Resources.DeepCopyInto(&out.Resources)
 	r.ExternalAccess.DeepCopyInto(&out.ExternalAccess)
+	r.Authentication.DeepCopyInto(&out.Authentication)
 }
 
 // DeepCopy returns a deep copy of RAGmeSpec
@@ -357,6 +361,110 @@ type RAGmeIngressConfig struct {
 	Host        string            `json:"host,omitempty"`
 	TLSEnabled  bool              `json:"tlsEnabled,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// RAGmeAuthentication defines authentication configuration
+type RAGmeAuthentication struct {
+	// OAuth providers configuration
+	OAuth RAGmeOAuthConfig `json:"oauth,omitempty"`
+
+	// Session configuration
+	Session RAGmeSessionConfig `json:"session,omitempty"`
+}
+
+// DeepCopyInto copies the receiver into the given *RAGmeAuthentication
+func (r *RAGmeAuthentication) DeepCopyInto(out *RAGmeAuthentication) {
+	*out = *r
+	r.OAuth.DeepCopyInto(&out.OAuth)
+	r.Session.DeepCopyInto(&out.Session)
+}
+
+// DeepCopy returns a deep copy of RAGmeAuthentication
+func (r *RAGmeAuthentication) DeepCopy() *RAGmeAuthentication {
+	if r == nil {
+		return nil
+	}
+	out := new(RAGmeAuthentication)
+	r.DeepCopyInto(out)
+	return out
+}
+
+// RAGmeOAuthConfig defines OAuth configuration
+type RAGmeOAuthConfig struct {
+	// Google OAuth configuration
+	Google RAGmeOAuthProvider `json:"google,omitempty"`
+
+	// GitHub OAuth configuration
+	GitHub RAGmeOAuthProvider `json:"github,omitempty"`
+
+	// Apple OAuth configuration
+	Apple RAGmeOAuthProvider `json:"apple,omitempty"`
+}
+
+// DeepCopyInto copies the receiver into the given *RAGmeOAuthConfig
+func (r *RAGmeOAuthConfig) DeepCopyInto(out *RAGmeOAuthConfig) {
+	*out = *r
+	r.Google.DeepCopyInto(&out.Google)
+	r.GitHub.DeepCopyInto(&out.GitHub)
+	r.Apple.DeepCopyInto(&out.Apple)
+}
+
+// DeepCopy returns a deep copy of RAGmeOAuthConfig
+func (r *RAGmeOAuthConfig) DeepCopy() *RAGmeOAuthConfig {
+	if r == nil {
+		return nil
+	}
+	out := new(RAGmeOAuthConfig)
+	r.DeepCopyInto(out)
+	return out
+}
+
+// RAGmeOAuthProvider defines OAuth provider configuration
+type RAGmeOAuthProvider struct {
+	Enabled      bool   `json:"enabled,omitempty"`
+	ClientID     string `json:"clientId,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty"`
+	RedirectURI  string `json:"redirectUri,omitempty"`
+	Scope        string `json:"scope,omitempty"`
+}
+
+// DeepCopyInto copies the receiver into the given *RAGmeOAuthProvider
+func (r *RAGmeOAuthProvider) DeepCopyInto(out *RAGmeOAuthProvider) {
+	*out = *r
+}
+
+// DeepCopy returns a deep copy of RAGmeOAuthProvider
+func (r *RAGmeOAuthProvider) DeepCopy() *RAGmeOAuthProvider {
+	if r == nil {
+		return nil
+	}
+	out := new(RAGmeOAuthProvider)
+	r.DeepCopyInto(out)
+	return out
+}
+
+// RAGmeSessionConfig defines session configuration
+type RAGmeSessionConfig struct {
+	SecretKey     string `json:"secretKey,omitempty"`
+	MaxAgeSeconds int32  `json:"maxAgeSeconds,omitempty"`
+	Secure        bool   `json:"secure,omitempty"`
+	HttpOnly      bool   `json:"httpOnly,omitempty"`
+	SameSite      string `json:"sameSite,omitempty"`
+}
+
+// DeepCopyInto copies the receiver into the given *RAGmeSessionConfig
+func (r *RAGmeSessionConfig) DeepCopyInto(out *RAGmeSessionConfig) {
+	*out = *r
+}
+
+// DeepCopy returns a deep copy of RAGmeSessionConfig
+func (r *RAGmeSessionConfig) DeepCopy() *RAGmeSessionConfig {
+	if r == nil {
+		return nil
+	}
+	out := new(RAGmeSessionConfig)
+	r.DeepCopyInto(out)
+	return out
 }
 
 // DeepCopyInto copies the receiver into the given *RAGmeIngressConfig

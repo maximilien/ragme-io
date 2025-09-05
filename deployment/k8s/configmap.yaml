@@ -32,6 +32,11 @@ data:
   # Watch Directory
   WATCH_DIRECTORY: "/app/watch_directory"
   MINIO_LOCAL_PATH: "/app/minio_data"
+  
+  # OAuth Configuration
+  GOOGLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/apple/callback"
 
 ---
 apiVersion: v1
@@ -62,3 +67,14 @@ stringData:
   S3_SECRET_KEY: "your-s3-secret-key"
   S3_BUCKET_NAME: "your-s3-bucket"
   S3_REGION: "us-east-1"
+  
+  # OAuth secrets - update these values
+  GOOGLE_OAUTH_CLIENT_ID: "your-google-oauth-client-id"
+  GOOGLE_OAUTH_CLIENT_SECRET: "your-google-oauth-client-secret"
+  GITHUB_OAUTH_CLIENT_ID: "your-github-oauth-client-id"
+  GITHUB_OAUTH_CLIENT_SECRET: "your-github-oauth-client-secret"
+  APPLE_OAUTH_CLIENT_ID: "your-apple-oauth-client-id"
+  APPLE_OAUTH_CLIENT_SECRET: "your-apple-oauth-client-secret"
+  
+  # Session configuration
+  SESSION_SECRET_KEY: "your-session-secret-key-change-in-production"
