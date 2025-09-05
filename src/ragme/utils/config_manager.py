@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 dr.max
 
+import locale
 import os
 import re
 import warnings
@@ -37,6 +38,11 @@ class ConfigManager:
             # Load environment variables first
             dotenv.load_dotenv()
             # Note: Config will be loaded lazily when first accessed
+
+    def reload_config(self) -> None:
+        """Reload the configuration from file."""
+        self._config = None
+        dotenv.load_dotenv()  # Reload environment variables
 
     @property
     def config(self) -> dict[str, Any]:
@@ -85,12 +91,19 @@ class ConfigManager:
             pattern = r"\$\{([^}]+)\}"
 
             def replace_var(match):
-                var_name = match.group(1)
-                env_value = os.getenv(var_name)
-                if env_value is None:
-                    # Keep the placeholder if environment variable is not set
-                    return match.group(0)
-                return env_value
+                var_expr = match.group(1)
+                # Handle ${VAR:-default} syntax
+                if ":-" in var_expr:
+                    var_name, default_value = var_expr.split(":-", 1)
+                    env_value = os.getenv(var_name)
+                    return env_value if env_value is not None else default_value
+                else:
+                    # Handle ${VAR} syntax
+                    env_value = os.getenv(var_expr)
+                    if env_value is None:
+                        # Keep the placeholder if environment variable is not set
+                        return match.group(0)
+                    return env_value
 
             return re.sub(pattern, replace_var, obj)
         else:
@@ -414,6 +427,223 @@ class ConfigManager:
         """Get LLM configuration."""
         return self.get("llm", {})
 
+    def get_i18n_config(self) -> dict[str, Any]:
+        """Get internationalization configuration."""
+        return self.get("i18n", {})
+
+    def get_preferred_language(self) -> str:
+        """
+        Get the preferred language for LLM responses.
+
+        Returns:
+            ISO language code (e.g., "en", "fr", "es", "de") or "en" as default
+        """
+        i18n_config = self.get_i18n_config()
+        preferred_language = i18n_config.get("preferred_language", "default")
+
+        if preferred_language == "default":
+            return self._detect_system_language()
+
+        return preferred_language
+
+    def get_preferred_locale(self) -> str:
+        """
+        Get the preferred locale for the system.
+
+        Returns:
+            ISO locale code (e.g., "en_US", "fr_FR", "es_ES", "de_DE") or "en_US" as default
+        """
+        i18n_config = self.get_i18n_config()
+        preferred_locale = i18n_config.get("preferred_locale", "default")
+
+        if preferred_locale == "default":
+            return self._detect_system_locale()
+
+        return preferred_locale
+
+    def get_language_name(self, language_code: str | None = None) -> str:
+        """
+        Get the human-readable language name from ISO language code.
+
+        Args:
+            language_code: ISO language code (e.g., "en", "fr", "es", "de").
+                          If None, uses the preferred language from config.
+
+        Returns:
+            Human-readable language name (e.g., "English", "French", "Spanish", "German")
+        """
+        if language_code is None:
+            language_code = self.get_preferred_language()
+
+        language_names = {
+            "en": "English",
+            "fr": "French",
+            "es": "Spanish",
+            "de": "German",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "ja": "Japanese",
+            "ko": "Korean",
+            "zh": "Chinese",
+            "ar": "Arabic",
+            "hi": "Hindi",
+            "nl": "Dutch",
+            "sv": "Swedish",
+            "no": "Norwegian",
+            "da": "Danish",
+            "fi": "Finnish",
+            "pl": "Polish",
+            "tr": "Turkish",
+            "cs": "Czech",
+            "hu": "Hungarian",
+            "ro": "Romanian",
+            "bg": "Bulgarian",
+            "hr": "Croatian",
+            "sk": "Slovak",
+            "sl": "Slovenian",
+            "et": "Estonian",
+            "lv": "Latvian",
+            "lt": "Lithuanian",
+            "el": "Greek",
+            "he": "Hebrew",
+            "th": "Thai",
+            "vi": "Vietnamese",
+            "id": "Indonesian",
+            "ms": "Malay",
+            "tl": "Filipino",
+            "uk": "Ukrainian",
+            "be": "Belarusian",
+            "ka": "Georgian",
+            "hy": "Armenian",
+            "az": "Azerbaijani",
+            "kk": "Kazakh",
+            "ky": "Kyrgyz",
+            "uz": "Uzbek",
+            "tg": "Tajik",
+            "mn": "Mongolian",
+            "my": "Burmese",
+            "km": "Khmer",
+            "lo": "Lao",
+            "si": "Sinhala",
+            "ne": "Nepali",
+            "bn": "Bengali",
+            "gu": "Gujarati",
+            "pa": "Punjabi",
+            "ta": "Tamil",
+            "te": "Telugu",
+            "kn": "Kannada",
+            "ml": "Malayalam",
+            "or": "Odia",
+            "as": "Assamese",
+            "mr": "Marathi",
+            "ur": "Urdu",
+            "fa": "Persian",
+            "ps": "Pashto",
+            "sd": "Sindhi",
+            "bo": "Tibetan",
+            "dz": "Dzongkha",
+            "am": "Amharic",
+            "ti": "Tigrinya",
+            "om": "Oromo",
+            "so": "Somali",
+            "sw": "Swahili",
+            "zu": "Zulu",
+            "xh": "Xhosa",
+            "af": "Afrikaans",
+            "is": "Icelandic",
+            "ga": "Irish",
+            "cy": "Welsh",
+            "mt": "Maltese",
+            "eu": "Basque",
+            "ca": "Catalan",
+            "gl": "Galician",
+            "mk": "Macedonian",
+            "sq": "Albanian",
+            "sr": "Serbian",
+            "bs": "Bosnian",
+            "me": "Montenegrin",
+        }
+
+        return language_names.get(language_code, "English")
+
+    def _detect_system_language(self) -> str:
+        """
+        Detect the system's preferred language.
+
+        Returns:
+            ISO language code (e.g., "en", "fr", "es", "de")
+        """
+        try:
+            # Try to get the system locale
+            system_locale = locale.getdefaultlocale()[0]
+            if system_locale:
+                # Extract language code from locale (e.g., "en_US" -> "en")
+                language_code = system_locale.split("_")[0].lower()
+                return language_code
+        except (locale.Error, AttributeError, IndexError):
+            pass
+
+        # Fallback to environment variables
+        for env_var in ["LANG", "LC_ALL", "LC_CTYPE"]:
+            try:
+                env_locale = os.getenv(env_var)
+                if env_locale:
+                    # Extract language code from locale (e.g., "en_US.UTF-8" -> "en")
+                    language_code = env_locale.split("_")[0].split(".")[0].lower()
+                    # Validate that it's a reasonable language code (2-3 characters, alphabetic)
+                    if (
+                        language_code
+                        and len(language_code) <= 3
+                        and language_code.isalpha()
+                    ):
+                        return language_code
+            except (AttributeError, IndexError):
+                continue
+
+        # Final fallback to English
+        return "en"
+
+    def _detect_system_locale(self) -> str:
+        """
+        Detect the system's preferred locale.
+
+        Returns:
+            ISO locale code (e.g., "en_US", "fr_FR", "es_ES", "de_DE")
+        """
+        try:
+            # Try to get the system locale
+            system_locale = locale.getdefaultlocale()[0]
+            if system_locale:
+                return system_locale
+        except (locale.Error, AttributeError):
+            pass
+
+        # Fallback to environment variables
+        for env_var in ["LANG", "LC_ALL", "LC_CTYPE"]:
+            try:
+                env_locale = os.getenv(env_var)
+                if env_locale:
+                    # Clean up locale string (e.g., "en_US.UTF-8" -> "en_US")
+                    locale_code = env_locale.split(".")[0]
+                    # Validate that it's a reasonable locale format (language_country)
+                    if "_" in locale_code and len(locale_code.split("_")) == 2:
+                        lang, country = locale_code.split("_")
+                        if (
+                            lang
+                            and len(lang) <= 3
+                            and lang.isalpha()
+                            and country
+                            and len(country) <= 3
+                            and country.isalpha()
+                        ):
+                            return locale_code
+            except (AttributeError, IndexError):
+                continue
+
+        # Final fallback to English US
+        return "en_US"
+
     def get_frontend_config(self) -> dict[str, Any]:
         """Get frontend configuration."""
         return self.get("frontend", {})
@@ -447,6 +677,7 @@ class ConfigManager:
         # Only include explicitly safe sections
         safe_sections = {
             "application": ["name", "version", "title", "description"],
+            "i18n": True,  # All i18n config is safe
             "frontend": True,  # All frontend config is safe
             "client": True,  # All client config is safe
             "features": True,  # All feature flags are safe
@@ -640,6 +871,36 @@ class ConfigManager:
     def get_query_image_relevance_threshold(self) -> float:
         """Get the image relevance threshold."""
         return self.get_query_config().get("relevance_thresholds", {}).get("image", 0.3)
+
+    def get_authentication_config(self) -> dict[str, Any]:
+        """Get authentication configuration."""
+        return self.get("authentication", {})
+
+    def is_login_bypassed(self) -> bool:
+        """Check if login is bypassed."""
+        return self.get("authentication.bypass_login", False)
+
+    def get_oauth_config(self) -> dict[str, Any]:
+        """Get OAuth configuration."""
+        return self.get("authentication.oauth", {})
+
+    def get_oauth_providers(self) -> dict[str, Any]:
+        """Get OAuth providers configuration."""
+        return self.get("authentication.oauth.providers", {})
+
+    def get_oauth_provider_config(self, provider: str) -> dict[str, Any] | None:
+        """Get configuration for a specific OAuth provider."""
+        providers = self.get_oauth_providers()
+        return providers.get(provider)
+
+    def is_oauth_provider_enabled(self, provider: str) -> bool:
+        """Check if an OAuth provider is enabled."""
+        provider_config = self.get_oauth_provider_config(provider)
+        return provider_config.get("enabled", False) if provider_config else False
+
+    def get_session_config(self) -> dict[str, Any]:
+        """Get session configuration."""
+        return self.get("authentication.session", {})
 
     def __str__(self) -> str:
         """String representation of the configuration."""

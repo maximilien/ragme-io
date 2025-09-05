@@ -8,6 +8,12 @@ class RAGmeAssistant {
         this.chatHistory = [];
         this.chatSessions = [];
         this.currentChatId = null;
+        
+        // Authentication state
+        this.isAuthenticated = false;
+        this.currentUser = null;
+        this.authProviders = [];
+        this.bypassLogin = false;
         // Default settings - will be overridden by configuration
         this.settings = {
             maxDocuments: 10, // Changed from 50 to 10 (max: 25)
@@ -130,6 +136,14 @@ class RAGmeAssistant {
 
             // Update API configuration from loaded config if available
             this.updateApiConfig();
+
+            // Load auth providers first to check bypass_login
+            await this.loadAuthProviders();
+            console.log('RAGmeAssistant: Auth providers loaded');
+
+            // Check authentication status
+            await this.checkAuthenticationStatus();
+            console.log('RAGmeAssistant: Authentication status checked');
 
             this.connectSocket();
             console.log('RAGmeAssistant: Socket connected');
@@ -356,6 +370,220 @@ class RAGmeAssistant {
             }
         } catch (error) {
             console.warn('Failed to load configuration:', error);
+        }
+    }
+
+    // Authentication Methods
+    async checkAuthenticationStatus() {
+        try {
+            // Check for auth=success parameter in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const authSuccess = urlParams.get('auth') === 'success';
+            const token = urlParams.get('token');
+            
+            if (authSuccess && token) {
+                // Store the session token
+                localStorage.setItem('session_token', token);
+                console.log('OAuth authentication successful, stored session token');
+                
+                // Clear the auth parameters from URL
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+            
+            // If bypass_login is true, clear any stored session token to avoid conflicts
+            if (this.bypassLogin) {
+                localStorage.removeItem('session_token');
+                console.log('Bypass login enabled, cleared stored session token before auth check');
+            }
+            
+            // Get stored token or use cookie
+            const storedToken = localStorage.getItem('session_token');
+            const headers = {};
+            if (storedToken) {
+                headers['Authorization'] = `Bearer ${storedToken}`;
+            }
+            
+            const response = await fetch(this.buildApiUrl('auth/status'), {
+                credentials: 'include',
+                headers: headers
+            });
+            
+            if (response.ok) {
+                const authData = await response.json();
+                this.isAuthenticated = authData.authenticated;
+                this.bypassLogin = authData.bypass_login;
+                this.currentUser = authData.user || null;
+                
+                console.log('Authentication status:', {
+                    isAuthenticated: this.isAuthenticated,
+                    bypassLogin: this.bypassLogin,
+                    user: this.currentUser
+                });
+                
+                // Debug: Log the decision logic
+                console.log('Login decision:', {
+                    shouldShowLogin: !this.isAuthenticated && !this.bypassLogin,
+                    isAuthenticated: this.isAuthenticated,
+                    bypassLogin: this.bypassLogin
+                });
+                
+                // If bypass_login is true, clear any stored session token to avoid conflicts
+                if (this.bypassLogin) {
+                    localStorage.removeItem('session_token');
+                    console.log('Bypass login enabled, cleared stored session token');
+                }
+                
+                // Show login modal if not authenticated and not bypassed
+                if (!this.isAuthenticated && !this.bypassLogin) {
+                    this.showLoginModal();
+                } else {
+                    this.hideLoginModal();
+                    this.updateUserInterface();
+                }
+            } else {
+                console.warn('Failed to check authentication status');
+                // Default to showing login modal if we can't check status
+                this.showLoginModal();
+            }
+        } catch (error) {
+            console.warn('Error checking authentication status:', error);
+            // Default to showing login modal on error
+            this.showLoginModal();
+        }
+    }
+
+    async loadAuthProviders() {
+        try {
+            const response = await fetch(this.buildApiUrl('auth/providers'));
+            if (response.ok) {
+                const data = await response.json();
+                this.authProviders = data.providers || [];
+                this.bypassLogin = data.bypass_login || false;
+                
+                console.log('Auth providers loaded:', this.authProviders);
+                this.renderAuthProviders();
+            }
+        } catch (error) {
+            console.warn('Failed to load auth providers:', error);
+        }
+    }
+
+    showLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.add('show');
+            this.loadAuthProviders();
+        }
+    }
+
+    hideLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    renderAuthProviders() {
+        const providersContainer = document.getElementById('oauthProviders');
+        if (!providersContainer) return;
+
+        providersContainer.innerHTML = '';
+
+        this.authProviders.forEach(provider => {
+            const button = document.createElement('button');
+            button.className = `oauth-provider-btn ${provider.name}`;
+            button.onclick = () => this.initiateOAuthLogin(provider.name);
+            
+            const icon = this.getProviderIcon(provider.name);
+            const displayName = provider.display_name || provider.name;
+            
+            button.innerHTML = `
+                <i class="${icon}"></i>
+                <span>Continue with ${displayName}</span>
+            `;
+            
+            providersContainer.appendChild(button);
+        });
+    }
+
+    getProviderIcon(providerName) {
+        const icons = {
+            google: 'fab fa-google',
+            github: 'fab fa-github',
+            apple: 'fab fa-apple'
+        };
+        return icons[providerName] || 'fas fa-sign-in-alt';
+    }
+
+    initiateOAuthLogin(provider) {
+        console.log(`Initiating OAuth login with ${provider}`);
+        
+        // Show loading state
+        const loadingElement = document.getElementById('loginLoading');
+        const providersElement = document.getElementById('oauthProviders');
+        
+        if (loadingElement) loadingElement.style.display = 'flex';
+        if (providersElement) providersElement.style.display = 'none';
+        
+        // Redirect to OAuth provider
+        window.location.href = this.buildApiUrl(`auth/${provider}/login`);
+    }
+
+    async logout() {
+        try {
+            // Get stored token for logout request
+            const storedToken = localStorage.getItem('session_token');
+            const headers = {};
+            if (storedToken) {
+                headers['Authorization'] = `Bearer ${storedToken}`;
+            }
+            
+            const response = await fetch(this.buildApiUrl('auth/logout'), {
+                method: 'POST',
+                credentials: 'include',
+                headers: headers
+            });
+            
+            if (response.ok) {
+                this.isAuthenticated = false;
+                this.currentUser = null;
+                
+                // Clear stored token
+                localStorage.removeItem('session_token');
+                
+                this.updateUserInterface();
+                this.showLoginModal();
+                this.showNotification('Logged out successfully', 'success');
+            } else {
+                this.showNotification('Failed to logout', 'error');
+            }
+        } catch (error) {
+            console.warn('Error during logout:', error);
+            this.showNotification('Failed to logout', 'error');
+        }
+    }
+
+    updateUserInterface() {
+        // Update header with user info
+        const headerTitle = document.querySelector('.header .title');
+        if (headerTitle && this.currentUser) {
+            headerTitle.textContent = `Welcome, ${this.currentUser.name}`;
+        }
+        
+        // Update hamburger menu with logout option
+        this.updateHamburgerMenu();
+    }
+
+    updateHamburgerMenu() {
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (!logoutBtn) return;
+
+        // Show/hide logout button based on authentication status
+        if (this.isAuthenticated && !this.bypassLogin) {
+            logoutBtn.style.display = 'flex';
+        } else {
+            logoutBtn.style.display = 'none';
         }
     }
 
@@ -819,6 +1047,11 @@ class RAGmeAssistant {
             await this.showSettingsModal();
         });
 
+        // Logout button
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+
         // New chat button
         document.getElementById('newChatBtn').addEventListener('click', () => {
             this.createNewChat();
@@ -1172,11 +1405,17 @@ class RAGmeAssistant {
         // File upload setup
         this.setupFileUpload();
 
-        // Modal overlay click to close
+        // Modal overlay click to close (excluding login modal for security)
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) {
                     const modalId = overlay.id;
+                    
+                    // Prevent closing login modal by clicking outside (security measure)
+                    if (modalId === 'loginModal') {
+                        return;
+                    }
+                    
                     this.hideModal(modalId);
 
                     // Reset document details modal state if it was closed
@@ -1199,6 +1438,9 @@ class RAGmeAssistant {
                 this.forceRefreshSummary();
             }
         });
+
+        // Login modal event listeners - no close button to prevent bypassing authentication
+        // Note: Login modal cannot be closed by clicking outside or X button
 
     }
 
@@ -2440,6 +2682,41 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (this.config && this.config.application) {
             document.getElementById('appName').textContent = this.config.application.name || 'RAGme';
             document.getElementById('appVersion').textContent = this.config.application.version || '1.0.0';
+        }
+
+        // Populate i18n settings
+        if (this.config && this.config.i18n) {
+            document.getElementById('settingsPreferredLanguage').textContent = this.config.i18n.preferred_language || 'default';
+            document.getElementById('settingsPreferredLocale').textContent = this.config.i18n.preferred_locale || 'default';
+            
+            // Get language name from language code
+            const languageCode = this.config.i18n.preferred_language || 'en';
+            const languageNames = {
+                'en': 'English', 'fr': 'French', 'es': 'Spanish', 'de': 'German', 'it': 'Italian',
+                'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese', 'ko': 'Korean', 'zh': 'Chinese',
+                'ar': 'Arabic', 'hi': 'Hindi', 'nl': 'Dutch', 'sv': 'Swedish', 'no': 'Norwegian',
+                'da': 'Danish', 'fi': 'Finnish', 'pl': 'Polish', 'tr': 'Turkish', 'cs': 'Czech',
+                'hu': 'Hungarian', 'ro': 'Romanian', 'bg': 'Bulgarian', 'hr': 'Croatian', 'sk': 'Slovak',
+                'sl': 'Slovenian', 'et': 'Estonian', 'lv': 'Latvian', 'lt': 'Lithuanian', 'el': 'Greek',
+                'he': 'Hebrew', 'th': 'Thai', 'vi': 'Vietnamese', 'id': 'Indonesian', 'ms': 'Malay',
+                'tl': 'Filipino', 'uk': 'Ukrainian', 'be': 'Belarusian', 'ka': 'Georgian', 'hy': 'Armenian',
+                'az': 'Azerbaijani', 'kk': 'Kazakh', 'ky': 'Kyrgyz', 'uz': 'Uzbek', 'tg': 'Tajik',
+                'mn': 'Mongolian', 'my': 'Burmese', 'km': 'Khmer', 'lo': 'Lao', 'si': 'Sinhala',
+                'ne': 'Nepali', 'bn': 'Bengali', 'gu': 'Gujarati', 'pa': 'Punjabi', 'ta': 'Tamil',
+                'te': 'Telugu', 'kn': 'Kannada', 'ml': 'Malayalam', 'or': 'Odia', 'as': 'Assamese',
+                'mr': 'Marathi', 'ur': 'Urdu', 'fa': 'Persian', 'ps': 'Pashto', 'sd': 'Sindhi',
+                'bo': 'Tibetan', 'dz': 'Dzongkha', 'am': 'Amharic', 'ti': 'Tigrinya', 'om': 'Oromo',
+                'so': 'Somali', 'sw': 'Swahili', 'zu': 'Zulu', 'xh': 'Xhosa', 'af': 'Afrikaans',
+                'is': 'Icelandic', 'ga': 'Irish', 'cy': 'Welsh', 'mt': 'Maltese', 'eu': 'Basque',
+                'ca': 'Catalan', 'gl': 'Galician', 'mk': 'Macedonian', 'sq': 'Albanian', 'sr': 'Serbian',
+                'bs': 'Bosnian', 'me': 'Montenegrin', 'default': 'Auto-detect'
+            };
+            document.getElementById('settingsLanguageName').textContent = languageNames[languageCode] || 'English';
+        } else {
+            // Fallback values when i18n config is not available
+            document.getElementById('settingsPreferredLanguage').textContent = 'default';
+            document.getElementById('settingsPreferredLocale').textContent = 'default';
+            document.getElementById('settingsLanguageName').textContent = 'Auto-detect';
         }
 
         // Load and set vector DB info with a delay to ensure it runs after other functions
@@ -6967,8 +7244,110 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
 
         this.speechRecognition.continuous = false;
         this.speechRecognition.interimResults = false;
-        // Get language from config or default to en-US
-        const speechLang = this.config?.frontend?.settings?.speech_language || 'en-US';
+        // Get language from i18n config or fallback to frontend settings or default to en-US
+        let speechLang = 'en-US'; // Default fallback
+        
+        if (this.config?.i18n?.preferred_locale) {
+            // Use preferred locale from i18n config
+            speechLang = this.config.i18n.preferred_locale;
+        } else if (this.config?.i18n?.preferred_language) {
+            // Convert language code to locale format (e.g., "en" -> "en-US")
+            const languageCode = this.config.i18n.preferred_language;
+            const localeMap = {
+                'en': 'en-US',
+                'fr': 'fr-FR',
+                'es': 'es-ES',
+                'de': 'de-DE',
+                'it': 'it-IT',
+                'pt': 'pt-PT',
+                'ru': 'ru-RU',
+                'ja': 'ja-JP',
+                'ko': 'ko-KR',
+                'zh': 'zh-CN',
+                'ar': 'ar-SA',
+                'hi': 'hi-IN',
+                'nl': 'nl-NL',
+                'sv': 'sv-SE',
+                'no': 'no-NO',
+                'da': 'da-DK',
+                'fi': 'fi-FI',
+                'pl': 'pl-PL',
+                'tr': 'tr-TR',
+                'cs': 'cs-CZ',
+                'hu': 'hu-HU',
+                'ro': 'ro-RO',
+                'bg': 'bg-BG',
+                'hr': 'hr-HR',
+                'sk': 'sk-SK',
+                'sl': 'sl-SI',
+                'et': 'et-EE',
+                'lv': 'lv-LV',
+                'lt': 'lt-LT',
+                'el': 'el-GR',
+                'he': 'he-IL',
+                'th': 'th-TH',
+                'vi': 'vi-VN',
+                'id': 'id-ID',
+                'ms': 'ms-MY',
+                'tl': 'tl-PH',
+                'uk': 'uk-UA',
+                'be': 'be-BY',
+                'ka': 'ka-GE',
+                'hy': 'hy-AM',
+                'az': 'az-AZ',
+                'kk': 'kk-KZ',
+                'ky': 'ky-KG',
+                'uz': 'uz-UZ',
+                'tg': 'tg-TJ',
+                'mn': 'mn-MN',
+                'my': 'my-MM',
+                'km': 'km-KH',
+                'lo': 'lo-LA',
+                'si': 'si-LK',
+                'ne': 'ne-NP',
+                'bn': 'bn-BD',
+                'gu': 'gu-IN',
+                'pa': 'pa-IN',
+                'ta': 'ta-IN',
+                'te': 'te-IN',
+                'kn': 'kn-IN',
+                'ml': 'ml-IN',
+                'or': 'or-IN',
+                'as': 'as-IN',
+                'mr': 'mr-IN',
+                'ur': 'ur-PK',
+                'fa': 'fa-IR',
+                'ps': 'ps-AF',
+                'sd': 'sd-PK',
+                'bo': 'bo-CN',
+                'dz': 'dz-BT',
+                'am': 'am-ET',
+                'ti': 'ti-ET',
+                'om': 'om-ET',
+                'so': 'so-SO',
+                'sw': 'sw-KE',
+                'zu': 'zu-ZA',
+                'xh': 'xh-ZA',
+                'af': 'af-ZA',
+                'is': 'is-IS',
+                'ga': 'ga-IE',
+                'cy': 'cy-GB',
+                'mt': 'mt-MT',
+                'eu': 'eu-ES',
+                'ca': 'ca-ES',
+                'gl': 'gl-ES',
+                'mk': 'mk-MK',
+                'sq': 'sq-AL',
+                'sr': 'sr-RS',
+                'bs': 'bs-BA',
+                'me': 'me-ME'
+            };
+            speechLang = localeMap[languageCode] || `${languageCode}-${languageCode.toUpperCase()}`;
+        } else if (this.config?.frontend?.settings?.speech_language) {
+            // Fallback to legacy frontend settings
+            speechLang = this.config.frontend.settings.speech_language;
+        }
+        
         this.speechRecognition.lang = speechLang;
 
         this.speechRecognition.onstart = () => {

@@ -68,10 +68,9 @@ class QueryAgent:
         self.image_rerank_top_k: int = config.get_query_image_rerank_top_k()
         self.image_rerank_with_llm: bool = config.get_query_image_rerank_enabled()
 
-        # Get language settings
-        llm_config = config.get_llm_config()
-        self.force_english = llm_config.get("force_english", True)
-        self.default_language = llm_config.get("language", "en")
+        # Get language settings from i18n configuration
+        self.preferred_language = config.get_preferred_language()
+        self.language_name = config.get_language_name(self.preferred_language)
 
         self.llm = OpenAI(model=llm_model, temperature=temperature)
 
@@ -233,12 +232,8 @@ class QueryAgent:
             list[str]: List of expanded queries including the original
         """
         try:
-            # Build language instruction based on configuration
-            language_instruction = ""
-            if self.force_english:
-                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-            elif self.default_language != "en":
-                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+            # Build language instruction based on i18n configuration
+            language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
             prompt = f"""You are an expert at understanding search queries and generating related search terms.{language_instruction}
 
@@ -374,12 +369,8 @@ User query: "{query}"
             return results
 
         try:
-            # Build language instruction based on configuration
-            language_instruction = ""
-            if self.force_english:
-                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-            elif self.default_language != "en":
-                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+            # Build language instruction based on i18n configuration
+            language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
             # Create a batch scoring prompt for efficiency
             documents_info = []
@@ -480,12 +471,8 @@ Respond with ONLY a JSON array of scores (0.0-1.0), one for each document, in or
             str: Extracted date query or empty string if not found
         """
         try:
-            # Build language instruction based on configuration
-            language_instruction = ""
-            if self.force_english:
-                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-            elif self.default_language != "en":
-                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+            # Build language instruction based on i18n configuration
+            language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
             prompt = f"""You are a helpful assistant that extracts date queries from user requests.{language_instruction}
 
@@ -585,12 +572,8 @@ Date query:"""
 
             context = "\n".join(context_parts)
 
-            # Build language instruction based on configuration
-            language_instruction = ""
-            if self.force_english:
-                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-            elif self.default_language != "en":
-                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+            # Build language instruction based on i18n configuration
+            language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
             # Create prompt for LLM to generate summary
             prompt = f"""You are a helpful assistant that summarizes image collections.{language_instruction}
@@ -1302,11 +1285,7 @@ Respond with ONLY "YES" if images would be helpful, or "NO" if not.
 
             listing = "\n".join(lines)
             # Build language instruction for reranking
-            rerank_language_instruction = ""
-            if self.force_english:
-                rerank_language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query.\n"
-            elif self.default_language != "en":
-                rerank_language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query.\n"
+            rerank_language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query.\n"
 
             prompt = (
                 "You will receive a user query and a list of text document candidates (index, filename, url, content_preview).\n"
@@ -1420,12 +1399,8 @@ Respond with ONLY "YES" if images would be helpful, or "NO" if not.
 
             context = "\n".join(context_parts)
 
-            # Build language instruction based on configuration
-            language_instruction = ""
-            if self.force_english:
-                language_instruction = "\nIMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query. This is a critical requirement.\n"
-            elif self.default_language != "en":
-                language_instruction = f"\nIMPORTANT: You MUST ALWAYS respond in {self.default_language}, regardless of the language used in the user's query. This is a critical requirement.\n"
+            # Build language instruction based on i18n configuration
+            language_instruction = f"\nIMPORTANT: You are a helpful assistant that only responds in {self.language_name}. You MUST ALWAYS respond in {self.language_name}, regardless of the language used in the user's query. This is a critical requirement.\n"
 
             # Create prompt for LLM to answer the specific query
             prompt = f"""You are a helpful assistant that answers questions based on the provided documents and images.{language_instruction}

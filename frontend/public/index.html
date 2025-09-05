@@ -336,6 +336,11 @@
             <i class="fas fa-cog"></i>
             Settings
         </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="logoutBtn">
+            <i class="fas fa-sign-out-alt"></i>
+            Logout
+        </div>
     </div>
 
     <!-- Add Content Modal -->
@@ -455,6 +460,30 @@
         </div>
     </div>
 
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal-content login-modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-sign-in-alt"></i> Login to RAGme</h3>
+            </div>
+            <div class="modal-body">
+                <div class="login-content">
+                    <div class="login-welcome">
+                        <h4>Welcome to RAGme</h4>
+                        <p>Please sign in with one of the following providers to continue:</p>
+                    </div>
+                    <div class="oauth-providers" id="oauthProviders">
+                        <!-- OAuth provider buttons will be populated here -->
+                    </div>
+                    <div class="login-loading" id="loginLoading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Redirecting to authentication...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-content settings-modal">
@@ -502,6 +531,22 @@
                             <div class="setting-item read-only">
                                 <label>Vector Database:</label>
                                 <span id="settingsVectorDbType">-</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h4><i class="fas fa-globe"></i> Language & Locale</h4>
+                            <div class="setting-item read-only">
+                                <label>Preferred Language:</label>
+                                <span id="settingsPreferredLanguage">-</span>
+                            </div>
+                            <div class="setting-item read-only">
+                                <label>Preferred Locale:</label>
+                                <span id="settingsPreferredLocale">-</span>
+                            </div>
+                            <div class="setting-item read-only">
+                                <label>Language Name:</label>
+                                <span id="settingsLanguageName">-</span>
                             </div>
                         </div>
 

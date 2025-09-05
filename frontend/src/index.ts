@@ -26,6 +26,10 @@ interface AppConfig {
     description?: string;
     version?: string;
   };
+  i18n?: {
+    preferred_language?: string;
+    preferred_locale?: string;
+  };
   vector_databases?: {
     type?: string;
     collections?: Array<{ name?: string; type?: string }>;
@@ -258,7 +262,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'ragme-frontend'
+    service: 'ragme-frontend',
   });
 });
 

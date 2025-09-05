@@ -203,6 +203,9 @@ ngrok.yml
 # RAGme Configuration
 config.yaml
 
+# Generated Kubernetes config files with secrets
+deployment/k8s/configmap-generated.yaml
+
 # RAGme dev
 TODOs.md
 .ragme-prompts.txt
@@ -210,6 +213,9 @@ tags.txt
 
 # MinIO data directory
 minio_data/
+
+# OAuth data directory
+data/
 
 # RAGme processed file markers (only in watch directory)
 watch_directory/**/*.processed
