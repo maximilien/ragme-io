@@ -103,6 +103,38 @@ if [ -f ".env" ]; then
         sed -i.bak "s|\${MINIO_LOCAL_PATH}|$MINIO_LOCAL_PATH|g" config.yaml.processed
     fi
     
+    # OAuth Configuration
+    if [ -n "$GOOGLE_OAUTH_CLIENT_ID" ]; then
+        sed -i.bak "s|\${GOOGLE_OAUTH_CLIENT_ID}|$GOOGLE_OAUTH_CLIENT_ID|g" config.yaml.processed
+    fi
+    if [ -n "$GOOGLE_OAUTH_CLIENT_SECRET" ]; then
+        sed -i.bak "s|\${GOOGLE_OAUTH_CLIENT_SECRET}|$GOOGLE_OAUTH_CLIENT_SECRET|g" config.yaml.processed
+    fi
+    if [ -n "$GOOGLE_OAUTH_REDIRECT_URI" ]; then
+        sed -i.bak "s|\${GOOGLE_OAUTH_REDIRECT_URI}|$GOOGLE_OAUTH_REDIRECT_URI|g" config.yaml.processed
+    fi
+    if [ -n "$GITHUB_OAUTH_CLIENT_ID" ]; then
+        sed -i.bak "s|\${GITHUB_OAUTH_CLIENT_ID}|$GITHUB_OAUTH_CLIENT_ID|g" config.yaml.processed
+    fi
+    if [ -n "$GITHUB_OAUTH_CLIENT_SECRET" ]; then
+        sed -i.bak "s|\${GITHUB_OAUTH_CLIENT_SECRET}|$GITHUB_OAUTH_CLIENT_SECRET|g" config.yaml.processed
+    fi
+    if [ -n "$GITHUB_OAUTH_REDIRECT_URI" ]; then
+        sed -i.bak "s|\${GITHUB_OAUTH_REDIRECT_URI}|$GITHUB_OAUTH_REDIRECT_URI|g" config.yaml.processed
+    fi
+    if [ -n "$APPLE_OAUTH_CLIENT_ID" ]; then
+        sed -i.bak "s|\${APPLE_OAUTH_CLIENT_ID}|$APPLE_OAUTH_CLIENT_ID|g" config.yaml.processed
+    fi
+    if [ -n "$APPLE_OAUTH_CLIENT_SECRET" ]; then
+        sed -i.bak "s|\${APPLE_OAUTH_CLIENT_SECRET}|$APPLE_OAUTH_CLIENT_SECRET|g" config.yaml.processed
+    fi
+    if [ -n "$APPLE_OAUTH_REDIRECT_URI" ]; then
+        sed -i.bak "s|\${APPLE_OAUTH_REDIRECT_URI}|$APPLE_OAUTH_REDIRECT_URI|g" config.yaml.processed
+    fi
+    if [ -n "$SESSION_SECRET_KEY" ]; then
+        sed -i.bak "s|\${SESSION_SECRET_KEY}|$SESSION_SECRET_KEY|g" config.yaml.processed
+    fi
+    
     # Clean up backup files
     rm -f config.yaml.processed.bak
     

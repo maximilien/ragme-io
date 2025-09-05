@@ -3128,8 +3128,10 @@ async def download_file(document_id: str):
 async def get_auth_providers():
     """Get available OAuth providers."""
     try:
+        print(f"[DEBUG] /auth/providers endpoint called")
         oauth_manager = get_oauth_manager()
         enabled_providers = oauth_manager.get_enabled_providers()
+        print(f"[DEBUG] Enabled providers: {enabled_providers}")
 
         providers_info = []
         for provider in enabled_providers:
@@ -3138,12 +3140,15 @@ async def get_auth_providers():
                 {"name": provider, "display_name": provider.title(), "enabled": True}
             )
 
-        return {
+        result = {
             "success": True,
             "providers": providers_info,
             "bypass_login": config.is_login_bypassed(),
         }
+        print(f"[DEBUG] Returning providers: {result}")
+        return result
     except Exception as e:
+        print(f"[DEBUG] Error in /auth/providers: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
