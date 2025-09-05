@@ -162,7 +162,11 @@ jobs:
     - name: Create .env file
       run: |
         cp env.example .env
-        echo "OPENAI_API_KEY=fake-key-for-testing" >> .env
+        # Replace placeholder values with test values
+        sed -i 's/your-openai-api-key-here/fake-key-for-testing/g' .env
+        sed -i 's/your-weaviate-api-key/fake-weaviate-key/g' .env
+        sed -i 's/your-weaviate-url/http:\/\/localhost:8080/g' .env
+        sed -i 's/your-session-secret-key-change-in-production/test-session-secret/g' .env
         
     - name: Test container builds
       run: |
