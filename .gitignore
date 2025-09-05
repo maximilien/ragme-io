@@ -203,6 +203,9 @@ ngrok.yml
 # RAGme Configuration
 config.yaml
 
+# Generated Kubernetes config files with secrets
+deployment/k8s/configmap-generated.yaml
+
 # RAGme dev
 TODOs.md
 .ragme-prompts.txt
