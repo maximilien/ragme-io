@@ -63,6 +63,14 @@ interface AppConfig {
 let appConfig: AppConfig = {};
 let RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8021';
 
+// For CSP configuration, use external NodePort URL when running in Kubernetes
+const getCSPApiUrl = () => {
+  if (process.env.RAGME_API_URL?.includes('ragme-api')) {
+    return 'http://localhost:30021';
+  }
+  return RAGME_API_URL;
+};
+
 // Try to load configuration from the backend
 async function loadConfiguration() {
   try {
@@ -159,9 +167,9 @@ app.use(
         defaultSrc: ["'self'"],
         connectSrc: [
           "'self'",
-          RAGME_API_URL,
-          RAGME_API_URL.replace('http://', 'ws://'),
-          RAGME_API_URL.replace('http://', 'wss://'),
+          getCSPApiUrl(),
+          getCSPApiUrl().replace('http://', 'ws://'),
+          getCSPApiUrl().replace('http://', 'wss://'),
         ],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
