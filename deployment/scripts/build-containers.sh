@@ -135,6 +135,14 @@ if [ -f ".env" ]; then
         sed -i.bak "s|\${SESSION_SECRET_KEY}|$SESSION_SECRET_KEY|g" config.yaml.processed
     fi
     
+    # Update CSP configuration for Kubernetes NodePort deployment
+    # Replace localhost:8021 with localhost:30021 (API NodePort)
+    # Replace localhost:8020 with localhost:30020 (Frontend NodePort)
+    sed -i.bak "s|http://localhost:8021|http://localhost:30021|g" config.yaml.processed
+    sed -i.bak "s|ws://localhost:8021|ws://localhost:30021|g" config.yaml.processed
+    sed -i.bak "s|http://localhost:8020|http://localhost:30020|g" config.yaml.processed
+    sed -i.bak "s|ws://localhost:8020|ws://localhost:30020|g" config.yaml.processed
+    
     # Clean up backup files
     rm -f config.yaml.processed.bak
     
@@ -142,6 +150,17 @@ if [ -f ".env" ]; then
 else
     print_warning "No .env file found, using config.yaml as-is"
     cp config.yaml config.yaml.processed
+    
+    # Update CSP configuration for Kubernetes NodePort deployment even without .env
+    # Replace localhost:8021 with localhost:30021 (API NodePort)
+    # Replace localhost:8020 with localhost:30020 (Frontend NodePort)
+    sed -i.bak "s|http://localhost:8021|http://localhost:30021|g" config.yaml.processed
+    sed -i.bak "s|ws://localhost:8021|ws://localhost:30021|g" config.yaml.processed
+    sed -i.bak "s|http://localhost:8020|http://localhost:30020|g" config.yaml.processed
+    sed -i.bak "s|ws://localhost:8020|ws://localhost:30020|g" config.yaml.processed
+    
+    # Clean up backup files
+    rm -f config.yaml.processed.bak
 fi
 
 print_status "Building RAGme containers with Podman..."
