@@ -197,7 +197,12 @@ check_disk_space
 
 # Build Frontend service
 print_status "Building Frontend service container..."
-podman build -f deployment/containers/Dockerfile.frontend -t localhost/ragme-frontend:latest .
+podman build \
+  --build-arg RAGME_API_URL="$RAGME_API_URL" \
+  --build-arg RAGME_MCP_URL="$RAGME_MCP_URL" \
+  --build-arg RAGME_UI_URL="$RAGME_UI_URL" \
+  -f deployment/containers/Dockerfile.frontend \
+  -t localhost/ragme-frontend:latest .
 
 print_status "All containers built successfully!"
 
