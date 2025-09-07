@@ -41,16 +41,17 @@ spec:
             secretKeyRef:
               name: ragme-secrets
               key: OPENAI_API_KEY
-        - name: WEAVIATE_URL
-          valueFrom:
-            secretKeyRef:
-              name: ragme-secrets
-              key: WEAVIATE_URL
-        - name: WEAVIATE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: ragme-secrets
-              key: WEAVIATE_API_KEY
+        # Weaviate Cloud environment variables removed for local development
+        # - name: WEAVIATE_URL
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: ragme-secrets
+        #       key: WEAVIATE_URL
+        # - name: WEAVIATE_API_KEY
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: ragme-secrets
+        #       key: WEAVIATE_API_KEY
         - name: VECTOR_DB_TYPE
           valueFrom:
             configMapKeyRef:
