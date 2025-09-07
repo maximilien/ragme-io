@@ -149,6 +149,17 @@ if [ -f ".env" ]; then
     export RAGME_MCP_URL="http://localhost:30022"
     export RAGME_UI_URL="http://localhost:30020"
     
+    # Substitute environment variables in config.yaml.processed
+    if [ -n "$RAGME_API_URL" ]; then
+        sed -i.bak "s|\${RAGME_API_URL}|$RAGME_API_URL|g" config.yaml.processed
+    fi
+    if [ -n "$RAGME_MCP_URL" ]; then
+        sed -i.bak "s|\${RAGME_MCP_URL}|$RAGME_MCP_URL|g" config.yaml.processed
+    fi
+    if [ -n "$RAGME_UI_URL" ]; then
+        sed -i.bak "s|\${RAGME_UI_URL}|$RAGME_UI_URL|g" config.yaml.processed
+    fi
+    
     # Clean up backup files
     rm -f config.yaml.processed.bak
     
@@ -170,6 +181,17 @@ else
     export RAGME_API_URL="http://localhost:30021"
     export RAGME_MCP_URL="http://localhost:30022"
     export RAGME_UI_URL="http://localhost:30020"
+    
+    # Substitute environment variables in config.yaml.processed
+    if [ -n "$RAGME_API_URL" ]; then
+        sed -i.bak "s|\${RAGME_API_URL}|$RAGME_API_URL|g" config.yaml.processed
+    fi
+    if [ -n "$RAGME_MCP_URL" ]; then
+        sed -i.bak "s|\${RAGME_MCP_URL}|$RAGME_MCP_URL|g" config.yaml.processed
+    fi
+    if [ -n "$RAGME_UI_URL" ]; then
+        sed -i.bak "s|\${RAGME_UI_URL}|$RAGME_UI_URL|g" config.yaml.processed
+    fi
     
     # Clean up backup files
     rm -f config.yaml.processed.bak
