@@ -51,9 +51,9 @@ stringData:
   # Required secrets - update these values
   OPENAI_API_KEY: "your-openai-api-key-here"
   
-  # Optional secrets for external services (commented out for local development)
-  # WEAVIATE_API_KEY: "your-weaviate-api-key-here"
-  # WEAVIATE_URL: "your-weaviate-url-here"
+  # Optional secrets for external services
+  WEAVIATE_API_KEY: "your-weaviate-api-key-here"
+  WEAVIATE_URL: "your-weaviate-url-here"
   MILVUS_URI: "your-milvus-uri"
   MILVUS_TOKEN: "your-milvus-token"
   

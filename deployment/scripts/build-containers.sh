@@ -160,6 +160,29 @@ if [ -f ".env" ]; then
         sed -i.bak "s|\${RAGME_UI_URL}|$RAGME_UI_URL|g" config.yaml.processed
     fi
     
+    # Weaviate Configuration - set to empty values for local development
+    # This forces the system to use local Weaviate instead of Weaviate Cloud
+    if [ -n "$WEAVIATE_URL" ]; then
+        sed -i.bak "s|\${WEAVIATE_URL}|$WEAVIATE_URL|g" config.yaml.processed
+    else
+        # Set to empty string to disable Weaviate Cloud
+        sed -i.bak "s|\${WEAVIATE_URL}||g" config.yaml.processed
+    fi
+    if [ -n "$WEAVIATE_API_KEY" ]; then
+        sed -i.bak "s|\${WEAVIATE_API_KEY}|$WEAVIATE_API_KEY|g" config.yaml.processed
+    else
+        # Set to empty string to disable Weaviate Cloud
+        sed -i.bak "s|\${WEAVIATE_API_KEY}||g" config.yaml.processed
+    fi
+    
+    # Vector Database Collection Names
+    if [ -n "$VECTOR_DB_TEXT_COLLECTION_NAME" ]; then
+        sed -i.bak "s|\${VECTOR_DB_TEXT_COLLECTION_NAME}|$VECTOR_DB_TEXT_COLLECTION_NAME|g" config.yaml.processed
+    fi
+    if [ -n "$VECTOR_DB_IMAGE_COLLECTION_NAME" ]; then
+        sed -i.bak "s|\${VECTOR_DB_IMAGE_COLLECTION_NAME}|$VECTOR_DB_IMAGE_COLLECTION_NAME|g" config.yaml.processed
+    fi
+    
     # Clean up backup files
     rm -f config.yaml.processed.bak
     
@@ -191,6 +214,29 @@ else
     fi
     if [ -n "$RAGME_UI_URL" ]; then
         sed -i.bak "s|\${RAGME_UI_URL}|$RAGME_UI_URL|g" config.yaml.processed
+    fi
+    
+    # Weaviate Configuration - set to empty values for local development
+    # This forces the system to use local Weaviate instead of Weaviate Cloud
+    if [ -n "$WEAVIATE_URL" ]; then
+        sed -i.bak "s|\${WEAVIATE_URL}|$WEAVIATE_URL|g" config.yaml.processed
+    else
+        # Set to empty string to disable Weaviate Cloud
+        sed -i.bak "s|\${WEAVIATE_URL}||g" config.yaml.processed
+    fi
+    if [ -n "$WEAVIATE_API_KEY" ]; then
+        sed -i.bak "s|\${WEAVIATE_API_KEY}|$WEAVIATE_API_KEY|g" config.yaml.processed
+    else
+        # Set to empty string to disable Weaviate Cloud
+        sed -i.bak "s|\${WEAVIATE_API_KEY}||g" config.yaml.processed
+    fi
+    
+    # Vector Database Collection Names
+    if [ -n "$VECTOR_DB_TEXT_COLLECTION_NAME" ]; then
+        sed -i.bak "s|\${VECTOR_DB_TEXT_COLLECTION_NAME}|$VECTOR_DB_TEXT_COLLECTION_NAME|g" config.yaml.processed
+    fi
+    if [ -n "$VECTOR_DB_IMAGE_COLLECTION_NAME" ]; then
+        sed -i.bak "s|\${VECTOR_DB_IMAGE_COLLECTION_NAME}|$VECTOR_DB_IMAGE_COLLECTION_NAME|g" config.yaml.processed
     fi
     
     # Clean up backup files
