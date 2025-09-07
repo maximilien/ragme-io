@@ -143,6 +143,12 @@ if [ -f ".env" ]; then
     sed -i.bak "s|http://localhost:8020|http://localhost:30020|g" config.yaml.processed
     sed -i.bak "s|ws://localhost:8020|ws://localhost:30020|g" config.yaml.processed
     
+    # Update environment variables for Kubernetes NodePort deployment
+    # Set RAGME_API_URL to external NodePort URL for frontend server
+    export RAGME_API_URL="http://localhost:30021"
+    export RAGME_MCP_URL="http://localhost:30022"
+    export RAGME_UI_URL="http://localhost:30020"
+    
     # Clean up backup files
     rm -f config.yaml.processed.bak
     
@@ -158,6 +164,12 @@ else
     sed -i.bak "s|ws://localhost:8021|ws://localhost:30021|g" config.yaml.processed
     sed -i.bak "s|http://localhost:8020|http://localhost:30020|g" config.yaml.processed
     sed -i.bak "s|ws://localhost:8020|ws://localhost:30020|g" config.yaml.processed
+    
+    # Update environment variables for Kubernetes NodePort deployment
+    # Set RAGME_API_URL to external NodePort URL for frontend server
+    export RAGME_API_URL="http://localhost:30021"
+    export RAGME_MCP_URL="http://localhost:30022"
+    export RAGME_UI_URL="http://localhost:30020"
     
     # Clean up backup files
     rm -f config.yaml.processed.bak
