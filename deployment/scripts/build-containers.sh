@@ -160,19 +160,12 @@ if [ -f ".env" ]; then
         sed -i.bak "s|\${RAGME_UI_URL}|$RAGME_UI_URL|g" config.yaml.processed
     fi
     
-    # Weaviate Configuration - set to empty values for local development
-    # This forces the system to use local Weaviate instead of Weaviate Cloud
+    # Weaviate Configuration - use values from .env file as-is
     if [ -n "$WEAVIATE_URL" ]; then
         sed -i.bak "s|\${WEAVIATE_URL}|$WEAVIATE_URL|g" config.yaml.processed
-    else
-        # Set to empty string to disable Weaviate Cloud
-        sed -i.bak "s|\${WEAVIATE_URL}||g" config.yaml.processed
     fi
     if [ -n "$WEAVIATE_API_KEY" ]; then
         sed -i.bak "s|\${WEAVIATE_API_KEY}|$WEAVIATE_API_KEY|g" config.yaml.processed
-    else
-        # Set to empty string to disable Weaviate Cloud
-        sed -i.bak "s|\${WEAVIATE_API_KEY}||g" config.yaml.processed
     fi
     
     # Vector Database Collection Names
@@ -216,19 +209,12 @@ else
         sed -i.bak "s|\${RAGME_UI_URL}|$RAGME_UI_URL|g" config.yaml.processed
     fi
     
-    # Weaviate Configuration - set to empty values for local development
-    # This forces the system to use local Weaviate instead of Weaviate Cloud
+    # Weaviate Configuration - use values from .env file as-is
     if [ -n "$WEAVIATE_URL" ]; then
         sed -i.bak "s|\${WEAVIATE_URL}|$WEAVIATE_URL|g" config.yaml.processed
-    else
-        # Set to empty string to disable Weaviate Cloud
-        sed -i.bak "s|\${WEAVIATE_URL}||g" config.yaml.processed
     fi
     if [ -n "$WEAVIATE_API_KEY" ]; then
         sed -i.bak "s|\${WEAVIATE_API_KEY}|$WEAVIATE_API_KEY|g" config.yaml.processed
-    else
-        # Set to empty string to disable Weaviate Cloud
-        sed -i.bak "s|\${WEAVIATE_API_KEY}||g" config.yaml.processed
     fi
     
     # Vector Database Collection Names
