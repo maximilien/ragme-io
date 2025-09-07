@@ -56,4 +56,4 @@ ENV PYTHONUNBUFFERED=1
 ENV RAGME_API_PORT=8021
 
 # Start API service
-CMD ["uvicorn", "src.ragme.apis.api:app", "--host", "0.0.0.0", "--port", "8021"]
+CMD ["uvicorn", "src.ragme.apis.api:socket_app", "--host", "0.0.0.0", "--port", "8021"]

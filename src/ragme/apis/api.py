@@ -2287,6 +2287,44 @@ try:
         print(f"🔌 SOCKET DISCONNECT: Client disconnected: {sid}")
 
     @sio.event
+    async def chat_message(sid, data):
+        """Handle chat message requests from frontend."""
+        print(f"🔌 SOCKET EVENT: chat_message called with data: {data}")
+        try:
+            message = data.get("content", "")
+            timestamp = data.get("timestamp", "")
+            
+            print(f"Processing chat message: {message}")
+            
+            # Process the query using the RAG system
+            response = await get_ragme().run(message)
+            
+            print(f"RAG response: {response}")
+            
+            # Send response back to frontend
+            await sio.emit(
+                "chat_response",
+                {
+                    "success": True,
+                    "response": response,
+                    "timestamp": timestamp
+                },
+                room=sid,
+            )
+            
+        except Exception as e:
+            print(f"Error in chat_message socket handler: {e}")
+            await sio.emit(
+                "chat_response",
+                {
+                    "success": False,
+                    "error": f"Error processing message: {str(e)}",
+                    "timestamp": data.get("timestamp", "")
+                },
+                room=sid,
+            )
+
+    @sio.event
     async def summarize_document(sid, data):
         """Handle document summarization requests from frontend."""
         print(f"🔌 SOCKET EVENT: summarize_document called with data: {data}")
@@ -2603,6 +2641,23 @@ try:
                 room=sid,
             )
 
+    def serialize_weaviate_data(data):
+        """Convert Weaviate UUID objects to strings for JSON serialization."""
+        import json
+        
+        def convert_uuids(obj):
+            # Check for various Weaviate UUID types
+            if hasattr(obj, '__class__') and 'WeaviateUUID' in str(obj.__class__):
+                return str(obj)
+            elif isinstance(obj, dict):
+                return {key: convert_uuids(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_uuids(item) for item in obj]
+            else:
+                return obj
+        
+        return convert_uuids(data)
+
     @sio.event
     async def list_content(sid, data):
         """Handle content listing requests from frontend."""
@@ -2665,11 +2720,14 @@ try:
 
             print(f"Returning {len(paginated_items)} items out of {total_count} total")
 
+            # Serialize Weaviate UUIDs to strings for JSON compatibility
+            serialized_items = serialize_weaviate_data(paginated_items)
+
             await sio.emit(
                 "content_listed",
                 {
                     "success": True,
-                    "items": paginated_items,
+                    "items": serialized_items,
                     "pagination": {
                         "limit": limit,
                         "offset": offset,
