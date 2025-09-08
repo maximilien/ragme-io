@@ -62,31 +62,34 @@ interface AppConfig {
 // Load configuration from backend or environment variables
 let appConfig: AppConfig = {};
 let RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8021';
+let INTERNAL_API_URL = RAGME_API_URL; // URL used by frontend server to connect to backend
 
 // For local development, always use local ports unless explicitly overridden
 if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
   RAGME_API_URL = 'http://localhost:8021';
+  INTERNAL_API_URL = RAGME_API_URL;
 }
 
-// For Kubernetes deployment, use internal service URL
+// For Kubernetes deployment, use internal service URL for backend communication
 if (process.env.NODE_ENV === 'production' && process.env.RAGME_API_URL?.includes('localhost:30021')) {
-  RAGME_API_URL = 'http://ragme-api:8021';
+  INTERNAL_API_URL = 'http://ragme-api:8021';
+  // Keep RAGME_API_URL as external URL for browser/CSP
 }
 
 // Try to load configuration from the backend
 async function loadConfiguration() {
   try {
-    const response = await fetch(`${RAGME_API_URL}/config`);
+    const response = await fetch(`${INTERNAL_API_URL}/config`);
     if (response.ok) {
       const responseData = (await response.json()) as { status: string; config: AppConfig };
       appConfig = responseData.config;
       logger.info('Configuration loaded from backend');
 
-      // Update RAGME_API_URL if different in config
+      // Update INTERNAL_API_URL if different in config (but not if it's already set to external URL)
       const configApiUrl = `http://localhost:${appConfig.network?.api?.port || 8021}`;
-      if (configApiUrl !== RAGME_API_URL) {
-        RAGME_API_URL = configApiUrl;
-        logger.info(`Updated API URL to: ${RAGME_API_URL}`);
+      if (configApiUrl !== INTERNAL_API_URL && !INTERNAL_API_URL.includes('localhost:30021')) {
+        INTERNAL_API_URL = configApiUrl;
+        logger.info(`Updated internal API URL to: ${INTERNAL_API_URL}`);
 
         // Update CSP configuration with new API URL
         app.use(helmet(getCSPConfig()));
