@@ -154,8 +154,8 @@ if [ -f ".env" ]; then
     
     # Update environment variables for Kubernetes NodePort deployment
     # Set RAGME_API_URL to external NodePort URL for frontend server
-    export RAGME_API_URL="http://localhost:30021"
-    export RAGME_MCP_URL="http://localhost:30022"
+    export RAGME_API_URL="http://ragme-api:8021"
+    export RAGME_MCP_URL="http://ragme-mcp:8022"
     export RAGME_UI_URL="http://localhost:30020"
     
     # Substitute environment variables in config.yaml.processed
@@ -212,8 +212,8 @@ else
     
     # Update environment variables for Kubernetes NodePort deployment
     # Set RAGME_API_URL to external NodePort URL for frontend server
-    export RAGME_API_URL="http://localhost:30021"
-    export RAGME_MCP_URL="http://localhost:30022"
+    export RAGME_API_URL="http://ragme-api:8021"
+    export RAGME_MCP_URL="http://ragme-mcp:8022"
     export RAGME_UI_URL="http://localhost:30020"
     
     # Substitute environment variables in config.yaml.processed

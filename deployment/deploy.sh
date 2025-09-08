@@ -719,9 +719,9 @@ data:
   RAGME_MCP_PORT: "8022"
   RAGME_FRONTEND_PORT: "8020"
   
-  # Service URLs (external access for frontend)
-  RAGME_API_URL: "http://localhost:30021"
-  RAGME_MCP_URL: "http://localhost:30022"
+  # Service URLs (internal cluster access for frontend server)
+  RAGME_API_URL: "http://ragme-api:8021"
+  RAGME_MCP_URL: "http://ragme-mcp:8022"
   
   # Vector Database Configuration
   VECTOR_DB_TYPE: "%s"
