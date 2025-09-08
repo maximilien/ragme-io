@@ -71,7 +71,10 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
 }
 
 // For Kubernetes deployment, use internal service URL for backend communication
-if (process.env.NODE_ENV === 'production' && process.env.RAGME_API_URL?.includes('localhost:30021')) {
+if (
+  process.env.NODE_ENV === 'production' &&
+  process.env.RAGME_API_URL?.includes('localhost:30021')
+) {
   INTERNAL_API_URL = 'http://ragme-api:8021';
   // Keep RAGME_API_URL as external URL for browser/CSP
 }
@@ -1041,7 +1044,8 @@ app.get('/api/config', (req, res) => {
     })),
     features: appConfig.features || {},
     api_url:
-      process.env.NODE_ENV === 'production' && process.env.RAGME_API_URL?.includes('localhost:30021')
+      process.env.NODE_ENV === 'production' &&
+      process.env.RAGME_API_URL?.includes('localhost:30021')
         ? 'http://localhost:30021'
         : RAGME_API_URL,
   };
