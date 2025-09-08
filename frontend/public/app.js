@@ -3880,10 +3880,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             clearInterval(this.healthCheckInterval);
         }
 
-        // Check health every 30 seconds
+        // Check health every 2 minutes (120 seconds)
         this.healthCheckInterval = setInterval(() => {
             this.checkHealthStatus();
-        }, 30000);
+        }, 120000);
     }
 
     stopHealthChecks() {
@@ -6085,19 +6085,26 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         return div.innerHTML;
     }
 
-    loadVectorDbInfo() {
+    loadVectorDbInfo(retryCount = 0) {
         // Ensure socket is connected before requesting vector DB info
         if (this.socket && this.socket.connected) {
             this.socket.emit('get_vector_db_info');
         } else {
-            // If socket is not connected, retry after a short delay
-            setTimeout(() => {
-                this.loadVectorDbInfo();
-            }, 1000);
+            // If socket is not connected, retry with exponential backoff (max 5 retries)
+            if (retryCount < 5) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Max 10 seconds
+                setTimeout(() => {
+                    this.loadVectorDbInfo(retryCount + 1);
+                }, delay);
+            } else {
+                console.warn('Failed to connect to socket after 5 retries, giving up');
+            }
         }
 
-        // Also check health status to detect connection issues
-        this.checkHealthStatus();
+        // Only check health status on first attempt or after successful connection
+        if (retryCount === 0 || (this.socket && this.socket.connected)) {
+            this.checkHealthStatus();
+        }
     }
 
     async checkHealthStatus() {
