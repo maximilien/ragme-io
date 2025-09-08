@@ -723,6 +723,44 @@ app.delete('/delete-document/:documentId', async (req, res) => {
   }
 });
 
+// Summarize document endpoint
+app.post('/summarize-document', async (req, res) => {
+  try {
+    const { documentId, forceRefresh } = req.body;
+
+    if (!documentId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Document ID is required',
+      });
+    }
+
+    const apiResult = await callRAGmeAPI('/summarize-document', { 
+      document_id: documentId,
+      force_refresh: forceRefresh 
+    });
+
+    if (apiResult && apiResult.status === 'success') {
+      res.json({
+        status: 'success',
+        summary: apiResult.summary,
+        documentId: documentId,
+      });
+    } else {
+      res.status(500).json({
+        status: 'error',
+        message: apiResult?.message || 'Failed to summarize document',
+      });
+    }
+  } catch (error) {
+    logger.error('Summarize document error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to summarize document',
+    });
+  }
+});
+
 // Delete image endpoint
 app.delete('/delete-image/:imageId', async (req, res) => {
   const imageId = req.params.imageId;
