@@ -68,6 +68,11 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
   RAGME_API_URL = 'http://localhost:8021';
 }
 
+// For Kubernetes deployment, use internal service URL
+if (process.env.NODE_ENV === 'production' && process.env.RAGME_API_URL?.includes('localhost:30021')) {
+  RAGME_API_URL = 'http://ragme-api:8021';
+}
+
 // Try to load configuration from the backend
 async function loadConfiguration() {
   try {
