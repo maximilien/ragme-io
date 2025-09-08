@@ -36,8 +36,29 @@ spec:
             configMapKeyRef:
               name: ragme-config
               key: RAGME_API_URL
+        - name: RAGME_MCP_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_MCP_URL
         - name: NODE_ENV
           value: "production"
+        # OAuth Configuration for frontend
+        - name: GOOGLE_OAUTH_REDIRECT_URI
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: GOOGLE_OAUTH_REDIRECT_URI
+        - name: GITHUB_OAUTH_REDIRECT_URI
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: GITHUB_OAUTH_REDIRECT_URI
+        - name: APPLE_OAUTH_REDIRECT_URI
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: APPLE_OAUTH_REDIRECT_URI
         volumeMounts:
         - name: logs
           mountPath: /app/logs

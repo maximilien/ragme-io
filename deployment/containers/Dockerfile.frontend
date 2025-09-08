@@ -31,10 +31,17 @@ EXPOSE 8020
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8020/health || exit 1
 
+# Accept build arguments
+ARG RAGME_API_URL=http://localhost:8021
+ARG RAGME_MCP_URL=http://localhost:8022
+ARG RAGME_UI_URL=http://localhost:8020
+
 # Set environment variables
 ENV NODE_ENV=production
 ENV RAGME_FRONTEND_PORT=8020
-ENV RAGME_API_URL=http://ragme-api:8021
+ENV RAGME_API_URL=$RAGME_API_URL
+ENV RAGME_MCP_URL=$RAGME_MCP_URL
+ENV RAGME_UI_URL=$RAGME_UI_URL
 
 # Start frontend service
 CMD ["npm", "start"]

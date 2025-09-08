@@ -133,6 +133,9 @@ celerybeat.pid
 # Environments
 .env
 .env.app.*
+
+# Processed config files (contain secrets)
+config.yaml.processed
 .venv
 env/
 venv/
@@ -205,6 +208,9 @@ config.yaml
 
 # Generated Kubernetes config files with secrets
 deployment/k8s/configmap-generated.yaml
+
+# Container image tar files (generated during k8s deployment)
+*.tar
 
 # RAGme dev
 TODOs.md

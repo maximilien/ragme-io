@@ -24,6 +24,11 @@ class OAuthManager:
         self.oauth_config = config.get_oauth_config()
         self.providers_config = config.get_oauth_providers()
 
+        # Debug logging
+        print("[DEBUG] OAuthManager initialized")
+        print(f"[DEBUG] OAuth config: {self.oauth_config}")
+        print(f"[DEBUG] Providers config: {self.providers_config}")
+
     def get_authorization_url(self, provider: str, state: str | None = None) -> str:
         """
         Get the authorization URL for a specific OAuth provider.

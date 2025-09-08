@@ -62,21 +62,40 @@ interface AppConfig {
 // Load configuration from backend or environment variables
 let appConfig: AppConfig = {};
 let RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8021';
+let INTERNAL_API_URL = RAGME_API_URL; // URL used by frontend server to connect to backend
+
+// For local development, always use local ports unless explicitly overridden
+if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
+  RAGME_API_URL = 'http://localhost:8021';
+  INTERNAL_API_URL = RAGME_API_URL;
+}
+
+// For Kubernetes deployment, use internal service URL for backend communication
+if (
+  process.env.NODE_ENV === 'production' &&
+  process.env.RAGME_API_URL?.includes('localhost:30021')
+) {
+  INTERNAL_API_URL = 'http://ragme-api:8021';
+  // Keep RAGME_API_URL as external URL for browser/CSP
+}
 
 // Try to load configuration from the backend
 async function loadConfiguration() {
   try {
-    const response = await fetch(`${RAGME_API_URL}/config`);
+    const response = await fetch(`${INTERNAL_API_URL}/config`);
     if (response.ok) {
       const responseData = (await response.json()) as { status: string; config: AppConfig };
       appConfig = responseData.config;
       logger.info('Configuration loaded from backend');
 
-      // Update RAGME_API_URL if different in config
+      // Update INTERNAL_API_URL if different in config (but not if it's already set to external URL)
       const configApiUrl = `http://localhost:${appConfig.network?.api?.port || 8021}`;
-      if (configApiUrl !== RAGME_API_URL) {
-        RAGME_API_URL = configApiUrl;
-        logger.info(`Updated API URL to: ${RAGME_API_URL}`);
+      if (configApiUrl !== INTERNAL_API_URL && !INTERNAL_API_URL.includes('localhost:30021')) {
+        INTERNAL_API_URL = configApiUrl;
+        logger.info(`Updated internal API URL to: ${INTERNAL_API_URL}`);
+
+        // Update CSP configuration with new API URL
+        app.use(helmet(getCSPConfig()));
       }
     } else {
       logger.warn('Could not load configuration from backend, using defaults');
@@ -151,17 +170,17 @@ interface MCPResponse {
   error?: string;
 }
 
-// Middleware
-app.use(
-  helmet({
+// Function to get CSP configuration
+function getCSPConfig() {
+  return {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         connectSrc: [
           "'self'",
-          'http://localhost:8021',
-          'ws://localhost:8021',
-          'wss://localhost:8021',
+          RAGME_API_URL,
+          RAGME_API_URL.replace('http://', 'ws://'),
+          RAGME_API_URL.replace('http://', 'wss://'),
         ],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -172,8 +191,11 @@ app.use(
         baseUri: ["'self'"],
       },
     },
-  })
-);
+  };
+}
+
+// Middleware
+app.use(helmet(getCSPConfig()));
 app.use(compression());
 app.use(cors());
 app.use(express.json());
@@ -412,17 +434,20 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
           // Convert buffer to base64 and send as JSON
           const base64Data = file.buffer.toString('base64');
-          const mcpResponse = await fetch('http://localhost:8022/tool/process_pdf_base64', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filename: file.originalname,
-              content: base64Data,
-              content_type: file.mimetype,
-            }),
-          });
+          const mcpResponse = await fetch(
+            `${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_pdf_base64`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filename: file.originalname,
+                content: base64Data,
+                content_type: file.mimetype,
+              }),
+            }
+          );
 
           logger.info(`MCP response status: ${mcpResponse.status}`);
           if (mcpResponse.ok) {
@@ -453,17 +478,20 @@ app.post('/upload-files', upload.array('files'), async (req, res) => {
 
           // Convert buffer to base64 and send as JSON
           const base64Data = file.buffer.toString('base64');
-          const mcpResponse = await fetch('http://localhost:8022/tool/process_docx_base64', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filename: file.originalname,
-              content: base64Data,
-              content_type: file.mimetype,
-            }),
-          });
+          const mcpResponse = await fetch(
+            `${process.env.RAGME_MCP_URL || 'http://localhost:8022'}/tool/process_docx_base64`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filename: file.originalname,
+                content: base64Data,
+                content_type: file.mimetype,
+              }),
+            }
+          );
 
           logger.info(`MCP response status: ${mcpResponse.status}`);
           if (mcpResponse.ok) {
@@ -719,7 +747,7 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
     logger.info('Sending request to backend API');
     let result;
     try {
-      const response = await axios.post('http://localhost:8021/upload-images', formData, {
+      const response = await axios.post(`${RAGME_API_URL}/upload-images`, formData, {
         headers: {
           ...formData.getHeaders(),
         },
@@ -1015,7 +1043,11 @@ app.get('/api/config', (req, res) => {
       // Note: authentication_type and url are excluded for security
     })),
     features: appConfig.features || {},
-    api_url: RAGME_API_URL,
+    api_url:
+      process.env.NODE_ENV === 'production' &&
+      process.env.RAGME_API_URL?.includes('localhost:30021')
+        ? 'http://localhost:30021'
+        : RAGME_API_URL,
   };
 
   res.json(safeConfig);

@@ -722,6 +722,11 @@ data:
   # Watch Directory
   WATCH_DIRECTORY: "${WATCH_DIRECTORY:-/app/watch_directory}"
   MINIO_LOCAL_PATH: "${MINIO_LOCAL_PATH:-/app/minio_data}"
+  
+  # OAuth Configuration
+  GOOGLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/apple/callback"
 ---
 apiVersion: v1
 kind: Secret
@@ -751,6 +756,17 @@ stringData:
   S3_SECRET_KEY: "${S3_SECRET_KEY:-your-s3-secret-key}"
   S3_BUCKET_NAME: "${S3_BUCKET_NAME:-your-s3-bucket}"
   S3_REGION: "${S3_REGION:-us-east-1}"
+  
+  # OAuth secrets - update these values
+  GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID:-your-google-oauth-client-id}"
+  GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET:-your-google-oauth-client-secret}"
+  GITHUB_OAUTH_CLIENT_ID: "${GITHUB_OAUTH_CLIENT_ID:-your-github-oauth-client-id}"
+  GITHUB_OAUTH_CLIENT_SECRET: "${GITHUB_OAUTH_CLIENT_SECRET:-your-github-oauth-client-secret}"
+  APPLE_OAUTH_CLIENT_ID: "${APPLE_OAUTH_CLIENT_ID:-your-apple-oauth-client-id}"
+  APPLE_OAUTH_CLIENT_SECRET: "${APPLE_OAUTH_CLIENT_SECRET:-your-apple-oauth-client-secret}"
+  
+  # Session configuration
+  SESSION_SECRET_KEY: "${SESSION_SECRET_KEY:-ragme-shared-session-secret-key-2025}"
 EOF
     
     print_status "Configmap generated from .env file"

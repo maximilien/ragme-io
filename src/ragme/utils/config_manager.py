@@ -882,11 +882,15 @@ class ConfigManager:
 
     def get_oauth_config(self) -> dict[str, Any]:
         """Get OAuth configuration."""
-        return self.get("authentication.oauth", {})
+        oauth_config = self.get("authentication.oauth", {})
+        print(f"[DEBUG] get_oauth_config: {oauth_config}")
+        return oauth_config
 
     def get_oauth_providers(self) -> dict[str, Any]:
         """Get OAuth providers configuration."""
-        return self.get("authentication.oauth.providers", {})
+        providers = self.get("authentication.oauth.providers", {})
+        print(f"[DEBUG] get_oauth_providers: {providers}")
+        return providers
 
     def get_oauth_provider_config(self, provider: str) -> dict[str, Any] | None:
         """Get configuration for a specific OAuth provider."""

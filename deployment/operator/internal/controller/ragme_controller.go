@@ -140,6 +140,17 @@ func (r *RAGmeReconciler) setDefaults(ragme *ragmev1.RAGme) {
 	if ragme.Spec.VectorDB.Type == "" {
 		ragme.Spec.VectorDB.Type = "milvus"
 	}
+
+	// Set default authentication values
+	if ragme.Spec.Authentication.Session.SecretKey == "" {
+		ragme.Spec.Authentication.Session.SecretKey = "ragme-shared-session-secret-key-2025"
+	}
+	if ragme.Spec.Authentication.Session.MaxAgeSeconds == 0 {
+		ragme.Spec.Authentication.Session.MaxAgeSeconds = 86400 // 24 hours
+	}
+	if ragme.Spec.Authentication.Session.SameSite == "" {
+		ragme.Spec.Authentication.Session.SameSite = "lax"
+	}
 }
 
 // reconcileStorage reconciles shared storage components
@@ -601,14 +612,48 @@ func (r *RAGmeReconciler) createRAGmeServiceDeployment(ragme *ragmev1.RAGme, ser
 		image = fmt.Sprintf("%s/ragme-frontend:%s", ragme.Spec.Images.Registry, ragme.Spec.Images.Tag)
 	}
 
+	envVars := []corev1.EnvVar{
+		{Name: "RAGME_API_URL", Value: fmt.Sprintf("http://%s-api:8021", ragme.Name)},
+		{Name: "RAGME_MCP_URL", Value: fmt.Sprintf("http://%s-mcp:8022", ragme.Name)},
+	}
+
+	// Add OAuth environment variables if authentication is configured
+	if ragme.Spec.Authentication.OAuth.Google.Enabled {
+		envVars = append(envVars, []corev1.EnvVar{
+			{Name: "GOOGLE_OAUTH_CLIENT_ID", Value: ragme.Spec.Authentication.OAuth.Google.ClientID},
+			{Name: "GOOGLE_OAUTH_CLIENT_SECRET", Value: ragme.Spec.Authentication.OAuth.Google.ClientSecret},
+			{Name: "GOOGLE_OAUTH_REDIRECT_URI", Value: ragme.Spec.Authentication.OAuth.Google.RedirectURI},
+		}...)
+	}
+
+	if ragme.Spec.Authentication.OAuth.GitHub.Enabled {
+		envVars = append(envVars, []corev1.EnvVar{
+			{Name: "GITHUB_OAUTH_CLIENT_ID", Value: ragme.Spec.Authentication.OAuth.GitHub.ClientID},
+			{Name: "GITHUB_OAUTH_CLIENT_SECRET", Value: ragme.Spec.Authentication.OAuth.GitHub.ClientSecret},
+			{Name: "GITHUB_OAUTH_REDIRECT_URI", Value: ragme.Spec.Authentication.OAuth.GitHub.RedirectURI},
+		}...)
+	}
+
+	if ragme.Spec.Authentication.OAuth.Apple.Enabled {
+		envVars = append(envVars, []corev1.EnvVar{
+			{Name: "APPLE_OAUTH_CLIENT_ID", Value: ragme.Spec.Authentication.OAuth.Apple.ClientID},
+			{Name: "APPLE_OAUTH_CLIENT_SECRET", Value: ragme.Spec.Authentication.OAuth.Apple.ClientSecret},
+			{Name: "APPLE_OAUTH_REDIRECT_URI", Value: ragme.Spec.Authentication.OAuth.Apple.RedirectURI},
+		}...)
+	}
+
+	// Add session configuration
+	if ragme.Spec.Authentication.Session.SecretKey != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: "SESSION_SECRET_KEY", Value: ragme.Spec.Authentication.Session.SecretKey,
+		})
+	}
+
 	container := corev1.Container{
 		Name:            serviceName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(ragme.Spec.Images.PullPolicy),
-		Env: []corev1.EnvVar{
-			{Name: "RAGME_API_URL", Value: fmt.Sprintf("http://%s-api:8021", ragme.Name)},
-			{Name: "RAGME_MCP_URL", Value: fmt.Sprintf("http://%s-mcp:8022", ragme.Name)},
-		},
+		Env:             envVars,
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: "logs", MountPath: "/app/logs"},
 			{Name: "watch-directory", MountPath: "/app/watch_directory"},

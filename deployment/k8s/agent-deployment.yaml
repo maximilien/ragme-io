@@ -83,6 +83,42 @@ spec:
             secretKeyRef:
               name: ragme-secrets
               key: MINIO_SECRET_KEY
+        # OAuth Configuration
+        - name: GOOGLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GOOGLE_OAUTH_CLIENT_ID
+        - name: GOOGLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GOOGLE_OAUTH_CLIENT_SECRET
+        - name: GITHUB_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GITHUB_OAUTH_CLIENT_ID
+        - name: GITHUB_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GITHUB_OAUTH_CLIENT_SECRET
+        - name: APPLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: APPLE_OAUTH_CLIENT_ID
+        - name: APPLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: APPLE_OAUTH_CLIENT_SECRET
+        - name: SESSION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: SESSION_SECRET_KEY
         volumeMounts:
         - name: logs
           mountPath: /app/logs

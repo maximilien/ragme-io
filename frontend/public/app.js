@@ -89,7 +89,7 @@ class RAGmeAssistant {
 
         // API configuration
         this.apiConfig = {
-            baseUrl: 'http://localhost:8021', // Default API base URL
+            baseUrl: 'http://localhost:8021', // Default API base URL for local development
             endpoints: {
                 config: '/config',
                 health: '/health',
@@ -118,8 +118,6 @@ class RAGmeAssistant {
             currentOperation: null,
             startTime: null
         };
-
-
 
         this.init();
     }
@@ -167,7 +165,7 @@ class RAGmeAssistant {
             this.renderChatHistory(); // Render chat history after loading
             console.log('RAGmeAssistant: Chat history rendered');
 
-            this.loadVectorDbInfo();
+            this.loadVectorDbInfoFromBackend();
             this.startAutoRefresh();
             this.startHealthChecks();
 
@@ -205,7 +203,10 @@ class RAGmeAssistant {
 
     updateApiConfig() {
         // Update API configuration from loaded config if available
-        if (this.config && this.config.network && this.config.network.api) {
+        if (this.config && this.config.api_url) {
+            this.apiConfig.baseUrl = this.config.api_url;
+            console.log('API base URL updated from config:', this.apiConfig.baseUrl);
+        } else if (this.config && this.config.network && this.config.network.api) {
             const apiConfig = this.config.network.api;
             if (apiConfig.host && apiConfig.port) {
                 const protocol = apiConfig.ssl ? 'https' : 'http';
@@ -228,7 +229,9 @@ class RAGmeAssistant {
 
     async loadConfiguration() {
         try {
-            const response = await fetch(this.buildApiUrl('config'));
+            // Load configuration from frontend server's /api/config endpoint
+            // This endpoint provides the correct api_url based on environment
+            const response = await fetch('/api/config');
             if (response.ok) {
                 this.config = await response.json();
                 console.log('Configuration loaded:', this.config);
@@ -486,6 +489,9 @@ class RAGmeAssistant {
                 
                 console.log('Auth providers loaded:', this.authProviders);
                 this.renderAuthProviders();
+                
+                // Update close button visibility based on bypass login setting
+                this.updateLoginModalCloseButton();
             }
         } catch (error) {
             console.warn('Failed to load auth providers:', error);
@@ -511,8 +517,13 @@ class RAGmeAssistant {
     updateLoginModalCloseButton() {
         const closeButton = document.getElementById('closeLoginModal');
         if (closeButton) {
-            // Only show the close button when bypass_login is true
-            closeButton.style.display = this.bypassLogin ? 'block' : 'none';
+            if (this.bypassLogin) {
+                closeButton.style.display = 'block';
+                console.log('Bypass login enabled - showing close button');
+            } else {
+                closeButton.style.display = 'none';
+                console.log('Bypass login disabled - hiding close button');
+            }
         }
     }
 
@@ -830,7 +841,7 @@ class RAGmeAssistant {
                 timeout: 20000
             } : {};
 
-            this.socket = io(socketOptions);
+            this.socket = io(this.apiConfig.baseUrl, socketOptions);
             console.log('Socket.io connection created with options:', socketOptions);
         } catch (error) {
             console.error('Failed to create socket connection:', error);
@@ -872,11 +883,11 @@ class RAGmeAssistant {
             if (elapsed < minThinkingTime) {
                 setTimeout(() => {
                     this.removeThinkingMessage();
-                    this.addMessage('ai', response.content, response.id);
+                    this.addMessage('ai', response.response || response.content || 'No response received', response.id);
                 }, minThinkingTime - elapsed);
             } else {
                 this.removeThinkingMessage();
-                this.addMessage('ai', response.content, response.id);
+                this.addMessage('ai', response.response || response.content || 'No response received', response.id);
             }
 
             // Re-enable send button
@@ -1480,8 +1491,14 @@ class RAGmeAssistant {
             }
         });
 
-        // Login modal event listeners - no close button to prevent bypassing authentication
-        // Note: Login modal cannot be closed by clicking outside or X button
+        // Login modal event listeners
+        // Close button is only available when bypass_login is enabled
+        document.getElementById('closeLoginModal').addEventListener('click', () => {
+            if (this.bypassLogin) {
+                this.hideLoginModal();
+                console.log('Login modal closed via X button (bypass login enabled)');
+            }
+        });
 
     }
 
@@ -3894,10 +3911,10 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             clearInterval(this.healthCheckInterval);
         }
 
-        // Check health every 30 seconds
+        // Check health every 2 minutes (120 seconds)
         this.healthCheckInterval = setInterval(() => {
             this.checkHealthStatus();
-        }, 30000);
+        }, 120000);
     }
 
     stopHealthChecks() {
@@ -6099,19 +6116,26 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         return div.innerHTML;
     }
 
-    loadVectorDbInfo() {
+    loadVectorDbInfo(retryCount = 0) {
         // Ensure socket is connected before requesting vector DB info
         if (this.socket && this.socket.connected) {
             this.socket.emit('get_vector_db_info');
         } else {
-            // If socket is not connected, retry after a short delay
-            setTimeout(() => {
-                this.loadVectorDbInfo();
-            }, 1000);
+            // If socket is not connected, retry with exponential backoff (max 5 retries)
+            if (retryCount < 5) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Max 10 seconds
+                setTimeout(() => {
+                    this.loadVectorDbInfo(retryCount + 1);
+                }, delay);
+            } else {
+                console.warn('Failed to connect to socket after 5 retries, giving up');
+            }
         }
 
-        // Also check health status to detect connection issues
-        this.checkHealthStatus();
+        // Only check health status on first attempt or after successful connection
+        if (retryCount === 0 || (this.socket && this.socket.connected)) {
+            this.checkHealthStatus();
+        }
     }
 
     async checkHealthStatus() {
@@ -6148,14 +6172,14 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     async loadVectorDbInfoFromBackend() {
         try {
-            const response = await fetch(this.buildApiUrl('config'));
+            const response = await fetch('/api/config');
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'success' && data.config.vector_databases) {
+                if (data.vector_databases) {
                     this.vectorDbInfo = {
-                        dbType: data.config.vector_databases.type,
-                        type: data.config.vector_databases.type,
-                        collections: data.config.vector_databases.collections || []
+                        dbType: data.vector_databases.type,
+                        type: data.vector_databases.type,
+                        collections: data.vector_databases.collections || []
                     };
                     this.updateVectorDbInfoDisplay();
 
@@ -6183,18 +6207,18 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         vectorDbElement.textContent = 'Loading...';
 
         try {
-            const response = await fetch(this.buildApiUrl('config'));
+            const response = await fetch('/api/config');
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'success' && data.config.vector_databases && data.config.vector_databases.type) {
-                    const dbType = data.config.vector_databases.type;
+                if (data.vector_databases && data.vector_databases.type) {
+                    const dbType = data.vector_databases.type;
                     vectorDbElement.textContent = dbType;
 
                     // Also update the global vectorDbInfo
                     this.vectorDbInfo = {
                         dbType: dbType,
                         type: dbType,
-                        collections: data.config.vector_databases.collections || []
+                        collections: data.vector_databases.collections || []
                     };
                 } else {
                     vectorDbElement.textContent = 'Not configured';
@@ -7843,6 +7867,11 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
 
 // Simple markdown parser fallback if marked is not available
 function simpleMarkdownParser(text) {
+    // Handle undefined, null, or non-string text
+    if (!text || typeof text !== 'string') {
+        return '';
+    }
+
     if (typeof marked !== 'undefined') {
         // First handle our custom image format
         text = text.replace(/\[IMAGE:([^:]+):([^\]]+)\]/g, function(match, imageId, filename) {

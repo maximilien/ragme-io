@@ -9,11 +9,6 @@ application:
   version: "${APPLICATION_VERSION}"
   title: "${APPLICATION_TITLE}"
   description: "${APPLICATION_DESCRIPTION}"
-
-# Internationalization Configuration
-i18n:
-  preferred_language: "default"  # ISO language code (e.g., "en", "fr", "es", "de") or "default" to auto-detect
-  preferred_locale: "default"    # ISO locale code (e.g., "en_US", "fr_FR", "es_ES", "de_DE") or "default" to auto-detect
   
 # Network Configuration
 network:
@@ -30,7 +25,7 @@ network:
     
   # Frontend Configuration
   frontend:
-    port: 8020
+    port: 3020
     api_url: "http://localhost:8021"  # Backend API URL for frontend
     
   # Socket.IO Configuration
@@ -48,43 +43,6 @@ security:
   file_upload:
     max_file_size_mb: 50
     allowed_extensions: [".pdf", ".docx", ".txt", ".md", ".json", ".csv"]
-
-# Authentication Configuration
-authentication:
-  # Bypass login for development/testing (default: false)
-  bypass_login: false
-  
-  # OAuth providers configuration
-  oauth:
-    providers:
-      google:
-        enabled: true
-        client_id: "${GOOGLE_OAUTH_CLIENT_ID}"
-        client_secret: "${GOOGLE_OAUTH_CLIENT_SECRET}"
-        redirect_uri: "${GOOGLE_OAUTH_REDIRECT_URI:-http://localhost:8021/auth/google/callback}"
-        scope: "openid email profile"
-        
-      github:
-        enabled: true
-        client_id: "${GITHUB_OAUTH_CLIENT_ID}"
-        client_secret: "${GITHUB_OAUTH_CLIENT_SECRET}"
-        redirect_uri: "${GITHUB_OAUTH_REDIRECT_URI:-http://localhost:8021/auth/github/callback}"
-        scope: "user:email"
-        
-      apple:
-        enabled: true
-        client_id: "${APPLE_OAUTH_CLIENT_ID}"
-        client_secret: "${APPLE_OAUTH_CLIENT_SECRET}"
-        redirect_uri: "${APPLE_OAUTH_REDIRECT_URI:-http://localhost:8021/auth/apple/callback}"
-        scope: "name email"
-        
-  # Session configuration
-  session:
-    secret_key: "${SESSION_SECRET_KEY:-your-secret-key-change-in-production}"
-    max_age_seconds: 86400  # 24 hours
-    secure: false  # Set to true in production with HTTPS
-    httponly: true
-    samesite: "lax"
 
 # Vector Database Configuration
 vector_databases:
@@ -330,17 +288,6 @@ environment:
     - "RAGME_API_PORT"
     - "RAGME_MCP_PORT"
     - "RAGME_FRONTEND_PORT"
-    # OAuth Configuration
-    - "GOOGLE_OAUTH_CLIENT_ID"
-    - "GOOGLE_OAUTH_CLIENT_SECRET"
-    - "GOOGLE_OAUTH_REDIRECT_URI"
-    - "GITHUB_OAUTH_CLIENT_ID"
-    - "GITHUB_OAUTH_CLIENT_SECRET"
-    - "GITHUB_OAUTH_REDIRECT_URI"
-    - "APPLE_OAUTH_CLIENT_ID"
-    - "APPLE_OAUTH_CLIENT_SECRET"
-    - "APPLE_OAUTH_REDIRECT_URI"
-    - "SESSION_SECRET_KEY"
 
 # Development Configuration
 development:
@@ -374,7 +321,7 @@ features:
   json_ingestion: true
   pattern_deletion: true
   bypass_delete_confirmation: false  # Skip confirmation for delete operations (useful for testing)
-  authentication: true  # OAuth authentication enabled
+  authentication: false  # Future feature
   multi_tenant: false    # Future feature
   mcp_integration: true
   mcp_tools: true       # Enable/disable MCP Tools UI features and backend service
