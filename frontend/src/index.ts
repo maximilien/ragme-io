@@ -726,9 +726,9 @@ app.delete('/delete-document/:documentId', async (req, res) => {
 // Summarize document endpoint
 app.post('/summarize-document', async (req, res) => {
   try {
-    const { documentId, forceRefresh } = req.body;
+    const { document_id, forceRefresh } = req.body;
 
-    if (!documentId) {
+    if (!document_id) {
       return res.status(400).json({
         status: 'error',
         message: 'Document ID is required',
@@ -736,7 +736,7 @@ app.post('/summarize-document', async (req, res) => {
     }
 
     const apiResult = await callRAGmeAPI('/summarize-document', { 
-      document_id: documentId,
+      document_id: document_id,
       force_refresh: forceRefresh 
     });
 
@@ -744,7 +744,7 @@ app.post('/summarize-document', async (req, res) => {
       res.json({
         status: 'success',
         summary: apiResult.summary,
-        documentId: documentId,
+        documentId: document_id,
       });
     } else {
       res.status(500).json({
