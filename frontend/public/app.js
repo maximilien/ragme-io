@@ -119,8 +119,6 @@ class RAGmeAssistant {
             startTime: null
         };
 
-
-
         this.init();
     }
 
@@ -167,7 +165,7 @@ class RAGmeAssistant {
             this.renderChatHistory(); // Render chat history after loading
             console.log('RAGmeAssistant: Chat history rendered');
 
-            this.loadVectorDbInfo();
+            this.loadVectorDbInfoFromBackend();
             this.startAutoRefresh();
             this.startHealthChecks();
 
@@ -6144,11 +6142,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const response = await fetch('/api/config');
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'success' && data.config.vector_databases) {
+                if (data.vector_databases) {
                     this.vectorDbInfo = {
-                        dbType: data.config.vector_databases.type,
-                        type: data.config.vector_databases.type,
-                        collections: data.config.vector_databases.collections || []
+                        dbType: data.vector_databases.type,
+                        type: data.vector_databases.type,
+                        collections: data.vector_databases.collections || []
                     };
                     this.updateVectorDbInfoDisplay();
 
@@ -6179,15 +6177,15 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const response = await fetch('/api/config');
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'success' && data.config.vector_databases && data.config.vector_databases.type) {
-                    const dbType = data.config.vector_databases.type;
+                if (data.vector_databases && data.vector_databases.type) {
+                    const dbType = data.vector_databases.type;
                     vectorDbElement.textContent = dbType;
 
                     // Also update the global vectorDbInfo
                     this.vectorDbInfo = {
                         dbType: dbType,
                         type: dbType,
-                        collections: data.config.vector_databases.collections || []
+                        collections: data.vector_databases.collections || []
                     };
                 } else {
                     vectorDbElement.textContent = 'Not configured';
