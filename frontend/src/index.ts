@@ -83,33 +83,35 @@ if (
 async function loadConfiguration() {
   const maxRetries = 10;
   const retryDelay = 2000; // 2 seconds
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      logger.info(`Attempting to load configuration from backend (attempt ${attempt}/${maxRetries})`);
-      
+      logger.info(
+        `Attempting to load configuration from backend (attempt ${attempt}/${maxRetries})`
+      );
+
       // First, check if the backend is healthy
       const healthController = new AbortController();
       const healthTimeout = setTimeout(() => healthController.abort(), 5000);
-      
+
       const healthResponse = await fetch(`${INTERNAL_API_URL}/health`, {
-        signal: healthController.signal
+        signal: healthController.signal,
       });
       clearTimeout(healthTimeout);
-      
+
       if (!healthResponse.ok) {
         throw new Error(`Backend health check failed: ${healthResponse.status}`);
       }
-      
+
       // Now try to load the configuration
       const configController = new AbortController();
       const configTimeout = setTimeout(() => configController.abort(), 10000);
-      
+
       const response = await fetch(`${INTERNAL_API_URL}/config`, {
-        signal: configController.signal
+        signal: configController.signal,
       });
       clearTimeout(configTimeout);
-      
+
       if (response.ok) {
         const responseData = (await response.json()) as { status: string; config: AppConfig };
         appConfig = responseData.config;
@@ -135,12 +137,12 @@ async function loadConfiguration() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(`Configuration load attempt ${attempt} failed: ${errorMessage}`);
-      
+
       if (attempt === maxRetries) {
         logger.error('Failed to load configuration from backend after all retries, using defaults');
         return;
       }
-      
+
       // Wait before retrying
       logger.info(`Waiting ${retryDelay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -1129,17 +1131,17 @@ async function startHealthCheck() {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${INTERNAL_API_URL}/health`, { 
-        signal: controller.signal 
+
+      const response = await fetch(`${INTERNAL_API_URL}/health`, {
+        signal: controller.signal,
       });
       clearTimeout(timeout);
-      
+
       if (!response.ok) {
         logger.warn('Backend health check failed, attempting to reload configuration...');
         await loadConfiguration();
       }
-    } catch (error) {
+    } catch {
       logger.warn('Backend health check error, attempting to reload configuration...');
       await loadConfiguration();
     }
@@ -1149,7 +1151,7 @@ async function startHealthCheck() {
 // Start server with configuration loading
 async function startServer() {
   await loadConfiguration();
-  
+
   // Start periodic health checks
   startHealthCheck();
 
