@@ -2293,25 +2293,21 @@ try:
         try:
             message = data.get("content", "")
             timestamp = data.get("timestamp", "")
-            
+
             print(f"Processing chat message: {message}")
-            
+
             # Process the query using the RAG system
             response = await get_ragme().run(message)
-            
+
             print(f"RAG response: {response}")
-            
+
             # Send response back to frontend
             await sio.emit(
                 "chat_response",
-                {
-                    "success": True,
-                    "response": response,
-                    "timestamp": timestamp
-                },
+                {"success": True, "response": response, "timestamp": timestamp},
                 room=sid,
             )
-            
+
         except Exception as e:
             print(f"Error in chat_message socket handler: {e}")
             await sio.emit(
@@ -2319,7 +2315,7 @@ try:
                 {
                     "success": False,
                     "error": f"Error processing message: {str(e)}",
-                    "timestamp": data.get("timestamp", "")
+                    "timestamp": data.get("timestamp", ""),
                 },
                 room=sid,
             )
@@ -2643,11 +2639,10 @@ try:
 
     def serialize_weaviate_data(data):
         """Convert Weaviate UUID objects to strings for JSON serialization."""
-        import json
-        
+
         def convert_uuids(obj):
             # Check for various Weaviate UUID types
-            if hasattr(obj, '__class__') and 'WeaviateUUID' in str(obj.__class__):
+            if hasattr(obj, "__class__") and "WeaviateUUID" in str(obj.__class__):
                 return str(obj)
             elif isinstance(obj, dict):
                 return {key: convert_uuids(value) for key, value in obj.items()}
@@ -2655,7 +2650,7 @@ try:
                 return [convert_uuids(item) for item in obj]
             else:
                 return obj
-        
+
         return convert_uuids(data)
 
     @sio.event
@@ -3186,7 +3181,7 @@ async def download_file(document_id: str):
 async def get_auth_providers():
     """Get available OAuth providers."""
     try:
-        print(f"[DEBUG] /auth/providers endpoint called")
+        print("[DEBUG] /auth/providers endpoint called")
         oauth_manager = get_oauth_manager()
         enabled_providers = oauth_manager.get_enabled_providers()
         print(f"[DEBUG] Enabled providers: {enabled_providers}")

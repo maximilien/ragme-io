@@ -1021,7 +1021,9 @@ app.get('/api/config', (req, res) => {
       // Note: authentication_type and url are excluded for security
     })),
     features: appConfig.features || {},
-    api_url: process.env.RAGME_API_URL?.includes('ragme-api') ? 'http://localhost:30021' : RAGME_API_URL,
+    api_url: process.env.RAGME_API_URL?.includes('ragme-api')
+      ? 'http://localhost:30021'
+      : RAGME_API_URL,
   };
 
   res.json(safeConfig);

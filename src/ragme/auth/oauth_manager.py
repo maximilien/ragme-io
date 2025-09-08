@@ -23,9 +23,9 @@ class OAuthManager:
         """Initialize the OAuth manager."""
         self.oauth_config = config.get_oauth_config()
         self.providers_config = config.get_oauth_providers()
-        
+
         # Debug logging
-        print(f"[DEBUG] OAuthManager initialized")
+        print("[DEBUG] OAuthManager initialized")
         print(f"[DEBUG] OAuth config: {self.oauth_config}")
         print(f"[DEBUG] Providers config: {self.providers_config}")
 
