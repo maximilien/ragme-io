@@ -234,3 +234,11 @@ env.test
 env.test.bak
 config.yaml.test
 config.yaml.test.bak
+
+# Backup and temporary files
+*.backup_*
+*.test_temp
+.env.backup_*
+.env.test_temp
+config.yaml.backup_*
+config.yaml.test_temp
