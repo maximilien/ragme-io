@@ -89,7 +89,7 @@ class RAGmeAssistant {
 
         // API configuration
         this.apiConfig = {
-            baseUrl: 'http://localhost:30021', // Default API base URL for Kubernetes NodePort
+            baseUrl: 'http://localhost:8021', // Default API base URL for local development
             endpoints: {
                 config: '/config',
                 health: '/health',
