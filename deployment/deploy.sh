@@ -898,11 +898,11 @@ patches:
 # Replicas for different environments
 replicas:
 - name: ragme-api
-  count: 1
+  count: 2
 - name: ragme-mcp
-  count: 1
+  count: 2
 - name: ragme-frontend
-  count: 1
+  count: 2
 - name: ragme-agent
   count: 1
 EOF
