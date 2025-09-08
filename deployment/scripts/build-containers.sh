@@ -57,7 +57,16 @@ if [ -f ".env" ]; then
     set +a
     
     # Create a processed config.yaml for the build using sed
-    cp config.yaml config.yaml.processed
+    # Use config.yaml if available, otherwise fall back to config.yaml.example
+    if [ -f "config.yaml" ]; then
+        cp config.yaml config.yaml.processed
+    elif [ -f "config.yaml.example" ]; then
+        cp config.yaml.example config.yaml.processed
+        print_warning "Using config.yaml.example as config.yaml is not available"
+    else
+        print_error "Neither config.yaml nor config.yaml.example found!"
+        exit 1
+    fi
     
     # Replace environment variables in the config file
     if [ -n "$APPLICATION_NAME" ]; then
@@ -182,7 +191,16 @@ if [ -f ".env" ]; then
     print_status "Config processed with environment variables"
 else
     print_warning "No .env file found, using config.yaml as-is"
-    cp config.yaml config.yaml.processed
+    # Use config.yaml if available, otherwise fall back to config.yaml.example
+    if [ -f "config.yaml" ]; then
+        cp config.yaml config.yaml.processed
+    elif [ -f "config.yaml.example" ]; then
+        cp config.yaml.example config.yaml.processed
+        print_warning "Using config.yaml.example as config.yaml is not available"
+    else
+        print_error "Neither config.yaml nor config.yaml.example found!"
+        exit 1
+    fi
     
     # Update CSP configuration for Kubernetes NodePort deployment even without .env
     # Replace localhost:8021 with localhost:30021 (API NodePort)
