@@ -231,7 +231,9 @@ class RAGmeAssistant {
 
     async loadConfiguration() {
         try {
-            const response = await fetch(this.buildApiUrl('config'));
+            // Load configuration from frontend server's /api/config endpoint
+            // This endpoint provides the correct api_url based on environment
+            const response = await fetch('/api/config');
             if (response.ok) {
                 this.config = await response.json();
                 console.log('Configuration loaded:', this.config);
@@ -6132,7 +6134,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     async loadVectorDbInfoFromBackend() {
         try {
-            const response = await fetch(this.buildApiUrl('config'));
+            const response = await fetch('/api/config');
             if (response.ok) {
                 const data = await response.json();
                 if (data.status === 'success' && data.config.vector_databases) {
@@ -6167,7 +6169,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         vectorDbElement.textContent = 'Loading...';
 
         try {
-            const response = await fetch(this.buildApiUrl('config'));
+            const response = await fetch('/api/config');
             if (response.ok) {
                 const data = await response.json();
                 if (data.status === 'success' && data.config.vector_databases && data.config.vector_databases.type) {
