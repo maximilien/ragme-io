@@ -1038,7 +1038,7 @@ app.get('/api/config', (req, res) => {
     })),
     features: appConfig.features || {},
     api_url:
-      process.env.RAGME_API_URL?.includes('ragme-api') && process.env.NODE_ENV === 'production'
+      process.env.NODE_ENV === 'production' && process.env.RAGME_API_URL?.includes('localhost:30021')
         ? 'http://localhost:30021'
         : RAGME_API_URL,
   };
