@@ -209,6 +209,9 @@ config.yaml
 # Generated Kubernetes config files with secrets
 deployment/k8s/configmap-generated.yaml
 
+# Container image tar files (generated during k8s deployment)
+*.tar
+
 # RAGme dev
 TODOs.md
 .ragme-prompts.txt
