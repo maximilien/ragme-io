@@ -273,9 +273,9 @@ frontend:
     show_vector_db_info: true  # Show/hide "Vector DB and Collections" on top pane
     
     # Document list settings
-    document_overview_enabled: true  # Document Overview enabled/disabled (default)
-    document_overview_visible: true  # Document Overview show/hide (default)
-    document_list_collapsed: false  # Document List pane collapse or showing (default)
+    document_overview_enabled: false  # Document Overview enabled/disabled (default)
+    document_overview_visible: false  # Document Overview show/hide (default)
+    document_list_collapsed: true  # Document List pane collapse or showing (default)
     document_list_width: 35  # Document List width size (default 35% of total width)
     
     # Chat History settings

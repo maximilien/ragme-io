@@ -79,33 +79,72 @@ if (
   // Keep RAGME_API_URL as external URL for browser/CSP
 }
 
-// Try to load configuration from the backend
+// Try to load configuration from the backend with retry logic
 async function loadConfiguration() {
-  try {
-    const response = await fetch(`${INTERNAL_API_URL}/config`);
-    if (response.ok) {
-      const responseData = (await response.json()) as { status: string; config: AppConfig };
-      appConfig = responseData.config;
-      logger.info('Configuration loaded from backend');
-
-      // Update INTERNAL_API_URL if different in config (but not if it's already set to external URL or internal service)
-      const configApiUrl = `http://localhost:${appConfig.network?.api?.port || 8021}`;
-      if (
-        configApiUrl !== INTERNAL_API_URL &&
-        !INTERNAL_API_URL.includes('localhost:30021') &&
-        !INTERNAL_API_URL.includes('ragme-api:8021')
-      ) {
-        INTERNAL_API_URL = configApiUrl;
-        logger.info(`Updated internal API URL to: ${INTERNAL_API_URL}`);
-
-        // Update CSP configuration with new API URL
-        app.use(helmet(getCSPConfig()));
+  const maxRetries = 10;
+  const retryDelay = 2000; // 2 seconds
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.info(`Attempting to load configuration from backend (attempt ${attempt}/${maxRetries})`);
+      
+      // First, check if the backend is healthy
+      const healthController = new AbortController();
+      const healthTimeout = setTimeout(() => healthController.abort(), 5000);
+      
+      const healthResponse = await fetch(`${INTERNAL_API_URL}/health`, {
+        signal: healthController.signal
+      });
+      clearTimeout(healthTimeout);
+      
+      if (!healthResponse.ok) {
+        throw new Error(`Backend health check failed: ${healthResponse.status}`);
       }
-    } else {
-      logger.warn('Could not load configuration from backend, using defaults');
+      
+      // Now try to load the configuration
+      const configController = new AbortController();
+      const configTimeout = setTimeout(() => configController.abort(), 10000);
+      
+      const response = await fetch(`${INTERNAL_API_URL}/config`, {
+        signal: configController.signal
+      });
+      clearTimeout(configTimeout);
+      
+      if (response.ok) {
+        const responseData = (await response.json()) as { status: string; config: AppConfig };
+        appConfig = responseData.config;
+        logger.info('Configuration loaded from backend successfully');
+
+        // Update INTERNAL_API_URL if different in config (but not if it's already set to external URL or internal service)
+        const configApiUrl = `http://localhost:${appConfig.network?.api?.port || 8021}`;
+        if (
+          configApiUrl !== INTERNAL_API_URL &&
+          !INTERNAL_API_URL.includes('localhost:30021') &&
+          !INTERNAL_API_URL.includes('ragme-api:8021')
+        ) {
+          INTERNAL_API_URL = configApiUrl;
+          logger.info(`Updated internal API URL to: ${INTERNAL_API_URL}`);
+
+          // Update CSP configuration with new API URL
+          app.use(helmet(getCSPConfig()));
+        }
+        return; // Success, exit the retry loop
+      } else {
+        throw new Error(`Configuration request failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn(`Configuration load attempt ${attempt} failed: ${errorMessage}`);
+      
+      if (attempt === maxRetries) {
+        logger.error('Failed to load configuration from backend after all retries, using defaults');
+        return;
+      }
+      
+      // Wait before retrying
+      logger.info(`Waiting ${retryDelay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
-  } catch {
-    logger.warn('Could not connect to backend for configuration, using defaults');
   }
 }
 
@@ -1026,7 +1065,13 @@ app.use((req, res, next) => {
 });
 
 // Add configuration endpoint for frontend
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
+  // If configuration is missing or incomplete, try to reload it
+  if (!appConfig.vector_databases || Object.keys(appConfig).length === 0) {
+    logger.info('Configuration missing or incomplete, attempting to reload...');
+    await loadConfiguration();
+  }
+
   // Filter out any potentially sensitive data before sending to frontend
   const safeConfig = {
     application: {
@@ -1077,9 +1122,35 @@ app.get('/api/auth/providers', async (req, res) => {
   }
 });
 
+// Periodic health check and configuration refresh
+async function startHealthCheck() {
+  setInterval(async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${INTERNAL_API_URL}/health`, { 
+        signal: controller.signal 
+      });
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        logger.warn('Backend health check failed, attempting to reload configuration...');
+        await loadConfiguration();
+      }
+    } catch (error) {
+      logger.warn('Backend health check error, attempting to reload configuration...');
+      await loadConfiguration();
+    }
+  }, 30000); // Check every 30 seconds
+}
+
 // Start server with configuration loading
 async function startServer() {
   await loadConfiguration();
+  
+  // Start periodic health checks
+  startHealthCheck();
 
   const finalPort =
     process.env.PORT ||
