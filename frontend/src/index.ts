@@ -63,6 +63,11 @@ interface AppConfig {
 let appConfig: AppConfig = {};
 let RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8021';
 
+// For local development, always use local ports unless explicitly overridden
+if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
+  RAGME_API_URL = 'http://localhost:8021';
+}
+
 // Try to load configuration from the backend
 async function loadConfiguration() {
   try {
@@ -77,6 +82,9 @@ async function loadConfiguration() {
       if (configApiUrl !== RAGME_API_URL) {
         RAGME_API_URL = configApiUrl;
         logger.info(`Updated API URL to: ${RAGME_API_URL}`);
+        
+        // Update CSP configuration with new API URL
+        app.use(helmet(getCSPConfig()));
       }
     } else {
       logger.warn('Could not load configuration from backend, using defaults');
@@ -151,9 +159,9 @@ interface MCPResponse {
   error?: string;
 }
 
-// Middleware
-app.use(
-  helmet({
+// Function to get CSP configuration
+function getCSPConfig() {
+  return {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -172,8 +180,11 @@ app.use(
         baseUri: ["'self'"],
       },
     },
-  })
-);
+  };
+}
+
+// Middleware
+app.use(helmet(getCSPConfig()));
 app.use(compression());
 app.use(cors());
 app.use(express.json());
@@ -1021,7 +1032,7 @@ app.get('/api/config', (req, res) => {
       // Note: authentication_type and url are excluded for security
     })),
     features: appConfig.features || {},
-    api_url: process.env.RAGME_API_URL?.includes('ragme-api')
+    api_url: process.env.RAGME_API_URL?.includes('ragme-api') && process.env.NODE_ENV === 'production'
       ? 'http://localhost:30021'
       : RAGME_API_URL,
   };
