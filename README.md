@@ -51,27 +51,37 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **[🔧 Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues, solutions, and debugging techniques
 - **[📖 Documentation Index](docs/README.md)** - Documentation overview and navigation
 
-## ☸️ Kubernetes Deployment ⭐ **NEW!**
+## ☸️ Kubernetes Deployment ⭐ **PRODUCTION READY!**
 
-RAGme now supports full Kubernetes deployment with containerization, orchestration, and a custom operator:
+RAGme now supports full Kubernetes deployment with high availability, automatic load balancing, and comprehensive troubleshooting:
 
 - **🐳 Containerized Services** - All RAGme services packaged as containers
-- **⚓ Kubernetes Manifests** - Production-ready deployment configurations  
+- **⚓ Kubernetes Manifests** - Production-ready deployment configurations with 2-replica high availability
 - **🎛️ Custom Operator** - Declarative RAGme management with Go-based operator
 - **🚀 One-Click Deployment** - Deploy to local Kind cluster with single command
+- **🔄 Automatic Load Balancing** - Built-in Kubernetes Services with health checking and failover
+- **🛠️ Comprehensive Troubleshooting** - Detailed debugging guides and recovery procedures
 
 ### Quick Kubernetes Setup
 
 ```bash
-# Deploy to local Kind cluster
+# Deploy to local Kind cluster with high availability
 cd deployment
-./deploy.sh
+./deploy.sh deploy
 
-# Access services
-# Frontend: http://localhost:30020
-# API: http://localhost:30021
+# Access services (with automatic load balancing)
+# Frontend: http://localhost:30020 (2 replicas)
+# API: http://localhost:30021 (2 replicas)
 # MinIO Console: http://localhost:30901
 ```
+
+### High Availability Features
+
+- **Multi-Replica Services**: Frontend and API run with 2 replicas for fault tolerance
+- **Automatic Load Balancing**: Kubernetes Services distribute traffic across healthy pods
+- **Health Checking**: Readiness and liveness probes ensure only healthy pods receive traffic
+- **Zero-Downtime Deployments**: Rolling updates maintain service availability
+- **Automatic Failover**: Failed pods are removed from rotation without manual intervention
 
 ### Advanced Deployment Options
 
@@ -81,10 +91,14 @@ kubectl apply -f deployment/operator/config/samples/ragme_v1_ragme.yaml
 
 # Production deployment with custom configuration
 kubectl apply -f my-production-ragme.yaml
+
+# Scale services for higher load
+kubectl scale deployment ragme-frontend --replicas=3 -n ragme
+kubectl scale deployment ragme-api --replicas=3 -n ragme
 ```
 
 **📚 Complete Kubernetes Documentation:**
-- **[🚀 Deployment Guide](deployment/README.md)** - Complete Kubernetes deployment guide
+- **[🚀 Deployment Guide](deployment/README.md)** - Complete Kubernetes deployment guide with troubleshooting
 - **[🐳 Containerization](docs/DEPLOYMENT_CONTAINERS.md)** - Container build and management
 - **[⚓ Kubernetes Manifests](docs/DEPLOYMENT_KUBERNETES.md)** - Kubernetes resource definitions
 - **[🎛️ Operator Guide](docs/DEPLOYMENT_OPERATOR.md)** - Custom operator usage and development

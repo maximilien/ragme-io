@@ -1,45 +1,6 @@
 # 🔧 RAGme Troubleshooting Guide
 
-This comprehensive troubleshooting guide covers common issues, their solutions, and debugging techniques for RAGme.
-
-## 🚨 Common Issues
-
-### Environment Variable Configuration Not Taking Effect
-
-**Problem**: Changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) doesn't take effect after restart.
-
-**Symptoms**:
-- Application still shows old name/title after switching `.env` files
-- Still connecting to old vector database collection
-- Environment changes appear ignored
-
-**Solution**: ✅ **FIXED!** This was a critical bug that has been resolved. The system now properly reads and applies all environment variable changes:
-
-1. **Verify configuration loading**:
-   ```bash
-   ./tools/config-validator.sh
-   ```
-
-2. **Check environment variables are loaded**:
-   ```bash
-   python3 -c "
-   from src.ragme.utils.config_manager import config
-   print(f'App name: {config.get(\"application.name\")}')
-   print(f'DB type: {config.get(\"vector_databases.default\")}')
-   "
-   ```
-
-3. **Proper environment switching**:
-   ```bash
-   ./stop.sh
-   cp .env.app.viewfinder-ai .env  # or your desired environment
-   ./start.sh
-   ```
-
-**What was fixed**:
-- Environment variable syntax in config.yaml (changed from `{$VAR}` to `${VAR}`)
-- Dynamic VECTOR_DB_TYPE selection and mapping
-- Proper configuration loading and substitution
+This comprehensive troubleshooting guide covers common issues, their solutions, and debugging techniques for RAGme in both local development and Kubernetes deployments.
 
 ## 🚨 Common Issues
 
@@ -718,6 +679,36 @@ For comprehensive debugging information, see [Process Management Guide](PROCESS_
    open http://localhost:8020                     # Frontend
    ```
 
+## ☸️ Kubernetes Deployment Issues
+
+For Kubernetes-specific troubleshooting, see the comprehensive **[Kubernetes Deployment Troubleshooting Guide](DEPLOYMENT_TROUBLESHOOTING.md)** which covers:
+
+- **Container Build Issues**: Podman installation, build failures, disk space
+- **Kind Cluster Issues**: Cluster creation, connectivity, port conflicts
+- **Pod Startup Issues**: ImagePullBackOff, CrashLoopBackOff, Pending pods
+- **Storage Issues**: PVC problems, volume mount failures
+- **Service Communication**: DNS resolution, connection refused
+- **Operator Issues**: CRD installation, RBAC permissions
+- **Configuration Issues**: Missing API keys, wrong configuration values
+
+### Quick Kubernetes Debugging
+
+```bash
+# Check deployment status
+kubectl get all -n ragme
+
+# Check pod logs
+kubectl logs -f deployment/ragme-frontend -n ragme
+kubectl logs -f deployment/ragme-api -n ragme
+
+# Restart services
+kubectl rollout restart deployment/ragme-frontend -n ragme
+kubectl rollout restart deployment/ragme-api -n ragme
+
+# Check events
+kubectl get events -n ragme --sort-by='.lastTimestamp'
+```
+
 ## 📞 Getting Help
 
 If you encounter issues not covered here:
@@ -728,6 +719,7 @@ If you encounter issues not covered here:
 4. **Check system resources**: CPU, memory, disk space
 5. **Review the [Process Management Guide](PROCESS_MANAGEMENT.md)**
 6. **Check service status**: `./stop.sh status`
+7. **For Kubernetes issues**: See [Kubernetes Deployment Troubleshooting](DEPLOYMENT_TROUBLESHOOTING.md)
 
 ## 🔄 Recent Fixes
 

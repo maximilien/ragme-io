@@ -13,7 +13,8 @@ Welcome to the RAGme documentation! This directory contains comprehensive docume
 - **[Development Guide](DEVELOPMENT.md)** - Development setup, testing, and contribution guidelines
 
 ### 🔧 Support & Troubleshooting
-- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues, solutions, and debugging techniques
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues, solutions, and debugging techniques for local development
+- **[Kubernetes Deployment Troubleshooting](DEPLOYMENT_TROUBLESHOOTING.md)** - Kubernetes-specific issues and solutions
 
 ## 🎯 Quick Navigation
 
@@ -30,18 +31,24 @@ Welcome to the RAGme documentation! This directory contains comprehensive docume
 ### For System Administrators
 1. Check **[Configuration Reference](CONFIGURATION.md)** for deployment options
 2. Review **[Architecture Guide](ARCHITECTURE.md)** for system requirements
-3. Use **[Troubleshooting Guide](TROUBLESHOOTING.md)** for maintenance
+3. Use **[Troubleshooting Guide](TROUBLESHOOTING.md)** for local development issues
+4. Use **[Kubernetes Deployment Troubleshooting](DEPLOYMENT_TROUBLESHOOTING.md)** for Kubernetes deployments
 
 ## 📋 Documentation Structure
 
 ```
 docs/
-├── README.md              # This file - Documentation index
-├── USER_GUIDE.md          # User-facing documentation
-├── CONFIGURATION.md       # Configuration reference
-├── ARCHITECTURE.md        # Technical architecture
-├── DEVELOPMENT.md         # Development guide
-└── TROUBLESHOOTING.md     # Troubleshooting guide
+├── README.md                    # This file - Documentation index
+├── USER_GUIDE.md               # User-facing documentation
+├── CONFIGURATION.md            # Configuration reference
+├── ARCHITECTURE.md             # Technical architecture
+├── DEVELOPMENT.md              # Development guide
+├── TROUBLESHOOTING.md          # Local development troubleshooting
+├── DEPLOYMENT_TROUBLESHOOTING.md # Kubernetes deployment troubleshooting
+├── DEPLOYMENT_CONTAINERS.md    # Container deployment guide
+├── DEPLOYMENT_KUBERNETES.md    # Kubernetes manifests guide
+├── DEPLOYMENT_OPERATOR.md      # Operator development guide
+└── ENHANCED_IMAGE_SEARCH.md    # Image search capabilities
 ```
 
 ## 🔄 Documentation Updates
