@@ -392,6 +392,11 @@ class RAGmeAssistant {
                 // Clear the auth parameters from URL
                 const newUrl = window.location.pathname;
                 window.history.replaceState({}, document.title, newUrl);
+                
+                // Force a page reload to ensure cookies are properly set
+                console.log('Reloading page to ensure proper authentication state');
+                window.location.reload();
+                return;
             }
             
             // If bypass_login is true, clear any stored session token to avoid conflicts
@@ -400,7 +405,7 @@ class RAGmeAssistant {
                 console.log('Bypass login enabled, cleared stored session token before auth check');
             }
             
-            // Get stored token or use cookie
+            // Get stored token from localStorage (fallback) or rely on cookies
             const storedToken = localStorage.getItem('session_token');
             const headers = {};
             if (storedToken) {
@@ -408,7 +413,7 @@ class RAGmeAssistant {
             }
             
             const response = await fetch(this.buildApiUrl('auth/status'), {
-                credentials: 'include',
+                credentials: 'include',  // This ensures cookies are sent
                 headers: headers
             });
             
@@ -421,8 +426,23 @@ class RAGmeAssistant {
                 console.log('Authentication status:', {
                     isAuthenticated: this.isAuthenticated,
                     bypassLogin: this.bypassLogin,
-                    user: this.currentUser
+                    user: this.currentUser,
+                    hasStoredToken: !!storedToken,
+                    responseStatus: response.status
                 });
+                
+                // Debug: Also check the debug endpoint
+                try {
+                    const debugResponse = await fetch(this.buildApiUrl('auth/debug'), {
+                        credentials: 'include'
+                    });
+                    if (debugResponse.ok) {
+                        const debugData = await debugResponse.json();
+                        console.log('Auth debug info:', debugData);
+                    }
+                } catch (debugError) {
+                    console.warn('Could not fetch auth debug info:', debugError);
+                }
                 
                 // Debug: Log the decision logic
                 console.log('Login decision:', {
@@ -444,6 +464,9 @@ class RAGmeAssistant {
                     this.hideLoginModal();
                     this.updateUserInterface();
                 }
+                
+                // Update close button visibility based on bypass_login status
+                this.updateLoginModalCloseButton();
             } else {
                 console.warn('Failed to check authentication status');
                 // Default to showing login modal if we can't check status
@@ -480,6 +503,7 @@ class RAGmeAssistant {
         if (modal) {
             modal.classList.add('show');
             this.loadAuthProviders();
+            this.updateLoginModalCloseButton();
         }
     }
 
@@ -1030,6 +1054,15 @@ class RAGmeAssistant {
             submenus.forEach(submenu => submenu.classList.remove('show'));
             triggers.forEach(trigger => trigger.classList.remove('active'));
         });
+
+        // Login modal close button (for bypass_login mode)
+        const closeLoginModal = document.getElementById('closeLoginModal');
+        if (closeLoginModal) {
+            closeLoginModal.addEventListener('click', () => {
+                this.hideLoginModal();
+                this.updateUserInterface();
+            });
+        }
 
         // Prevent submenu clicks from closing the main menu
         document.getElementById('manageChatsSubmenu').addEventListener('click', (e) => {
