@@ -202,16 +202,22 @@ class RAGmeAssistant {
     }
 
     updateApiConfig() {
-        // Update API configuration from loaded config if available
+        // For WebSocket connections, always use the frontend server's URL (current page URL)
+        // This ensures the browser can resolve the hostname correctly
+        const frontendUrl = window.location.origin;
+        this.apiConfig.baseUrl = frontendUrl;
+        console.log('API base URL set to frontend server URL for WebSocket connections:', this.apiConfig.baseUrl);
+        
+        // Store the internal API URL for HTTP requests (if needed)
         if (this.config && this.config.api_url) {
-            this.apiConfig.baseUrl = this.config.api_url;
-            console.log('API base URL updated from config:', this.apiConfig.baseUrl);
+            this.apiConfig.internalApiUrl = this.config.api_url;
+            console.log('Internal API URL stored:', this.apiConfig.internalApiUrl);
         } else if (this.config && this.config.network && this.config.network.api) {
             const apiConfig = this.config.network.api;
             if (apiConfig.host && apiConfig.port) {
                 const protocol = apiConfig.ssl ? 'https' : 'http';
-                this.apiConfig.baseUrl = `${protocol}://${apiConfig.host}:${apiConfig.port}`;
-                console.log('API base URL updated from config:', this.apiConfig.baseUrl);
+                this.apiConfig.internalApiUrl = `${protocol}://${apiConfig.host}:${apiConfig.port}`;
+                console.log('Internal API URL stored:', this.apiConfig.internalApiUrl);
             }
         }
     }

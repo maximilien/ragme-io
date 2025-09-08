@@ -220,6 +220,7 @@ function getCSPConfig() {
         connectSrc: [
           "'self'",
           RAGME_API_URL,
+          RAGME_API_URL.replace('http://', 'https://'),
           RAGME_API_URL.replace('http://', 'ws://'),
           RAGME_API_URL.replace('http://', 'wss://'),
         ],

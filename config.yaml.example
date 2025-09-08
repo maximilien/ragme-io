@@ -285,7 +285,7 @@ frontend:
     # Other UI settings
     default_date_filter: "current"  # Options: current, month, year, all
     default_visualization: "graph"  # Options: graph, chart, table
-    visualization_visible: true
+    visualization_visible: false
     
   # Document limits
   documents:

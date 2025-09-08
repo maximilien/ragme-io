@@ -228,3 +228,9 @@ watch_directory/**/*.processed
 
 # Ignore cookies
 cookies.txt
+
+# Ignore temporary testfiles
+env.test
+env.test.bak
+config.yaml.test
+config.yaml.test.bak
