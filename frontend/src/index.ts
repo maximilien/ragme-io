@@ -82,7 +82,7 @@ async function loadConfiguration() {
       if (configApiUrl !== RAGME_API_URL) {
         RAGME_API_URL = configApiUrl;
         logger.info(`Updated API URL to: ${RAGME_API_URL}`);
-        
+
         // Update CSP configuration with new API URL
         app.use(helmet(getCSPConfig()));
       }
@@ -1032,9 +1032,10 @@ app.get('/api/config', (req, res) => {
       // Note: authentication_type and url are excluded for security
     })),
     features: appConfig.features || {},
-    api_url: process.env.RAGME_API_URL?.includes('ragme-api') && process.env.NODE_ENV === 'production'
-      ? 'http://localhost:30021'
-      : RAGME_API_URL,
+    api_url:
+      process.env.RAGME_API_URL?.includes('ragme-api') && process.env.NODE_ENV === 'production'
+        ? 'http://localhost:30021'
+        : RAGME_API_URL,
   };
 
   res.json(safeConfig);
