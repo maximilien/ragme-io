@@ -289,6 +289,24 @@ setup_dependencies() {
     print_status "Please restart your terminal or run 'source ~/.bashrc' to ensure PATH is updated."
 }
 
+# Function to check if deployment already exists
+check_existing_deployment() {
+    if kubectl get namespace ragme >/dev/null 2>&1; then
+        print_warning "Namespace 'ragme' already exists. This may indicate a previous deployment."
+        print_status "Current pods in ragme namespace:"
+        kubectl get pods -n ragme 2>/dev/null || true
+        echo ""
+        print_status "To clean up the existing deployment, run: $0 destroy"
+        echo ""
+        read -p "Do you want to continue with the deployment? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Deployment cancelled by user"
+            exit 0
+        fi
+    fi
+}
+
 # Function to check dependencies
 check_dependencies() {
     print_status "Checking dependencies..."
@@ -405,11 +423,11 @@ load_images_directly() {
     podman save ragme-agent:latest -o ragme-agent.tar
     podman save ragme-frontend:latest -o ragme-frontend.tar
     
-    # Load tar files into kind
-    kind load image-archive ragme-api.tar --name $CLUSTER_NAME
-    kind load image-archive ragme-mcp.tar --name $CLUSTER_NAME
-    kind load image-archive ragme-agent.tar --name $CLUSTER_NAME
-    kind load image-archive ragme-frontend.tar --name $CLUSTER_NAME
+    # Load tar files into kind using Podman
+    KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive ragme-api.tar --name $CLUSTER_NAME
+    KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive ragme-mcp.tar --name $CLUSTER_NAME
+    KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive ragme-agent.tar --name $CLUSTER_NAME
+    KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive ragme-frontend.tar --name $CLUSTER_NAME
     
     # Clean up tar files
     rm -f ragme-api.tar ragme-mcp.tar ragme-agent.tar ragme-frontend.tar
@@ -566,8 +584,8 @@ EOF
         # Minikube cluster already created
         print_status "Minikube cluster ready"
     else
-        # Create the kind cluster with 8GB configuration
-        kind create cluster --config kind-config-8gb.yaml --name $CLUSTER_NAME
+        # Create the kind cluster with 8GB configuration using Podman
+        KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --config kind-config-8gb.yaml --name $CLUSTER_NAME
         
         # After cluster creation, manually set container memory to 8GB
         print_status "Setting worker node memory to 8GB..."
@@ -673,7 +691,8 @@ build_and_load_images() {
 
 # Function to generate configmap from .env file
 generate_configmap() {
-    print_status "Generating Kubernetes configmap from .env file..."
+    local output_file="${1:-k8s/configmap-generated.yaml}"
+    print_status "Generating Kubernetes configmap from .env file to $output_file..."
     
     # Check if .env file exists
     if [ ! -f "../.env" ]; then
@@ -686,9 +705,8 @@ generate_configmap() {
     source ../.env
     set +a
     
-    # Create a temporary configmap file
-    cat > k8s/configmap-generated.yaml << EOF
-apiVersion: v1
+    # Generate configmap with proper variable expansion using printf
+    printf 'apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ragme-config
@@ -706,24 +724,24 @@ data:
   RAGME_MCP_URL: "http://localhost:30022"
   
   # Vector Database Configuration
-  VECTOR_DB_TYPE: "${VECTOR_DB_TYPE:-weaviate}"
-  VECTOR_DB_TEXT_COLLECTION_NAME: "${VECTOR_DB_TEXT_COLLECTION_NAME:-ragme-text-docs}"
-  VECTOR_DB_IMAGE_COLLECTION_NAME: "${VECTOR_DB_IMAGE_COLLECTION_NAME:-ragme-image-docs}"
+  VECTOR_DB_TYPE: "%s"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "%s"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "%s"
   
   # MinIO Configuration
   MINIO_ENDPOINT: "ragme-minio:9000"
   
   # Application Configuration
-  APPLICATION_NAME: "${APPLICATION_NAME:-RAGme Kubernetes}"
-  APPLICATION_VERSION: "${APPLICATION_VERSION:-1.0.0}"
-  APPLICATION_TITLE: "${APPLICATION_TITLE:-RAGme AI Assistant}"
-  APPLICATION_DESCRIPTION: "${APPLICATION_DESCRIPTION:-AI-powered document and image processing assistant}"
+  APPLICATION_NAME: "%s"
+  APPLICATION_VERSION: "%s"
+  APPLICATION_TITLE: "%s"
+  APPLICATION_DESCRIPTION: "%s"
   
   # Watch Directory
-  WATCH_DIRECTORY: "${WATCH_DIRECTORY:-/app/watch_directory}"
-  MINIO_LOCAL_PATH: "${MINIO_LOCAL_PATH:-/app/minio_data}"
+  WATCH_DIRECTORY: "%s"
+  MINIO_LOCAL_PATH: "%s"
   
-  # OAuth Configuration
+  # OAuth Configuration - use internal service URLs for Kubernetes
   GOOGLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/google/callback"
   GITHUB_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/github/callback"
   APPLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/apple/callback"
@@ -738,52 +756,196 @@ metadata:
 type: Opaque
 stringData:
   # Required secrets - update these values
-  OPENAI_API_KEY: "${OPENAI_API_KEY}"
+  OPENAI_API_KEY: "%s"
   
   # Optional secrets for external services
-  WEAVIATE_API_KEY: "${WEAVIATE_API_KEY}"
-  WEAVIATE_URL: "${WEAVIATE_URL}"
-  MILVUS_URI: "${MILVUS_URI:-your-milvus-uri}"
-  MILVUS_TOKEN: "${MILVUS_TOKEN:-your-milvus-token}"
+  WEAVIATE_API_KEY: "%s"
+  WEAVIATE_URL: "%s"
+  MILVUS_URI: "%s"
+  MILVUS_TOKEN: "%s"
   
   # MinIO credentials
   MINIO_ACCESS_KEY: "minioadmin"
   MINIO_SECRET_KEY: "minioadmin"
   
   # S3 credentials (if using S3 instead of MinIO)
-  S3_ENDPOINT: "${S3_ENDPOINT:-your-s3-endpoint}"
-  S3_ACCESS_KEY: "${S3_ACCESS_KEY:-your-s3-access-key}"
-  S3_SECRET_KEY: "${S3_SECRET_KEY:-your-s3-secret-key}"
-  S3_BUCKET_NAME: "${S3_BUCKET_NAME:-your-s3-bucket}"
-  S3_REGION: "${S3_REGION:-us-east-1}"
+  S3_ENDPOINT: "%s"
+  S3_ACCESS_KEY: "%s"
+  S3_SECRET_KEY: "%s"
+  S3_BUCKET_NAME: "%s"
+  S3_REGION: "%s"
   
-  # OAuth secrets - update these values
-  GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID:-your-google-oauth-client-id}"
-  GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET:-your-google-oauth-client-secret}"
-  GITHUB_OAUTH_CLIENT_ID: "${GITHUB_OAUTH_CLIENT_ID:-your-github-oauth-client-id}"
-  GITHUB_OAUTH_CLIENT_SECRET: "${GITHUB_OAUTH_CLIENT_SECRET:-your-github-oauth-client-secret}"
-  APPLE_OAUTH_CLIENT_ID: "${APPLE_OAUTH_CLIENT_ID:-your-apple-oauth-client-id}"
-  APPLE_OAUTH_CLIENT_SECRET: "${APPLE_OAUTH_CLIENT_SECRET:-your-apple-oauth-client-secret}"
+  # OAuth secrets - use values from .env file
+  GOOGLE_OAUTH_CLIENT_ID: "%s"
+  GOOGLE_OAUTH_CLIENT_SECRET: "%s"
+  GITHUB_OAUTH_CLIENT_ID: "%s"
+  GITHUB_OAUTH_CLIENT_SECRET: "%s"
+  APPLE_OAUTH_CLIENT_ID: "%s"
+  APPLE_OAUTH_CLIENT_SECRET: "%s"
   
   # Session configuration
-  SESSION_SECRET_KEY: "${SESSION_SECRET_KEY:-ragme-shared-session-secret-key-2025}"
+  SESSION_SECRET_KEY: "%s"
+' \
+  "${VECTOR_DB_TYPE:-weaviate}" \
+  "${VECTOR_DB_TEXT_COLLECTION_NAME:-ragme-text-docs}" \
+  "${VECTOR_DB_IMAGE_COLLECTION_NAME:-ragme-image-docs}" \
+  "${APPLICATION_NAME:-RAGme Kubernetes}" \
+  "${APPLICATION_VERSION:-1.0.0}" \
+  "${APPLICATION_TITLE:-RAGme AI Assistant}" \
+  "${APPLICATION_DESCRIPTION:-AI-powered document and image processing assistant}" \
+  "${WATCH_DIRECTORY:-/app/watch_directory}" \
+  "${MINIO_LOCAL_PATH:-/app/minio_data}" \
+  "${OPENAI_API_KEY}" \
+  "${WEAVIATE_API_KEY:-}" \
+  "${WEAVIATE_URL:-}" \
+  "${MILVUS_URI:-your-milvus-uri}" \
+  "${MILVUS_TOKEN:-your-milvus-token}" \
+  "${S3_ENDPOINT:-your-s3-endpoint}" \
+  "${S3_ACCESS_KEY:-your-s3-access-key}" \
+  "${S3_SECRET_KEY:-your-s3-secret-key}" \
+  "${S3_BUCKET_NAME:-your-s3-bucket}" \
+  "${S3_REGION:-us-east-1}" \
+  "${GOOGLE_OAUTH_CLIENT_ID:-your-google-oauth-client-id}" \
+  "${GOOGLE_OAUTH_CLIENT_SECRET:-your-google-oauth-client-secret}" \
+  "${GITHUB_OAUTH_CLIENT_ID:-your-github-oauth-client-id}" \
+  "${GITHUB_OAUTH_CLIENT_SECRET:-your-github-oauth-client-secret}" \
+  "${APPLE_OAUTH_CLIENT_ID:-your-apple-oauth-client-id}" \
+  "${APPLE_OAUTH_CLIENT_SECRET:-your-apple-oauth-client-secret}" \
+  "${SESSION_SECRET_KEY:-ragme-shared-session-secret-key-2025}" > "$output_file"
+    
+    print_status "Configmap generated from .env file to $output_file"
+}
+
+# Function to create temporary kustomization without static configmap
+create_temp_kustomization() {
+    local output_file="$1"
+    print_status "Creating temporary kustomization file without static configmap..."
+    
+    # Create a temporary kustomization that excludes the static configmap.yaml
+    cat > "$output_file" << 'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ragme
+
+resources:
+- namespace.yaml
+- shared-storage.yaml
+- minio-deployment.yaml
+- weaviate-deployment.yaml
+- api-deployment.yaml
+- mcp-deployment.yaml
+- agent-deployment.yaml
+- frontend-deployment.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app: ragme
+  version: v1
+
+# Images that can be customized
+images:
+- name: ragme-api
+  newTag: latest
+- name: ragme-mcp
+  newTag: latest
+- name: ragme-agent
+  newTag: latest
+- name: ragme-frontend
+  newTag: latest
+
+# ConfigMap generators for deployment-specific config
+configMapGenerator:
+- name: ragme-deployment-config
+  literals:
+  - DEPLOYMENT_MODE=kubernetes
+  - CLUSTER_NAME=ragme-cluster
+
+# Patches for different environments
+patchesStrategicMerge: []
+
+# Memory patches for single worker node
+patches:
+- target:
+    kind: Deployment
+    name: ragme-api
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "384Mi"
+- target:
+    kind: Deployment
+    name: ragme-mcp
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+- target:
+    kind: Deployment
+    name: ragme-frontend
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+- target:
+    kind: Deployment
+    name: ragme-agent
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+
+# Replicas for different environments
+replicas:
+- name: ragme-api
+  count: 1
+- name: ragme-mcp
+  count: 1
+- name: ragme-frontend
+  count: 1
+- name: ragme-agent
+  count: 1
 EOF
     
-    print_status "Configmap generated from .env file"
+    print_status "Temporary kustomization created at $output_file"
 }
 
 # Function to deploy services
 deploy_services() {
     print_status "Deploying RAGme services to Kubernetes..."
     
-    # Generate configmap from .env file
-    generate_configmap
+    # Create namespace if it doesn't exist
+    print_status "Creating namespace 'ragme'..."
+    kubectl create namespace ragme --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Generate temporary configmap from .env file
+    local temp_configmap="k8s/configmap-temp.yaml"
+    generate_configmap "$temp_configmap"
+    
+    # Create a temporary kustomization without the static configmap
+    local temp_kustomization="k8s/kustomization-temp.yaml"
+    create_temp_kustomization "$temp_kustomization"
     
     # Apply the generated configmap first
-    kubectl apply -f k8s/configmap-generated.yaml
+    print_status "Applying generated configmap with .env values..."
+    kubectl apply -f "$temp_configmap"
+    
+    # Apply kustomization (without static configmap)
+    print_status "Applying kustomization..."
+    # Temporarily replace the original kustomization with our temp one
+    local original_kustomization="k8s/kustomization.yaml"
+    local backup_kustomization="k8s/kustomization.yaml.backup"
+    cp "$original_kustomization" "$backup_kustomization"
+    cp "$temp_kustomization" "$original_kustomization"
     
     # Apply kustomization
     kubectl apply -k k8s/
+    
+    # Restore original kustomization
+    mv "$backup_kustomization" "$original_kustomization"
+    
+    # Clean up temporary files
+    rm -f "$temp_configmap" "$temp_kustomization"
     
     print_status "Waiting for deployments to be ready..."
     
@@ -793,6 +955,41 @@ deploy_services() {
     kubectl wait --for=condition=available --timeout=300s deployment/ragme-mcp -n ragme
     kubectl wait --for=condition=available --timeout=300s deployment/ragme-agent -n ragme
     kubectl wait --for=condition=available --timeout=300s deployment/ragme-frontend -n ragme
+    kubectl wait --for=condition=available --timeout=300s deployment/ragme-weaviate -n ragme
+    
+    # Verify deployment is working
+    verify_deployment
+}
+
+# Function to verify deployment is working
+verify_deployment() {
+    print_status "Verifying deployment..."
+    
+    # Check if all pods are running
+    local failed_pods=$(kubectl get pods -n ragme --field-selector=status.phase!=Running --no-headers 2>/dev/null | wc -l)
+    if [ "$failed_pods" -gt 0 ]; then
+        print_warning "Some pods are not running. Checking pod status..."
+        kubectl get pods -n ragme
+        return 1
+    fi
+    
+    # Test API endpoint
+    print_status "Testing API endpoint..."
+    if curl -s -f "http://localhost:30021/health" >/dev/null 2>&1; then
+        print_status "✅ API is responding"
+    else
+        print_warning "⚠️  API is not responding on localhost:30021"
+    fi
+    
+    # Test frontend endpoint
+    print_status "Testing frontend endpoint..."
+    if curl -s -f "http://localhost:30020" >/dev/null 2>&1; then
+        print_status "✅ Frontend is responding"
+    else
+        print_warning "⚠️  Frontend is not responding on localhost:30020"
+    fi
+    
+    print_status "Deployment verification completed"
 }
 
 # Function to show deployment status
@@ -845,25 +1042,190 @@ case "${1:-deploy}" in
         # Check dependencies before proceeding
         check_dependencies
         
-        # Check if cluster exists (handle both Docker and Podman)
-        if [[ "$KIND_EXPERIMENTAL_PROVIDER" == "podman" ]]; then
-            # For Podman, check if containers exist
-            if podman ps --filter "name=ragme-cluster" --format "{{.Names}}" | grep -q "ragme-cluster"; then
-                print_status "Kind cluster '$CLUSTER_NAME' already exists (Podman)"
-            else
-                create_cluster
-            fi
+        # Check if deployment already exists
+        check_existing_deployment
+        
+        # Show available clusters and contexts for user reference
+        print_status "Current Kubernetes context:"
+        kubectl config current-context 2>/dev/null || echo "  (No context set)"
+        
+        print_status "Available Kind clusters:"
+        # Use Podman to check for existing Kind clusters
+        podman_clusters=$(podman ps --filter "name=ragme-cluster" --format "{{.Names}}" | grep -o "ragme-cluster-control-plane" | sed 's/-control-plane//' | sort -u)
+        if [[ -n "$podman_clusters" ]]; then
+            echo "$podman_clusters" | sed 's/^/  /'
         else
-            # For Docker, use kind get clusters
-            if ! kind get clusters | grep -q "^$CLUSTER_NAME$"; then
-                create_cluster
-            else
-                print_status "Kind cluster '$CLUSTER_NAME' already exists (Docker)"
-            fi
+            echo "  (No Kind clusters found)"
         fi
         
-        setup_registry
-        build_and_load_images
+        print_status "Available Kubernetes contexts:"
+        kubectl config get-contexts --no-headers 2>/dev/null | awk '{print "  " $2}' | sort -u || echo "  (No contexts found)"
+        echo ""
+        
+        # Check if cluster exists and handle gracefully
+        cluster_exists=false
+        
+        # Use Podman to check for existing Kind clusters
+        if podman ps --filter "name=${CLUSTER_NAME}" --format "{{.Names}}" | grep -q "${CLUSTER_NAME}-control-plane"; then
+            cluster_exists=true
+        fi
+        
+        if [[ "$cluster_exists" == "true" ]]; then
+            print_warning "Kind cluster '$CLUSTER_NAME' already exists."
+            
+            # Check for other available clusters
+            print_status "Available Kind clusters:"
+            # Use Podman to check for existing Kind clusters
+            podman_clusters=$(podman ps --filter "name=ragme-cluster" --format "{{.Names}}" | grep -o "ragme-cluster-control-plane" | sed 's/-control-plane//' | sort -u)
+            if [[ -n "$podman_clusters" ]]; then
+                echo "$podman_clusters" | sed 's/^/  /'
+            else
+                echo "  (No Kind clusters found)"
+            fi
+            
+            print_status "Available Kubernetes contexts:"
+            kubectl config get-contexts --no-headers 2>/dev/null | awk '{print "  " $2}' | sort -u || echo "  (No contexts found)"
+            
+            echo ""
+            print_status "Available options:"
+            echo "  1) Use existing Kind cluster '$CLUSTER_NAME' (recommended)"
+            echo "  2) Delete and recreate Kind cluster '$CLUSTER_NAME'"
+            echo "  3) Use a different Kind cluster name"
+            echo "  4) Use an existing Kubernetes context"
+            echo "  5) Cancel deployment"
+            echo ""
+            read -p "Please select an option (1-5): " -n 1 -r
+            echo
+            case $REPLY in
+                1)
+                    print_status "Using existing cluster '$CLUSTER_NAME'"
+                    ;;
+                2)
+                    print_status "Deleting existing cluster '$CLUSTER_NAME'..."
+                    KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name $CLUSTER_NAME
+                    print_status "Creating new cluster '$CLUSTER_NAME'..."
+                    create_cluster
+                    ;;
+                3)
+                    echo ""
+                    print_status "Available Kind clusters:"
+                    # Use Podman to check for existing Kind clusters
+                    podman_clusters=$(podman ps --filter "name=ragme-cluster" --format "{{.Names}}" | grep -o "ragme-cluster-control-plane" | sed 's/-control-plane//' | sort -u)
+                    if [[ -n "$podman_clusters" ]]; then
+                        echo "$podman_clusters" | sed 's/^/  /'
+                    else
+                        echo "  (No Kind clusters found)"
+                    fi
+                    echo ""
+                    read -p "Enter new Kind cluster name: " NEW_CLUSTER_NAME
+                    if [[ -n "$NEW_CLUSTER_NAME" ]]; then
+                        # Check if the new cluster name already exists using Podman
+                        if podman ps --filter "name=${NEW_CLUSTER_NAME}" --format "{{.Names}}" | grep -q "${NEW_CLUSTER_NAME}-control-plane"; then
+                            print_warning "Kind cluster '$NEW_CLUSTER_NAME' already exists. Please choose a different name or use option 2 to recreate."
+                            exit 1
+                        fi
+                        CLUSTER_NAME="$NEW_CLUSTER_NAME"
+                        print_status "Using Kind cluster name: $CLUSTER_NAME"
+                        create_cluster
+                    else
+                        print_error "Invalid cluster name. Exiting."
+                        exit 1
+                    fi
+                    ;;
+                4)
+                    echo ""
+                    print_status "Available Kubernetes contexts:"
+                    kubectl config get-contexts --no-headers 2>/dev/null | awk '{print "  " $2}' | sort -u || echo "  (No contexts found)"
+                    echo ""
+                    read -p "Enter context name to use: " CONTEXT_NAME
+                    if [[ -n "$CONTEXT_NAME" ]]; then
+                        # Check if the context exists
+                        if kubectl config get-contexts --no-headers 2>/dev/null | awk '{print $2}' | grep -q "^$CONTEXT_NAME$"; then
+                            print_status "Switching to context: $CONTEXT_NAME"
+                            kubectl config use-context "$CONTEXT_NAME"
+                            print_status "Using existing Kubernetes context: $CONTEXT_NAME"
+                            # Skip cluster creation and registry setup for existing contexts
+                            SKIP_CLUSTER_SETUP=true
+                        else
+                            print_error "Context '$CONTEXT_NAME' not found. Exiting."
+                            exit 1
+                        fi
+                    else
+                        print_error "Invalid context name. Exiting."
+                        exit 1
+                    fi
+                    ;;
+                5)
+                    print_status "Deployment cancelled by user"
+                    exit 0
+                    ;;
+                *)
+                    print_error "Invalid option. Exiting."
+                    exit 1
+                    ;;
+            esac
+        else
+            # No cluster exists, but check if user wants to use existing context
+            print_status "No Kind cluster '$CLUSTER_NAME' found."
+            print_status "Available Kubernetes contexts:"
+            kubectl config get-contexts --no-headers 2>/dev/null | awk '{print "  " $2}' | sort -u || echo "  (No contexts found)"
+            echo ""
+            print_status "Available options:"
+            echo "  1) Create new Kind cluster '$CLUSTER_NAME' (recommended)"
+            echo "  2) Use an existing Kubernetes context"
+            echo "  3) Cancel deployment"
+            echo ""
+            read -p "Please select an option (1-3): " -n 1 -r
+            echo
+            case $REPLY in
+                1)
+                    print_status "Creating new Kind cluster '$CLUSTER_NAME'..."
+                    create_cluster
+                    ;;
+                2)
+                    echo ""
+                    print_status "Available Kubernetes contexts:"
+                    kubectl config get-contexts --no-headers 2>/dev/null | awk '{print "  " $2}' | sort -u || echo "  (No contexts found)"
+                    echo ""
+                    read -p "Enter context name to use: " CONTEXT_NAME
+                    if [[ -n "$CONTEXT_NAME" ]]; then
+                        # Check if the context exists
+                        if kubectl config get-contexts --no-headers 2>/dev/null | awk '{print $2}' | grep -q "^$CONTEXT_NAME$"; then
+                            print_status "Switching to context: $CONTEXT_NAME"
+                            kubectl config use-context "$CONTEXT_NAME"
+                            print_status "Using existing Kubernetes context: $CONTEXT_NAME"
+                            # Skip cluster creation and registry setup for existing contexts
+                            SKIP_CLUSTER_SETUP=true
+                        else
+                            print_error "Context '$CONTEXT_NAME' not found. Exiting."
+                            exit 1
+                        fi
+                    else
+                        print_error "Invalid context name. Exiting."
+                        exit 1
+                    fi
+                    ;;
+                3)
+                    print_status "Deployment cancelled by user"
+                    exit 0
+                    ;;
+                *)
+                    print_error "Invalid option. Exiting."
+                    exit 1
+                    ;;
+            esac
+        fi
+        
+        # Skip cluster setup if using existing context
+        if [[ "$SKIP_CLUSTER_SETUP" != "true" ]]; then
+            setup_registry
+            build_and_load_images
+        else
+            print_status "Skipping cluster setup for existing context"
+            # Still need to build and load images for existing contexts
+            build_and_load_images
+        fi
+        
         deploy_services
         show_status
         
@@ -886,23 +1248,41 @@ case "${1:-deploy}" in
     "destroy")
         print_header "Destroying RAGme deployment"
         check_dependencies
-        kubectl delete namespace ragme --ignore-not-found
         
+        # Delete all resources in the ragme namespace
+        print_status "Deleting all resources in namespace 'ragme'..."
+        kubectl delete namespace ragme --ignore-not-found --timeout=60s
+        
+        # Wait for namespace to be fully deleted
+        print_status "Waiting for namespace to be fully deleted..."
+        kubectl wait --for=delete namespace/ragme --timeout=120s 2>/dev/null || true
+        
+        # Delete the entire cluster
         if [[ "${CLUSTER_TYPE:-kind}" == "minikube" ]]; then
+            print_status "Destroying Minikube cluster..."
             minikube stop 2>/dev/null || true
             minikube delete 2>/dev/null || true
             print_status "Minikube cluster destroyed"
         else
-            kind delete cluster --name $CLUSTER_NAME
+            print_status "Destroying Kind cluster '$CLUSTER_NAME'..."
+            KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name $CLUSTER_NAME 2>/dev/null || true
             print_status "Kind cluster destroyed"
         fi
         
+        # Clean up registry
+        print_status "Cleaning up registry..."
         podman rm -f kind-registry 2>/dev/null || true
         
         # Clean up generated files
+        print_status "Cleaning up generated files..."
         rm -f k8s/configmap-generated.yaml
+        rm -f kind-config.yaml kind-config-8gb.yaml
+        
+        # Clean up any remaining tar files
+        rm -f ragme-*.tar
         
         print_status "Deployment destroyed successfully"
+        print_status "All resources, cluster, and generated files have been cleaned up"
         ;;
         
     "cluster")

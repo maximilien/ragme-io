@@ -481,7 +481,7 @@ class RAGmeAssistant {
 
     async loadAuthProviders() {
         try {
-            const response = await fetch(this.buildApiUrl('auth/providers'));
+            const response = await fetch('/api/auth/providers');
             if (response.ok) {
                 const data = await response.json();
                 this.authProviders = data.providers || [];

@@ -88,9 +88,13 @@ async function loadConfiguration() {
       appConfig = responseData.config;
       logger.info('Configuration loaded from backend');
 
-      // Update INTERNAL_API_URL if different in config (but not if it's already set to external URL)
+      // Update INTERNAL_API_URL if different in config (but not if it's already set to external URL or internal service)
       const configApiUrl = `http://localhost:${appConfig.network?.api?.port || 8021}`;
-      if (configApiUrl !== INTERNAL_API_URL && !INTERNAL_API_URL.includes('localhost:30021')) {
+      if (
+        configApiUrl !== INTERNAL_API_URL &&
+        !INTERNAL_API_URL.includes('localhost:30021') &&
+        !INTERNAL_API_URL.includes('ragme-api:8021')
+      ) {
         INTERNAL_API_URL = configApiUrl;
         logger.info(`Updated internal API URL to: ${INTERNAL_API_URL}`);
 
@@ -126,14 +130,12 @@ const logger = {
     }
   },
   error: (message: string, ...args: unknown[]): void => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error(message, ...args);
-    }
+    // Always log errors, even in production
+    console.error(message, ...args);
   },
   warn: (message: string, ...args: unknown[]): void => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(message, ...args);
-    }
+    // Always log warnings, even in production
+    console.warn(message, ...args);
   },
 };
 
@@ -1051,6 +1053,28 @@ app.get('/api/config', (req, res) => {
   };
 
   res.json(safeConfig);
+});
+
+// Proxy OAuth providers endpoint
+app.get('/api/auth/providers', async (req, res) => {
+  try {
+    const response = await fetch(`${INTERNAL_API_URL}/auth/providers`);
+    if (response.ok) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      res.status(response.status).json({
+        success: false,
+        message: 'Failed to fetch OAuth providers',
+      });
+    }
+  } catch (error) {
+    logger.error('Error fetching OAuth providers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
 });
 
 // Start server with configuration loading
