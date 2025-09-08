@@ -94,9 +94,9 @@ start_core_services() {
     # Start MinIO first
     start_minio
     
-    # Start api.py
-    echo "Starting api.py..."
-    PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
+    # Start api.py with Socket.io support
+    echo "Starting api.py with Socket.io support..."
+    PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.api:socket_app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
     echo $! >> .pid
     sleep 3
 
@@ -136,8 +136,8 @@ start_service() {
             ;;
         "api")
             check_port ${RAGME_API_PORT:-8021}
-            echo "Starting api.py..."
-            PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.api:app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
+            echo "Starting api.py with Socket.io support..."
+            PYTHONWARNINGS="ignore::ResourceWarning,ignore::UserWarning" uv run uvicorn src.ragme.apis.api:socket_app --reload --host 0.0.0.0 --port ${RAGME_API_PORT:-8021} > logs/api.log 2>&1 &
             echo $! >> .pid
             sleep 3
             ;;
