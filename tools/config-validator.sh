@@ -19,6 +19,7 @@ CHECKS=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CONFIG_FILE="$PROJECT_ROOT/config.yaml"
+AGENTS_FILE="$PROJECT_ROOT/agents.yaml"
 
 # Load environment variables from .env file
 if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -478,6 +479,220 @@ EOF
     check_done
 }
 
+# Check if agents file exists
+check_agents_file_exists() {
+    print_header "Checking Agents Configuration File"
+    
+    if [[ ! -f "$AGENTS_FILE" ]]; then
+        print_info "Agents file not found: $AGENTS_FILE (using inline configuration)"
+        return 0
+    fi
+    
+    print_success "Agents configuration file exists: $AGENTS_FILE"
+    check_done
+    return 0
+}
+
+# Validate agents.yaml syntax
+validate_agents_yaml_syntax() {
+    if [[ ! -f "$AGENTS_FILE" ]]; then
+        return 0  # Skip if file doesn't exist
+    fi
+    
+    print_header "Validating Agents YAML Syntax"
+    
+    if ! python -c "import yaml; yaml.safe_load(open('$AGENTS_FILE'))" 2>/dev/null; then
+        print_error "Invalid YAML syntax in agents configuration file"
+        python -c "import yaml; yaml.safe_load(open('$AGENTS_FILE'))" 2>&1 | head -5
+        return 1
+    fi
+    
+    print_success "Agents YAML syntax is valid"
+    check_done
+    return 0
+}
+
+# Validate agents configuration structure and content
+validate_agents_structure() {
+    if [[ ! -f "$AGENTS_FILE" ]]; then
+        return 0  # Skip if file doesn't exist
+    fi
+    
+    print_header "Validating Agents Configuration Structure"
+    
+    python << 'EOF'
+import yaml
+import sys
+import os
+
+AGENTS_FILE = os.environ.get('AGENTS_FILE')
+errors = 0
+warnings = 0
+
+def print_error(msg):
+    global errors
+    print(f"\033[0;31m❌ ERROR: {msg}\033[0m", file=sys.stderr)
+    errors += 1
+
+def print_warning(msg):
+    global warnings
+    print(f"\033[1;33m⚠️  WARNING: {msg}\033[0m")
+    warnings += 1
+
+def print_success(msg):
+    print(f"\033[0;32m✅ {msg}\033[0m")
+
+try:
+    with open(AGENTS_FILE, 'r') as f:
+        agents_config = yaml.safe_load(f)
+except Exception as e:
+    print_error(f"Failed to load agents config: {e}")
+    sys.exit(1)
+
+# Check root structure
+if not isinstance(agents_config, dict):
+    print_error("Agents configuration must be a dictionary")
+    sys.exit(1)
+
+if 'agents' not in agents_config:
+    print_error("Missing required 'agents' section")
+    sys.exit(1)
+
+agents = agents_config['agents']
+
+print("Validating agents configuration...")
+if not isinstance(agents, list):
+    print_error("'agents' must be a list")
+    sys.exit(1)
+elif len(agents) == 0:
+    print_warning("No agents configured in agents.yaml")
+else:
+    print_success(f"Found {len(agents)} agent configurations")
+
+# Validate each agent
+valid_roles = ['dispatch', 'functional', 'query', 'react', 'local']
+valid_types = ['openai', 'llamaindex', 'custom']
+
+for i, agent in enumerate(agents):
+    if not isinstance(agent, dict):
+        print_error(f"Agent {i} must be a dictionary")
+        continue
+    
+    agent_name = agent.get('name', f'Agent {i}')
+    print(f"\nValidating agent: {agent_name}")
+    
+    # Required fields
+    required_fields = ['name', 'role', 'type', 'llm_model']
+    for field in required_fields:
+        if field not in agent:
+            print_error(f"Agent '{agent_name}' missing required field: {field}")
+        elif not isinstance(agent[field], str) or not agent[field].strip():
+            print_error(f"Agent '{agent_name}' field '{field}' must be a non-empty string")
+        else:
+            print_success(f"  {field}: {agent[field]}")
+    
+    # Validate role
+    role = agent.get('role')
+    if role and role not in valid_roles:
+        print_warning(f"Agent '{agent_name}' has unrecognized role '{role}'. Valid roles: {', '.join(valid_roles)}")
+    
+    # Validate type
+    agent_type = agent.get('type')
+    if agent_type and agent_type not in valid_types:
+        print_warning(f"Agent '{agent_name}' has unrecognized type '{agent_type}'. Valid types: {', '.join(valid_types)}")
+    
+    # Validate class_name for custom agents
+    if agent_type == 'custom' and 'class_name' not in agent:
+        print_error(f"Agent '{agent_name}' with type 'custom' must have 'class_name' field")
+    elif 'class_name' in agent:
+        class_name = agent['class_name']
+        if not isinstance(class_name, str) or not class_name.strip():
+            print_error(f"Agent '{agent_name}' class_name must be a non-empty string")
+        elif '.' not in class_name:
+            print_warning(f"Agent '{agent_name}' class_name should be fully qualified (e.g., 'module.ClassName')")
+        else:
+            print_success(f"  class_name: {class_name}")
+    
+    # Validate code configuration
+    if 'code' in agent:
+        code_config = agent['code']
+        if not isinstance(code_config, dict):
+            print_error(f"Agent '{agent_name}' code must be a dictionary")
+        else:
+            has_uri = 'uri' in code_config
+            has_inline = 'inline' in code_config
+            
+            if not has_uri and not has_inline:
+                print_error(f"Agent '{agent_name}' code must have either 'uri' or 'inline' field")
+            elif has_uri and has_inline:
+                print_warning(f"Agent '{agent_name}' has both 'uri' and 'inline' code. 'uri' will take precedence")
+            
+            if has_uri:
+                uri = code_config['uri']
+                if not isinstance(uri, str) or not uri.strip():
+                    print_error(f"Agent '{agent_name}' code.uri must be a non-empty string")
+                elif uri.startswith('https://github.com/'):
+                    print_success(f"  code.uri: {uri} (GitHub repository)")
+                elif uri.startswith('./') or uri.startswith('/'):
+                    print_success(f"  code.uri: {uri} (local file)")
+                else:
+                    print_warning(f"Agent '{agent_name}' code.uri format not recognized: {uri}")
+            
+            if has_inline and not has_uri:
+                inline_code = code_config['inline']
+                if not isinstance(inline_code, str) or not inline_code.strip():
+                    print_error(f"Agent '{agent_name}' code.inline must be a non-empty string")
+                else:
+                    print_success(f"  code.inline: {len(inline_code)} characters")
+    
+    # Validate environment variables
+    if 'env' in agent:
+        env_config = agent['env']
+        if not isinstance(env_config, dict):
+            print_error(f"Agent '{agent_name}' env must be a dictionary")
+        else:
+            print_success(f"  env: {len(env_config)} environment variables")
+            
+            # Check for common environment variable patterns
+            for env_key, env_value in env_config.items():
+                if isinstance(env_value, str) and env_value.startswith('${') and env_value.endswith('}'):
+                    print_success(f"    {env_key}: {env_value} (environment variable reference)")
+                else:
+                    print_success(f"    {env_key}: {type(env_value).__name__}")
+
+# Check for duplicate agent names
+agent_names = [agent.get('name') for agent in agents if isinstance(agent, dict)]
+duplicate_names = set([name for name in agent_names if agent_names.count(name) > 1])
+if duplicate_names:
+    print_error(f"Duplicate agent names found: {', '.join(duplicate_names)}")
+
+# Check for agents directory configuration
+if 'agents_directory' in agents_config:
+    agents_dir = agents_config['agents_directory']
+    if not isinstance(agents_dir, str) or not agents_dir.strip():
+        print_error("agents_directory must be a non-empty string")
+    else:
+        print_success(f"Agents directory configured: {agents_dir}")
+
+print(f"\n\033[0;34mAgents Validation Summary:\033[0m")
+print(f"Errors: {errors}")
+print(f"Warnings: {warnings}")
+
+if errors > 0:
+    sys.exit(1)
+else:
+    print("\033[0;32m✅ Agents configuration structure is valid\033[0m")
+
+EOF
+
+    if [[ $? -ne 0 ]]; then
+        ((ERRORS++))
+        return 1
+    fi
+    
+    check_done
+}
+
 # Test configuration loading with Python
 test_config_loading() {
     print_header "Testing Configuration Loading"
@@ -517,6 +732,22 @@ try:
     features = config.get('features', {})
     enabled_features = [k for k, v in features.items() if v]
     print(f"✅ {len(enabled_features)} features enabled")
+    
+    # Test agents configuration
+    if config.has_agents_file():
+        agents = config.get_all_agents()
+        print(f"✅ {len(agents)} agents loaded from agents.yaml")
+        
+        # Test agent config access
+        for agent in agents[:2]:  # Test first 2 agents
+            agent_name = agent.get('name', 'unknown')
+            agent_config = config.get_agent_config(agent_name)
+            if agent_config:
+                print(f"✅ Agent '{agent_name}' config loaded successfully")
+            else:
+                print(f"⚠️  Agent '{agent_name}' config not found")
+    else:
+        print("ℹ️  Using inline agent configuration from config.yaml")
     
     print("\n\033[0;32m✅ Configuration loading test passed\033[0m")
     
@@ -584,9 +815,42 @@ if 'vector_databases' in config:
     default_db = vdb.get('default', 'None')
     print(f"  Vector Databases: {db_count} configured, default: {default_db}")
 
-if 'agents' in config:
-    agent_count = len(config['agents'])
-    print(f"  Agents: {agent_count} configured")
+try:
+    # Try to get agents from new system first
+    agents = config_manager.get_all_agents()
+    agent_count = len(agents)
+    has_agents_file = config_manager.has_agents_file()
+    
+    if has_agents_file:
+        print(f"  Agents: {agent_count} configured (from agents.yaml)")
+        
+        # Show agent types breakdown
+        agent_types = {}
+        agent_roles = {}
+        for agent in agents:
+            agent_type = agent.get('type', 'unknown')
+            agent_role = agent.get('role', 'unknown')
+            agent_types[agent_type] = agent_types.get(agent_type, 0) + 1
+            agent_roles[agent_role] = agent_roles.get(agent_role, 0) + 1
+        
+        types_str = ', '.join([f"{k}:{v}" for k, v in agent_types.items()])
+        roles_str = ', '.join([f"{k}:{v}" for k, v in agent_roles.items()])
+        print(f"    Types: {types_str}")
+        print(f"    Roles: {roles_str}")
+        
+    else:
+        # Fallback to inline agents
+        if 'agents' in config:
+            agent_count = len(config['agents'])
+            print(f"  Agents: {agent_count} configured (inline in config.yaml)")
+        else:
+            print("  Agents: None configured")
+            
+except Exception as e:
+    # Fallback to old method
+    if 'agents' in config:
+        agent_count = len(config['agents'])
+        print(f"  Agents: {agent_count} configured")
 
 if 'mcp_servers' in config:
     mcp_count = len(config['mcp_servers'])
@@ -622,6 +886,7 @@ main() {
     echo -e "${NC}"
     
     export CONFIG_FILE
+    export AGENTS_FILE
     export PROJECT_ROOT
     
     # Run all checks
@@ -629,6 +894,12 @@ main() {
     check_file_exists || exit 1
     validate_yaml_syntax || exit 1
     validate_config_structure || exit 1
+    
+    # Agents configuration checks
+    check_agents_file_exists
+    validate_agents_yaml_syntax || exit 1
+    validate_agents_structure || exit 1
+    
     check_environment_variables
     test_config_loading || exit 1
     run_security_validation
@@ -664,7 +935,9 @@ case "${1:-}" in
         echo "  --config FILE  Specify config file path (default: config.yaml)"
         echo "  --quiet, -q    Suppress non-error output"
         echo ""
-        echo "This script validates the RAGme configuration file for:"
+        echo "This script validates the RAGme configuration files for:"
+        echo "  - config.yaml: Main configuration file"
+        echo "  - agents.yaml: Agent definitions (if present)"
         echo "  - YAML syntax correctness"
         echo "  - Required sections and fields"
         echo "  - Data type validation"

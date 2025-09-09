@@ -43,8 +43,9 @@ print_help() {
     echo "This script will:"
     echo "  1. Check and install system dependencies (Homebrew, Node.js, Python)"
     echo "  2. Install Python dependencies using uv"
-    echo "  3. Install Node.js dependencies for the frontend"
-    echo "  4. Run initial tests to verify setup"
+    echo "  3. Install agent framework dependencies"
+    echo "  4. Install Node.js dependencies for the frontend"
+    echo "  5. Run initial tests to verify setup"
     echo ""
     echo "Examples:"
     echo "  ./setup.sh                    # Full setup"
@@ -151,6 +152,14 @@ install_python_deps() {
     # Install test dependencies
     print_status "Installing test dependencies..."
     uv pip install -r requirements-test.txt
+    
+    # Install agent dependencies
+    if [ -f requirements-agents.txt ]; then
+        print_status "Installing agent framework dependencies..."
+        uv pip install -r requirements-agents.txt
+    else
+        print_warning "requirements-agents.txt not found, skipping agent dependencies"
+    fi
     
     # Install development tools
     print_status "Installing development tools..."
