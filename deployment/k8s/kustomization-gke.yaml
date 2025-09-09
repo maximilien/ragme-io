@@ -5,6 +5,7 @@ namespace: ragme
 
 resources:
   - namespace.yaml
+  - shared-storage.yaml
   - frontend-deployment-gke.yaml
   - api-deployment-gke.yaml
   - mcp-deployment-gke.yaml
@@ -13,7 +14,6 @@ resources:
   - ingress-gke.yaml
   - minio-deployment.yaml
   - weaviate-deployment.yaml
-  - shared-storage.yaml
 
 # ConfigMap and Secrets are created by deploy-gke.sh script
 # - configmap.yaml
