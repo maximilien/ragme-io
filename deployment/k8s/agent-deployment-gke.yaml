@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragme-agent
+  namespace: ragme
+  labels:
+    app: ragme
+    component: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ragme
+      component: agent
+  template:
+    metadata:
+      labels:
+        app: ragme
+        component: agent
+    spec:
+      containers:
+      - name: agent
+        image: gcr.io/propane-atrium-471123-u4/ragme-agent:latest
+        imagePullPolicy: Always
+        env:
+        - name: RAGME_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_API_URL
+        - name: RAGME_MCP_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_MCP_URL
+        - name: RAGME_UI_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_UI_URL
+        - name: WATCH_DIRECTORY
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: WATCH_DIRECTORY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: OPENAI_API_KEY
+        - name: WEAVIATE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_URL
+        - name: WEAVIATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_API_KEY
+        - name: VECTOR_DB_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_TYPE
+        - name: VECTOR_DB_TEXT_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_TEXT_COLLECTION_NAME
+        - name: VECTOR_DB_IMAGE_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_IMAGE_COLLECTION_NAME
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: MINIO_ENDPOINT
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: MINIO_SECRET_KEY
+        - name: GOOGLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GOOGLE_OAUTH_CLIENT_ID
+        - name: GOOGLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GOOGLE_OAUTH_CLIENT_SECRET
+        - name: GITHUB_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GITHUB_OAUTH_CLIENT_ID
+        - name: GITHUB_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GITHUB_OAUTH_CLIENT_SECRET
+        - name: APPLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: APPLE_OAUTH_CLIENT_ID
+        - name: APPLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: APPLE_OAUTH_CLIENT_SECRET
+        - name: SESSION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: SESSION_SECRET_KEY
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: watch-directory
+          mountPath: /app/watch_directory
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "500m"
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: watch-directory
+        persistentVolumeClaim:
+          claimName: ragme-shared-pvc

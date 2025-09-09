@@ -1,0 +1,172 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragme-api
+  namespace: ragme
+  labels:
+    app: ragme
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ragme
+      component: api
+  template:
+    metadata:
+      labels:
+        app: ragme
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: gcr.io/propane-atrium-471123-u4/ragme-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8021
+          name: http
+        env:
+        - name: RAGME_API_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_API_PORT
+        - name: RAGME_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_API_URL
+        - name: RAGME_MCP_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_MCP_URL
+        - name: RAGME_UI_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: RAGME_UI_URL
+        - name: VECTOR_DB_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_TYPE
+        - name: VECTOR_DB_TEXT_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_TEXT_COLLECTION_NAME
+        - name: VECTOR_DB_IMAGE_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: VECTOR_DB_IMAGE_COLLECTION_NAME
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: ragme-config
+              key: MINIO_ENDPOINT
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: OPENAI_API_KEY
+        - name: WEAVIATE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_URL
+        - name: WEAVIATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: WEAVIATE_API_KEY
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: MINIO_SECRET_KEY
+        - name: GOOGLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GOOGLE_OAUTH_CLIENT_ID
+        - name: GOOGLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GOOGLE_OAUTH_CLIENT_SECRET
+        - name: GITHUB_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GITHUB_OAUTH_CLIENT_ID
+        - name: GITHUB_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: GITHUB_OAUTH_CLIENT_SECRET
+        - name: APPLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: APPLE_OAUTH_CLIENT_ID
+        - name: APPLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: APPLE_OAUTH_CLIENT_SECRET
+        - name: SESSION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ragme-secrets
+              key: SESSION_SECRET_KEY
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8021
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8021
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+      volumes:
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-api
+  namespace: ragme
+  labels:
+    app: ragme
+    component: api
+spec:
+  selector:
+    app: ragme
+    component: api
+  ports:
+  - name: http
+    port: 8021
+    targetPort: 8021
+  type: ClusterIP

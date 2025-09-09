@@ -12,8 +12,8 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  # For local development, you might need to specify a storage class
-  storageClassName: "standard"  # Use standard storage class for kind clusters
+  # Use standard-rwo storage class for GKE (default)
+  storageClassName: "standard-rwo"
 
 ---
 apiVersion: v1
@@ -30,3 +30,4 @@ spec:
   resources:
     requests:
       storage: 2Gi
+  storageClassName: "standard-rwo"

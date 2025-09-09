@@ -30,9 +30,7 @@ COPY requirements.txt .
 COPY pyproject.toml .
 
 # Install Python dependencies and clean up caches
-RUN uv pip install --system -r requirements.txt \
-    && rm -rf ~/.cache/uv \
-    && rm -rf ~/.cache/pip \
+RUN pip install --no-cache-dir -r requirements.txt \
     && find /usr/local/lib/python3.11/site-packages -name "*.pyc" -delete \
     && find /usr/local/lib/python3.11/site-packages -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 

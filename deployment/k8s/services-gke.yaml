@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-frontend-lb
+  namespace: ragme
+  labels:
+    app: ragme-frontend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8020
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 8020
+    protocol: TCP
+    name: https
+  selector:
+    app: ragme
+    component: frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-api-lb
+  namespace: ragme
+  labels:
+    app: ragme-api
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8021
+    targetPort: 8021
+    protocol: TCP
+    name: api
+  selector:
+    app: ragme
+    component: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragme-mcp-lb
+  namespace: ragme
+  labels:
+    app: ragme-mcp
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8022
+    targetPort: 8022
+    protocol: TCP
+    name: mcp
+  selector:
+    app: ragme
+    component: mcp

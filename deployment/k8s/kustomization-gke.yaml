@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ragme
+
+resources:
+  - namespace.yaml
+  - shared-storage.yaml
+  - frontend-deployment-gke.yaml
+  - api-deployment-gke.yaml
+  - mcp-deployment-gke.yaml
+  - agent-deployment-gke.yaml
+  - services-gke.yaml
+  - ingress-gke.yaml
+  - minio-deployment.yaml
+  - weaviate-deployment.yaml
+
+# ConfigMap and Secrets are created by deploy-gke.sh script
+# - configmap.yaml
+# - secrets.yaml

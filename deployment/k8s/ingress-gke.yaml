@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ragme-ingress
+  namespace: ragme
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "ragme-ip"
+    networking.gke.io/managed-certificates: "ragme-ssl-cert"
+    kubernetes.io/ingress.allow-http: "true"
+spec:
+  rules:
+  - host: ragme.yourdomain.com  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ragme-frontend
+            port:
+              number: 8020
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: ragme-api
+            port:
+              number: 8021
+      - path: /mcp
+        pathType: Prefix
+        backend:
+          service:
+            name: ragme-mcp
+            port:
+              number: 8022
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: ragme-ssl-cert
+  namespace: ragme
+spec:
+  domains:
+    - ragme.yourdomain.com  # Replace with your actual domain

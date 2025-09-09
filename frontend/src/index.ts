@@ -16,6 +16,13 @@ const io = new Server(server, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
+  allowEIO3: true,
+  transports: ['polling', 'websocket'],
+});
+
+// Add Socket.IO debugging
+io.engine.on('connection_error', (err) => {
+  logger.error('Socket.IO connection error:', err.message, 'Code:', err.code, 'Context:', err.context);
 });
 
 // TypeScript interfaces for configuration
@@ -73,7 +80,7 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
 // For Kubernetes deployment, use internal service URL for backend communication
 if (
   process.env.NODE_ENV === 'production' &&
-  process.env.RAGME_API_URL?.includes('localhost:30021')
+  process.env.RAGME_API_URL?.includes('ragme-api:8021')
 ) {
   INTERNAL_API_URL = 'http://ragme-api:8021';
   // Keep RAGME_API_URL as external URL for browser/CSP
@@ -91,29 +98,21 @@ async function loadConfiguration() {
       );
 
       // First, check if the backend is healthy
-      const healthController = new AbortController();
-      const healthTimeout = setTimeout(() => healthController.abort(), 5000);
-
-      const healthResponse = await fetch(`${INTERNAL_API_URL}/health`, {
-        signal: healthController.signal,
+      const healthResponse = await axios.get(`${INTERNAL_API_URL}/health`, {
+        timeout: 5000,
       });
-      clearTimeout(healthTimeout);
 
-      if (!healthResponse.ok) {
+      if (healthResponse.status !== 200) {
         throw new Error(`Backend health check failed: ${healthResponse.status}`);
       }
 
       // Now try to load the configuration
-      const configController = new AbortController();
-      const configTimeout = setTimeout(() => configController.abort(), 10000);
-
-      const response = await fetch(`${INTERNAL_API_URL}/config`, {
-        signal: configController.signal,
+      const response = await axios.get(`${INTERNAL_API_URL}/config`, {
+        timeout: 10000,
       });
-      clearTimeout(configTimeout);
 
-      if (response.ok) {
-        const responseData = (await response.json()) as { status: string; config: AppConfig };
+      if (response.status === 200) {
+        const responseData = response.data as { status: string; config: AppConfig };
         appConfig = responseData.config;
         logger.info('Configuration loaded from backend successfully');
 
@@ -233,6 +232,7 @@ function getCSPConfig() {
         workerSrc: ["'self'", 'blob:'],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
+        upgradeInsecureRequests: null, // Disable HTTPS upgrade for HTTP LoadBalancer
       },
     },
   };
@@ -376,7 +376,7 @@ async function callRAGmeAPI(
   method?: string
 ): Promise<APIResponse | null> {
   try {
-    let url = `${RAGME_API_URL}${endpoint}`;
+    let url = `${INTERNAL_API_URL}${endpoint}`;
     if (queryParams) {
       url += queryParams;
     }
@@ -884,7 +884,15 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
 
 // WebSocket connection handling
 io.on('connection', socket => {
-  logger.info('User connected:', socket.id);
+  logger.info('Socket.IO: User connected:', socket.id);
+  
+  socket.on('error', (error) => {
+    logger.error('Socket.IO error for', socket.id, ':', error);
+  });
+  
+  socket.on('disconnect', (reason) => {
+    logger.info('Socket.IO: User disconnected:', socket.id, 'reason:', reason);
+  });
 
   // Handle chat messages
   socket.on('chat_message', async data => {
@@ -1091,9 +1099,6 @@ io.on('connection', socket => {
     socket.emit('chat_saved', { success: true, message: 'Chat saved successfully' });
   });
 
-  socket.on('disconnect', () => {
-    logger.info('User disconnected:', socket.id);
-  });
 });
 
 // Add 404 handler to log missing resources
@@ -1167,15 +1172,11 @@ app.get('/api/auth/providers', async (req, res) => {
 async function startHealthCheck() {
   setInterval(async () => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch(`${INTERNAL_API_URL}/health`, {
-        signal: controller.signal,
+      const response = await axios.get(`${INTERNAL_API_URL}/health`, {
+        timeout: 5000,
       });
-      clearTimeout(timeout);
 
-      if (!response.ok) {
+      if (response.status !== 200) {
         logger.warn('Backend health check failed, attempting to reload configuration...');
         await loadConfiguration();
       }
@@ -1188,8 +1189,20 @@ async function startHealthCheck() {
 
 // Start server with configuration loading
 async function startServer() {
-  await loadConfiguration();
+  console.log('startServer() called');
+  logger.info('Starting RAGme frontend server...');
+  
+  console.log('About to load configuration...');
+  try {
+    await loadConfiguration();
+    console.log('Configuration loaded successfully');
+    logger.info('Configuration loaded successfully');
+  } catch (error) {
+    console.error('Configuration loading failed:', error);
+    logger.error('Failed to load configuration, but continuing with defaults:', error);
+  }
 
+  console.log('About to start health checks...');
   // Start periodic health checks
   startHealthCheck();
 
@@ -1199,15 +1212,27 @@ async function startServer() {
     appConfig.network?.frontend?.port ||
     8020;
 
+  console.log(`About to start server on port ${finalPort}...`);
   server.listen(finalPort, () => {
     const appName = appConfig.application?.name || 'RAGme.io Assistant';
+    console.log(`🤖 ${appName} Frontend running on port ${finalPort}`);
     logger.info(`🤖 ${appName} Frontend running on port ${finalPort}`);
     logger.info(`Open http://localhost:${finalPort} in your browser`);
     logger.info(`RAGme API: ${RAGME_API_URL}`);
+    logger.info(`Internal API URL: ${INTERNAL_API_URL}`);
   });
 }
 
+// Log basic info before startup
+console.log('=== RAGme Frontend Starting ===');
+console.log('Node.js version:', process.version);
+console.log('Platform:', process.platform);
+console.log('Environment:', process.env.NODE_ENV);
+console.log('Working directory:', process.cwd());
+console.log('=====================================');
+
 startServer().catch(error => {
+  console.error('CRITICAL: Failed to start server:', error);
   logger.error('Failed to start server:', error);
   process.exit(1);
 });
