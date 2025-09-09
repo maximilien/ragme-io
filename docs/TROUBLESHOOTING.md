@@ -4,6 +4,43 @@ This comprehensive troubleshooting guide covers common issues, their solutions, 
 
 ## 🚨 Common Issues
 
+### Frontend Not Displaying Documents (500 Error)
+
+**Problem**: Frontend shows no documents and logs show "HTTP error! status: 500" when calling `/list-content` API endpoint.
+
+**Symptoms**:
+- Frontend document list is empty
+- Browser console shows: `Error calling RAGme API (/list-content?limit=25&offset=0&date_filter=all&content_type=both): Error: HTTP error! status: 500`
+- API endpoint returns: `{"detail":"'chunks'"}`
+
+**Solution**: ✅ **FIXED!** This was a critical bug in the document grouping logic that has been resolved:
+
+1. **Root Cause**: The `group_chunked_documents` function was attempting to access a `chunks` key that didn't exist in certain document groups, causing a `KeyError: 'chunks'` when processing mixed chunked/non-chunked documents.
+
+2. **Fix Applied**: Added defensive programming to ensure the `chunks` key exists before accessing it:
+   ```python
+   if "chunks" not in groups[base_url]:
+       groups[base_url]["chunks"] = []
+   ```
+
+3. **Verification**: The fix has been tested and committed. If you're still experiencing this issue:
+   ```bash
+   # Pull the latest changes
+   git pull
+   
+   # Restart the backend services
+   ./start.sh restart-backend
+   
+   # Test the API endpoint
+   curl -s "http://localhost:8021/list-content?limit=25&offset=0&date_filter=all&content_type=both" | python -m json.tool
+   ```
+
+**What was fixed**:
+- Added defensive check for `chunks` key existence in document grouping logic
+- Resolved 500 error in `/list-content` API endpoint
+- Fixed frontend document display issues
+- This was a regression introduced during Weaviate API migration
+
 ### Environment Variable Configuration Not Taking Effect
 
 **Problem**: Changing `.env` files (APPLICATION_*, VECTOR_DB_TYPE, collection names) doesn't take effect after restart.

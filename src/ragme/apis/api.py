@@ -511,9 +511,9 @@ def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, A
                     ].get("date_added", "") > groups[base_url]["metadata"].get(
                         "date_added", ""
                     ):
-                        groups[base_url]["metadata"]["date_added"] = doc["metadata"].get(
-                            "date_added", ""
-                        )
+                        groups[base_url]["metadata"]["date_added"] = doc[
+                            "metadata"
+                        ].get("date_added", "")
 
         elif doc.get("content_type") == "image" and doc.get("metadata", {}).get(
             "pdf_filename"
