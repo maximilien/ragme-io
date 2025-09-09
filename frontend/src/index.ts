@@ -21,8 +21,15 @@ const io = new Server(server, {
 });
 
 // Add Socket.IO debugging
-io.engine.on('connection_error', (err) => {
-  logger.error('Socket.IO connection error:', err.message, 'Code:', err.code, 'Context:', err.context);
+io.engine.on('connection_error', err => {
+  logger.error(
+    'Socket.IO connection error:',
+    err.message,
+    'Code:',
+    err.code,
+    'Context:',
+    err.context
+  );
 });
 
 // TypeScript interfaces for configuration
@@ -885,12 +892,12 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
 // WebSocket connection handling
 io.on('connection', socket => {
   logger.info('Socket.IO: User connected:', socket.id);
-  
-  socket.on('error', (error) => {
+
+  socket.on('error', error => {
     logger.error('Socket.IO error for', socket.id, ':', error);
   });
-  
-  socket.on('disconnect', (reason) => {
+
+  socket.on('disconnect', reason => {
     logger.info('Socket.IO: User disconnected:', socket.id, 'reason:', reason);
   });
 
@@ -1098,7 +1105,6 @@ io.on('connection', socket => {
     // In a real app, this would save to a database
     socket.emit('chat_saved', { success: true, message: 'Chat saved successfully' });
   });
-
 });
 
 // Add 404 handler to log missing resources
@@ -1191,7 +1197,7 @@ async function startHealthCheck() {
 async function startServer() {
   console.log('startServer() called');
   logger.info('Starting RAGme frontend server...');
-  
+
   console.log('About to load configuration...');
   try {
     await loadConfiguration();
