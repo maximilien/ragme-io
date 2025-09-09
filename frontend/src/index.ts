@@ -735,9 +735,9 @@ app.post('/summarize-document', async (req, res) => {
       });
     }
 
-    const apiResult = await callRAGmeAPI('/summarize-document', { 
+    const apiResult = await callRAGmeAPI('/summarize-document', {
       document_id: document_id,
-      force_refresh: forceRefresh 
+      force_refresh: forceRefresh,
     });
 
     if (apiResult && apiResult.status === 'success') {
