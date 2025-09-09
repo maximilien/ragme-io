@@ -16,6 +16,13 @@ const io = new Server(server, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
+  allowEIO3: true,
+  transports: ['polling', 'websocket'],
+});
+
+// Add Socket.IO debugging
+io.engine.on('connection_error', (err) => {
+  logger.error('Socket.IO connection error:', err.message, 'Code:', err.code, 'Context:', err.context);
 });
 
 // TypeScript interfaces for configuration
@@ -369,7 +376,7 @@ async function callRAGmeAPI(
   method?: string
 ): Promise<APIResponse | null> {
   try {
-    let url = `${RAGME_API_URL}${endpoint}`;
+    let url = `${INTERNAL_API_URL}${endpoint}`;
     if (queryParams) {
       url += queryParams;
     }
@@ -877,7 +884,15 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
 
 // WebSocket connection handling
 io.on('connection', socket => {
-  logger.info('User connected:', socket.id);
+  logger.info('Socket.IO: User connected:', socket.id);
+  
+  socket.on('error', (error) => {
+    logger.error('Socket.IO error for', socket.id, ':', error);
+  });
+  
+  socket.on('disconnect', (reason) => {
+    logger.info('Socket.IO: User disconnected:', socket.id, 'reason:', reason);
+  });
 
   // Handle chat messages
   socket.on('chat_message', async data => {
@@ -1084,9 +1099,6 @@ io.on('connection', socket => {
     socket.emit('chat_saved', { success: true, message: 'Chat saved successfully' });
   });
 
-  socket.on('disconnect', () => {
-    logger.info('User disconnected:', socket.id);
-  });
 });
 
 // Add 404 handler to log missing resources
@@ -1177,8 +1189,20 @@ async function startHealthCheck() {
 
 // Start server with configuration loading
 async function startServer() {
-  await loadConfiguration();
+  console.log('startServer() called');
+  logger.info('Starting RAGme frontend server...');
+  
+  console.log('About to load configuration...');
+  try {
+    await loadConfiguration();
+    console.log('Configuration loaded successfully');
+    logger.info('Configuration loaded successfully');
+  } catch (error) {
+    console.error('Configuration loading failed:', error);
+    logger.error('Failed to load configuration, but continuing with defaults:', error);
+  }
 
+  console.log('About to start health checks...');
   // Start periodic health checks
   startHealthCheck();
 
@@ -1188,15 +1212,27 @@ async function startServer() {
     appConfig.network?.frontend?.port ||
     8020;
 
+  console.log(`About to start server on port ${finalPort}...`);
   server.listen(finalPort, () => {
     const appName = appConfig.application?.name || 'RAGme.io Assistant';
+    console.log(`🤖 ${appName} Frontend running on port ${finalPort}`);
     logger.info(`🤖 ${appName} Frontend running on port ${finalPort}`);
     logger.info(`Open http://localhost:${finalPort} in your browser`);
     logger.info(`RAGme API: ${RAGME_API_URL}`);
+    logger.info(`Internal API URL: ${INTERNAL_API_URL}`);
   });
 }
 
+// Log basic info before startup
+console.log('=== RAGme Frontend Starting ===');
+console.log('Node.js version:', process.version);
+console.log('Platform:', process.platform);
+console.log('Environment:', process.env.NODE_ENV);
+console.log('Working directory:', process.cwd());
+console.log('=====================================');
+
 startServer().catch(error => {
+  console.error('CRITICAL: Failed to start server:', error);
   logger.error('Failed to start server:', error);
   process.exit(1);
 });
