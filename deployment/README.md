@@ -35,6 +35,34 @@ This directory contains everything needed to deploy RAGme on Kubernetes, includi
    ./deploy.sh destroy
    ```
 
+### Production Deployment with GKE
+
+1. **Create GKE cluster:**
+   ```bash
+   cd deployment
+   ./create-gke-cluster.sh
+   ```
+
+2. **Deploy RAGme to GKE:**
+   ```bash
+   ./deploy-gke.sh deploy
+   ```
+
+3. **Access services:**
+   - Frontend: http://[EXTERNAL-IP] (LoadBalancer)
+   - API: http://[EXTERNAL-IP]:30021 (LoadBalancer)
+   - MCP: http://[EXTERNAL-IP]:30022 (LoadBalancer)
+
+4. **Check deployment status:**
+   ```bash
+   ./deploy-gke.sh status
+   ```
+
+5. **Clean up:**
+   ```bash
+   ./deploy-gke.sh destroy
+   ```
+
 ## 📁 Directory Structure
 
 ```
@@ -50,8 +78,12 @@ deployment/
 │   ├── namespace.yaml   # RAGme namespace
 │   ├── configmap.yaml   # Configuration and secrets
 │   ├── shared-storage.yaml # Persistent volume claims
-│   ├── *-deployment.yaml # Service deployments
-│   └── kustomization.yaml # Kustomize configuration
+│   ├── *-deployment.yaml # Service deployments (Kind)
+│   ├── *-deployment-gke.yaml # GKE-specific deployments
+│   ├── services-gke.yaml # GKE LoadBalancer services
+│   ├── ingress-gke.yaml # GKE Ingress configuration
+│   ├── kustomization.yaml # Kustomize configuration (Kind)
+│   └── kustomization-gke.yaml # Kustomize configuration (GKE)
 ├── operator/            # Kubernetes operator (Go)
 │   ├── api/v1/         # CRD definitions
 │   ├── cmd/main.go     # Operator entry point
@@ -64,7 +96,9 @@ deployment/
 ├── tests/               # Deployment tests
 │   ├── unit/           # Unit tests
 │   └── integration/    # Integration tests
-├── deploy.sh           # Main deployment script
+├── deploy.sh           # Main deployment script (Kind)
+├── deploy-gke.sh       # GKE deployment script
+├── create-gke-cluster.sh # GKE cluster creation script
 └── README.md           # This file
 ```
 
@@ -86,6 +120,18 @@ RAGme services are containerized for Kubernetes deployment:
 ```bash
 # Build all containers
 ./deployment/scripts/build-containers.sh
+
+# Build specific service only (for faster iteration)
+./deployment/scripts/build-containers.sh --service frontend
+./deployment/scripts/build-containers.sh --service api
+./deployment/scripts/build-containers.sh --service mcp
+./deployment/scripts/build-containers.sh --service agent
+
+# Build for specific platform (GKE requires AMD64)
+./deployment/scripts/build-containers.sh --target gke --platform linux/amd64
+
+# Build without cache (for clean builds)
+./deployment/scripts/build-containers.sh --no-cache
 
 # Push to registry
 ./deployment/scripts/push-containers.sh <registry-url>

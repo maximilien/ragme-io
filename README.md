@@ -64,6 +64,7 @@ RAGme now supports full Kubernetes deployment with high availability, automatic 
 
 ### Quick Kubernetes Setup
 
+#### Local Development (Kind)
 ```bash
 # Deploy to local Kind cluster with high availability
 cd deployment
@@ -73,6 +74,21 @@ cd deployment
 # Frontend: http://localhost:30020 (2 replicas)
 # API: http://localhost:30021 (2 replicas)
 # MinIO Console: http://localhost:30901
+```
+
+#### Production Deployment (GKE)
+```bash
+# Create GKE cluster
+cd deployment
+./create-gke-cluster.sh
+
+# Deploy to GKE with LoadBalancer services
+./deploy-gke.sh deploy
+
+# Access services via external IP
+# Frontend: http://[EXTERNAL-IP] (LoadBalancer)
+# API: http://[EXTERNAL-IP]:30021 (LoadBalancer)
+# MCP: http://[EXTERNAL-IP]:30022 (LoadBalancer)
 ```
 
 ### High Availability Features
