@@ -20,8 +20,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: localhost/ragme-frontend:latest
-        imagePullPolicy: IfNotPresent
+        image: gcr.io/propane-atrium-471123-u4/ragme-frontend:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8020
           name: http
@@ -108,47 +108,3 @@ spec:
     port: 8020
     targetPort: 8020
   type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ragme-frontend-nodeport
-  namespace: ragme
-  labels:
-    app: ragme
-    component: frontend
-spec:
-  selector:
-    app: ragme
-    component: frontend
-  ports:
-  - name: http
-    port: 8020
-    targetPort: 8020
-    nodePort: 30020
-  type: NodePort
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ragme-frontend-ingress
-  namespace: ragme
-  labels:
-    app: ragme
-    component: frontend
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-  - host: ragme.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: ragme-frontend
-            port:
-              number: 8020

@@ -73,7 +73,7 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
 // For Kubernetes deployment, use internal service URL for backend communication
 if (
   process.env.NODE_ENV === 'production' &&
-  process.env.RAGME_API_URL?.includes('localhost:30021')
+  process.env.RAGME_API_URL?.includes('ragme-api:8021')
 ) {
   INTERNAL_API_URL = 'http://ragme-api:8021';
   // Keep RAGME_API_URL as external URL for browser/CSP
@@ -91,29 +91,21 @@ async function loadConfiguration() {
       );
 
       // First, check if the backend is healthy
-      const healthController = new AbortController();
-      const healthTimeout = setTimeout(() => healthController.abort(), 5000);
-
-      const healthResponse = await fetch(`${INTERNAL_API_URL}/health`, {
-        signal: healthController.signal,
+      const healthResponse = await axios.get(`${INTERNAL_API_URL}/health`, {
+        timeout: 5000,
       });
-      clearTimeout(healthTimeout);
 
-      if (!healthResponse.ok) {
+      if (healthResponse.status !== 200) {
         throw new Error(`Backend health check failed: ${healthResponse.status}`);
       }
 
       // Now try to load the configuration
-      const configController = new AbortController();
-      const configTimeout = setTimeout(() => configController.abort(), 10000);
-
-      const response = await fetch(`${INTERNAL_API_URL}/config`, {
-        signal: configController.signal,
+      const response = await axios.get(`${INTERNAL_API_URL}/config`, {
+        timeout: 10000,
       });
-      clearTimeout(configTimeout);
 
-      if (response.ok) {
-        const responseData = (await response.json()) as { status: string; config: AppConfig };
+      if (response.status === 200) {
+        const responseData = response.data as { status: string; config: AppConfig };
         appConfig = responseData.config;
         logger.info('Configuration loaded from backend successfully');
 
@@ -233,6 +225,7 @@ function getCSPConfig() {
         workerSrc: ["'self'", 'blob:'],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
+        upgradeInsecureRequests: null, // Disable HTTPS upgrade for HTTP LoadBalancer
       },
     },
   };
@@ -1167,15 +1160,11 @@ app.get('/api/auth/providers', async (req, res) => {
 async function startHealthCheck() {
   setInterval(async () => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch(`${INTERNAL_API_URL}/health`, {
-        signal: controller.signal,
+      const response = await axios.get(`${INTERNAL_API_URL}/health`, {
+        timeout: 5000,
       });
-      clearTimeout(timeout);
 
-      if (!response.ok) {
+      if (response.status !== 200) {
         logger.warn('Backend health check failed, attempting to reload configuration...');
         await loadConfiguration();
       }

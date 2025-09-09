@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # RAGme Container Build Script using Podman
-# This script builds all RAGme service containers
+# This script builds all RAGme service containers with platform-specific options
 
 set -e
 
@@ -9,7 +9,16 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Default values
+PLATFORM=""
+TARGET=""
+REGISTRY="localhost:5001"
+IMAGE_TAG="latest"
+NO_CACHE=""
+SERVICE=""
 
 # Function to print colored output
 print_status() {
@@ -23,6 +32,149 @@ print_warning() {
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
+
+print_header() {
+    echo -e "${BLUE}[BUILD]${NC} $1"
+}
+
+# Function to show help
+show_help() {
+    echo -e "${BLUE}RAGme Container Build Script${NC}"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -t, --target TARGET     Build target: kind, gke, local (default: auto-detect)"
+    echo "  -p, --platform PLATFORM Build platform: linux/amd64, linux/arm64 (default: auto-detect)"
+    echo "  -r, --registry REGISTRY Container registry (default: localhost:5001)"
+    echo "  --tag TAG               Image tag (default: latest)"
+    echo "  -s, --service SERVICE   Build only specific service: frontend, api, mcp, agent (default: all)"
+    echo "  --no-cache              Build without using cache"
+    echo "  -h, --help              Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0 --target kind                    # Build for kind (local development)"
+    echo "  $0 --target gke                     # Build for GKE (linux/amd64)"
+    echo "  $0 --platform linux/amd64          # Force AMD64 platform"
+    echo "  $0 --target gke --registry gcr.io/project-id  # Build for GKE with custom registry"
+    echo "  $0 --service frontend               # Build only frontend service"
+    echo "  $0 --service api --no-cache         # Build only API service without cache"
+    echo ""
+    echo "Auto-detection:"
+    echo "  - If no target specified, detects based on kubectl context"
+    echo "  - If no platform specified, detects based on target and host OS"
+    echo ""
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -t|--target)
+            TARGET="$2"
+            shift 2
+            ;;
+        -p|--platform)
+            PLATFORM="$2"
+            shift 2
+            ;;
+        -r|--registry)
+            REGISTRY="$2"
+            shift 2
+            ;;
+        --tag)
+            IMAGE_TAG="$2"
+            shift 2
+            ;;
+        -s|--service)
+            SERVICE="$2"
+            shift 2
+            ;;
+        --no-cache)
+            NO_CACHE="--no-cache"
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# Validate service argument if provided
+if [ -n "$SERVICE" ]; then
+    case "$SERVICE" in
+        frontend|api|mcp|agent)
+            print_status "Building only $SERVICE service"
+            ;;
+        *)
+            print_error "Invalid service: $SERVICE. Valid options: frontend, api, mcp, agent"
+            exit 1
+            ;;
+    esac
+fi
+
+# Auto-detect target if not specified
+if [ -z "$TARGET" ]; then
+    if command -v kubectl &> /dev/null; then
+        CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+        if [[ "$CURRENT_CONTEXT" == *"kind"* ]]; then
+            TARGET="kind"
+        elif [[ "$CURRENT_CONTEXT" == *"gke"* ]]; then
+            TARGET="gke"
+        else
+            TARGET="local"
+        fi
+    else
+        TARGET="local"
+    fi
+    print_status "Auto-detected target: $TARGET"
+fi
+
+# Auto-detect platform if not specified
+if [ -z "$PLATFORM" ]; then
+    case "$TARGET" in
+        "gke")
+            PLATFORM="linux/amd64"
+            ;;
+        "kind")
+            # Detect host architecture for kind
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # macOS - check if Apple Silicon or Intel
+                if [[ $(uname -m) == "arm64" ]]; then
+                    PLATFORM="linux/arm64"
+                else
+                    PLATFORM="linux/amd64"
+                fi
+            else
+                # Linux - use host architecture
+                PLATFORM="linux/$(uname -m)"
+            fi
+            ;;
+        "local")
+            # Use host architecture for local builds
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                if [[ $(uname -m) == "arm64" ]]; then
+                    PLATFORM="linux/arm64"
+                else
+                    PLATFORM="linux/amd64"
+                fi
+            else
+                PLATFORM="linux/$(uname -m)"
+            fi
+            ;;
+        *)
+            PLATFORM="linux/amd64"
+            ;;
+    esac
+    print_status "Auto-detected platform: $PLATFORM"
+fi
+
+print_header "Building RAGme containers for $TARGET target on $PLATFORM platform"
 
 # Function to check disk space
 check_disk_space() {
@@ -247,36 +399,64 @@ else
     rm -f config.yaml.processed.bak
 fi
 
+# Set image names based on target
+if [ "$TARGET" = "gke" ]; then
+    # For GKE, use GCR registry format
+    API_IMAGE="$REGISTRY/ragme-api:$IMAGE_TAG"
+    MCP_IMAGE="$REGISTRY/ragme-mcp:$IMAGE_TAG"
+    AGENT_IMAGE="$REGISTRY/ragme-agent:$IMAGE_TAG"
+    FRONTEND_IMAGE="$REGISTRY/ragme-frontend:$IMAGE_TAG"
+else
+    # For kind/local, use localhost format
+    API_IMAGE="localhost/ragme-api:$IMAGE_TAG"
+    MCP_IMAGE="localhost/ragme-mcp:$IMAGE_TAG"
+    AGENT_IMAGE="localhost/ragme-agent:$IMAGE_TAG"
+    FRONTEND_IMAGE="localhost/ragme-frontend:$IMAGE_TAG"
+fi
+
 print_status "Building RAGme containers with Podman..."
+print_status "Platform: $PLATFORM"
+print_status "Target: $TARGET"
+print_status "Registry: $REGISTRY"
 
 # Check disk space before building
 check_disk_space
 
-# Build API service
-print_status "Building API service container..."
-podman build -f deployment/containers/Dockerfile.api -t localhost/ragme-api:latest .
-check_disk_space
+# Build services based on selection
+if [ -z "$SERVICE" ] || [ "$SERVICE" = "api" ]; then
+    print_status "Building API service container..."
+    podman build $NO_CACHE --platform "$PLATFORM" -f deployment/containers/Dockerfile.api -t "$API_IMAGE" .
+    check_disk_space
+fi
 
-# Build MCP service
-print_status "Building MCP service container..."
-podman build -f deployment/containers/Dockerfile.mcp -t localhost/ragme-mcp:latest .
-check_disk_space
+if [ -z "$SERVICE" ] || [ "$SERVICE" = "mcp" ]; then
+    print_status "Building MCP service container..."
+    podman build $NO_CACHE --platform "$PLATFORM" -f deployment/containers/Dockerfile.mcp -t "$MCP_IMAGE" .
+    check_disk_space
+fi
 
-# Build Agent service
-print_status "Building Agent service container..."
-podman build -f deployment/containers/Dockerfile.agent -t localhost/ragme-agent:latest .
-check_disk_space
+if [ -z "$SERVICE" ] || [ "$SERVICE" = "agent" ]; then
+    print_status "Building Agent service container..."
+    podman build $NO_CACHE --platform "$PLATFORM" -f deployment/containers/Dockerfile.agent -t "$AGENT_IMAGE" .
+    check_disk_space
+fi
 
-# Build Frontend service
-print_status "Building Frontend service container..."
-podman build \
-  --build-arg RAGME_API_URL="$RAGME_API_URL" \
-  --build-arg RAGME_MCP_URL="$RAGME_MCP_URL" \
-  --build-arg RAGME_UI_URL="$RAGME_UI_URL" \
-  -f deployment/containers/Dockerfile.frontend \
-  -t localhost/ragme-frontend:latest .
+if [ -z "$SERVICE" ] || [ "$SERVICE" = "frontend" ]; then
+    print_status "Building Frontend service container..."
+    podman build $NO_CACHE \
+      --platform "$PLATFORM" \
+      --build-arg RAGME_API_URL="$RAGME_API_URL" \
+      --build-arg RAGME_MCP_URL="$RAGME_MCP_URL" \
+      --build-arg RAGME_UI_URL="$RAGME_UI_URL" \
+      -f deployment/containers/Dockerfile.frontend \
+      -t "$FRONTEND_IMAGE" .
+fi
 
-print_status "All containers built successfully!"
+if [ -n "$SERVICE" ]; then
+    print_status "$SERVICE service built successfully!"
+else
+    print_status "All containers built successfully!"
+fi
 
 # Clean up processed config file
 rm -f config.yaml.processed
@@ -285,8 +465,34 @@ rm -f config.yaml.processed
 print_status "Built images:"
 podman images | grep ragme || print_warning "No ragme images found"
 
-print_status "To test the containers locally, run:"
-echo "  cd deployment/containers && podman-compose up"
-echo ""
-print_status "To push images to a registry, run:"
-echo "  ./deployment/scripts/push-containers.sh <registry-url>"
+# Push images if target is GKE
+if [ "$TARGET" = "gke" ]; then
+    print_status "Pushing images to GCR registry..."
+    
+    # Configure Docker to use gcloud as a credential helper
+    gcloud auth configure-docker --quiet
+    
+    # Push each image
+    print_status "Pushing API image..."
+    podman push "$API_IMAGE"
+    
+    print_status "Pushing MCP image..."
+    podman push "$MCP_IMAGE"
+    
+    print_status "Pushing Agent image..."
+    podman push "$AGENT_IMAGE"
+    
+    print_status "Pushing Frontend image..."
+    podman push "$FRONTEND_IMAGE"
+    
+    print_status "All images pushed to GCR successfully!"
+    print_status "Images are now available at:"
+    echo "  - $API_IMAGE"
+    echo "  - $MCP_IMAGE"
+    echo "  - $AGENT_IMAGE"
+    echo "  - $FRONTEND_IMAGE"
+else
+    print_status "For kind deployment, images are ready locally"
+    print_status "To test the containers locally, run:"
+    echo "  cd deployment/containers && podman-compose up"
+fi
