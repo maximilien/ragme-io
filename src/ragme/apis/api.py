@@ -488,28 +488,32 @@ def group_chunked_documents(documents: list[dict[str, Any]]) -> list[dict[str, A
                     ]
 
             # Add chunk to the group
-            if groups[base_url]["chunks"] is not None:
-                groups[base_url]["chunks"].append(
-                    {**doc, "chunk_index": doc["metadata"].get("chunk_index", 0)}
-                )
-
-                # Sort chunks by index
-                groups[base_url]["chunks"].sort(key=lambda x: x["chunk_index"])
-
-                # Combine text from all chunks
-                groups[base_url]["combinedText"] = "\n\n--- Chunk ---\n\n".join(
-                    chunk.get("text", "") for chunk in groups[base_url]["chunks"]
-                )
-
-                # Use the latest date
-                if not groups[base_url]["metadata"].get("date_added") or doc[
-                    "metadata"
-                ].get("date_added", "") > groups[base_url]["metadata"].get(
-                    "date_added", ""
-                ):
-                    groups[base_url]["metadata"]["date_added"] = doc["metadata"].get(
-                        "date_added", ""
+            if base_url in groups:
+                # Ensure chunks key exists
+                if "chunks" not in groups[base_url]:
+                    groups[base_url]["chunks"] = []
+                if groups[base_url]["chunks"] is not None:
+                    groups[base_url]["chunks"].append(
+                        {**doc, "chunk_index": doc["metadata"].get("chunk_index", 0)}
                     )
+
+                    # Sort chunks by index
+                    groups[base_url]["chunks"].sort(key=lambda x: x["chunk_index"])
+
+                    # Combine text from all chunks
+                    groups[base_url]["combinedText"] = "\n\n--- Chunk ---\n\n".join(
+                        chunk.get("text", "") for chunk in groups[base_url]["chunks"]
+                    )
+
+                    # Use the latest date
+                    if not groups[base_url]["metadata"].get("date_added") or doc[
+                        "metadata"
+                    ].get("date_added", "") > groups[base_url]["metadata"].get(
+                        "date_added", ""
+                    ):
+                        groups[base_url]["metadata"]["date_added"] = doc[
+                            "metadata"
+                        ].get("date_added", "")
 
         elif doc.get("content_type") == "image" and doc.get("metadata", {}).get(
             "pdf_filename"
