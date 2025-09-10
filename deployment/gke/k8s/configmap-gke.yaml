@@ -11,20 +11,21 @@ data:
   RAGME_MCP_PORT: "8022"
   RAGME_FRONTEND_PORT: "8020"
   
-  # Service URLs (external NodePort for frontend, internal for backend)
-  RAGME_API_URL: "http://localhost:30021"
-  RAGME_MCP_URL: "http://localhost:30022"
+  # Service URLs (external LoadBalancer for GKE)
+  RAGME_API_URL: "http://localhost:8021"
+  RAGME_MCP_URL: "http://localhost:8022"
+  RAGME_UI_URL: "http://localhost:8020"
   
   # Vector Database Configuration
-  VECTOR_DB_TYPE: "weaviate"
-  VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-docs"
-  VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-docs"
+  VECTOR_DB_TYPE: "weaviate-local"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-collection"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-collection"
   
   # MinIO Configuration
   MINIO_ENDPOINT: "ragme-minio:9000"
   
   # Application Configuration
-  APPLICATION_NAME: "RAGme Kubernetes"
+  APPLICATION_NAME: "RAGme GKE"
   APPLICATION_VERSION: "1.0.0"
   APPLICATION_TITLE: "RAGme AI Assistant"
   APPLICATION_DESCRIPTION: "AI-powered document and image processing assistant"
@@ -33,10 +34,10 @@ data:
   WATCH_DIRECTORY: "/app/watch_directory"
   MINIO_LOCAL_PATH: "/app/minio_data"
   
-  # OAuth Configuration
-  GOOGLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/google/callback"
-  GITHUB_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/github/callback"
-  APPLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/apple/callback"
+  # OAuth Configuration (external URLs for GKE)
+  GOOGLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/apple/callback"
 
 ---
 apiVersion: v1

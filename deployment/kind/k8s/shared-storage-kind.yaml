@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ragme-shared-pvc
+  namespace: ragme
+  labels:
+    app: ragme
+    component: shared-storage
+spec:
+  accessModes:
+  - ReadWriteOnce  # Changed from ReadWriteMany for local-path compatibility
+  resources:
+    requests:
+      storage: 5Gi
+  # Use standard storage class for Kind (default)
+  storageClassName: "standard"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ragme-vector-db-pvc
+  namespace: ragme
+  labels:
+    app: ragme
+    component: vector-db
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: "standard"

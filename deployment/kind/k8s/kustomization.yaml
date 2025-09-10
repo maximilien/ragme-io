@@ -5,8 +5,8 @@ namespace: ragme
 
 resources:
 - namespace.yaml
-- configmap.yaml
-- shared-storage.yaml
+- configmap-kind.yaml
+- shared-storage-kind.yaml
 - minio-deployment.yaml
 - weaviate-deployment.yaml
 - api-deployment.yaml

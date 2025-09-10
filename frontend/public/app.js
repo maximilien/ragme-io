@@ -840,12 +840,13 @@ class RAGmeAssistant {
         try {
             // Safari-specific socket.io configuration
             const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-            const socketOptions = isSafari ? {
-                transports: ['websocket', 'polling'],
-                upgrade: true,
-                rememberUpgrade: true,
-                timeout: 20000
-            } : {};
+            const socketOptions = {
+                transports: ['polling'],
+                upgrade: false,
+                rememberUpgrade: false,
+                timeout: 20000,
+                forceNew: true
+            };
 
             this.socket = io(this.apiConfig.baseUrl, socketOptions);
             console.log('Socket.io connection created with options:', socketOptions);

@@ -17,52 +17,9 @@
         }
     </script>
 
-    <!-- Load resources dynamically to force HTTP -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Create stylesheet links
-            const styles = ['styles.css', 'all.min.css'];
-            styles.forEach(function(href) {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = href;  // Use relative paths
-                document.head.appendChild(link);
-            });
-
-            // Create script tags
-            const scripts = ['d3.v7.min.js', 'marked.min.js', 'purify.min.js'];
-            let loadedScripts = 0;
-
-            function loadNextScript() {
-                if (loadedScripts < scripts.length) {
-                    const script = document.createElement('script');
-                    script.src = scripts[loadedScripts];  // Use relative paths
-                    script.onload = function() {
-                        loadedScripts++;
-                        loadNextScript();
-                    };
-                    script.onerror = function() {
-                        console.error('Failed to load script:', scripts[loadedScripts]);
-                        loadedScripts++;
-                        loadNextScript();
-                    };
-                    document.head.appendChild(script);
-                } else {
-                    // Load socket.io and app.js last
-                    const socketScript = document.createElement('script');
-                    socketScript.src = '/socket.io/socket.io.js';  // Use relative path
-                    socketScript.onload = function() {
-                        const appScript = document.createElement('script');
-                        appScript.src = 'app.js?v=1.2';  // Use relative path
-                        document.head.appendChild(appScript);
-                    };
-                    document.head.appendChild(socketScript);
-                }
-            }
-
-            loadNextScript();
-        });
-    </script>
+    <!-- Load resources statically -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="all.min.css">
 </head>
 <body>
     <div class="app-container">
@@ -900,6 +857,10 @@
         </div>
     </div>
 
+    <!-- Load JavaScript files statically -->
+    <script src="d3.v7.min.js"></script>
+    <script src="marked.min.js"></script>
+    <script src="purify.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js?v=1.2"></script>
 </body>

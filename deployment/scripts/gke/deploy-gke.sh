@@ -254,7 +254,7 @@ update_manifests() {
     mkdir -p ${temp_dir}
     
     # Copy and update manifests
-    for manifest in k8s/*.yaml; do
+    for manifest in gke/k8s/*.yaml; do
         if [ -f "$manifest" ]; then
             local filename=$(basename "$manifest")
             local temp_manifest="${temp_dir}/${filename}"
@@ -276,7 +276,7 @@ apply_manifests() {
     print_status "Applying Kubernetes manifests using GKE-specific kustomization..."
     
     # Apply using kustomization for GKE
-    kubectl apply -k k8s/kustomization-gke.yaml
+    kubectl apply -k gke/k8s/
     
     # Clean up temp directory
     if [ -d "/tmp/ragme-manifests-gke" ]; then

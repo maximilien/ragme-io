@@ -15,9 +15,11 @@ const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST'],
+    credentials: true
   },
-  allowEIO3: true,
   transports: ['polling', 'websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Add Socket.IO debugging
@@ -76,7 +78,7 @@ interface AppConfig {
 // Load configuration from backend or environment variables
 let appConfig: AppConfig = {};
 let RAGME_API_URL = process.env.RAGME_API_URL || 'http://localhost:8021';
-let INTERNAL_API_URL = RAGME_API_URL; // URL used by frontend server to connect to backend
+let INTERNAL_API_URL = process.env.RAGME_INTERNAL_API_URL || RAGME_API_URL; // URL used by frontend server to connect to backend
 
 // For local development, always use local ports unless explicitly overridden
 if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
@@ -85,11 +87,8 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAGME_API_URL) {
 }
 
 // For Kubernetes deployment, use internal service URL for backend communication
-if (
-  process.env.NODE_ENV === 'production' &&
-  process.env.RAGME_API_URL?.includes('ragme-api:8021')
-) {
-  INTERNAL_API_URL = 'http://ragme-api:8021';
+if (process.env.RAGME_INTERNAL_API_URL) {
+  INTERNAL_API_URL = process.env.RAGME_INTERNAL_API_URL;
   // Keep RAGME_API_URL as external URL for browser/CSP
 }
 
@@ -251,13 +250,11 @@ app.use(compression());
 app.use(cors());
 app.use(express.json());
 
-app.use(express.static(path.join(process.cwd(), 'public')));
-
 // Proxy image requests to the backend
 app.get('/image/:imageId', async (req, res) => {
   try {
     const imageId = req.params.imageId;
-    const response = await fetch(`${RAGME_API_URL}/image/${imageId}`);
+    const response = await fetch(`${INTERNAL_API_URL}/image/${imageId}`);
 
     if (response.ok) {
       const data = await response.json();
@@ -281,7 +278,7 @@ app.get('/image/:imageId', async (req, res) => {
 app.get('/download-file/:documentId', async (req, res) => {
   try {
     const documentId = req.params.documentId;
-    const response = await fetch(`${RAGME_API_URL}/download-file/${documentId}`);
+    const response = await fetch(`${INTERNAL_API_URL}/download-file/${documentId}`);
 
     if (response.ok) {
       const data = await response.json();
@@ -304,7 +301,7 @@ app.get('/download-file/:documentId', async (req, res) => {
 // Proxy query requests to the backend
 app.post('/query', async (req, res) => {
   try {
-    const response = await fetch(`${RAGME_API_URL}/query`, {
+    const response = await fetch(`${INTERNAL_API_URL}/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -672,7 +669,7 @@ app.get('/api/document/:documentId', async (req, res) => {
 
   try {
     // Call the backend API directly
-    const response = await fetch(`${RAGME_API_URL}/document/${documentId}`);
+    const response = await fetch(`${INTERNAL_API_URL}/document/${documentId}`);
 
     const apiResult = (await response.json()) as APIResponse;
 
@@ -703,7 +700,7 @@ app.delete('/delete-document/:documentId', async (req, res) => {
 
   try {
     // Call the backend API directly to get better error handling
-    const response = await fetch(`${RAGME_API_URL}/delete-document/${documentId}`, {
+    const response = await fetch(`${INTERNAL_API_URL}/delete-document/${documentId}`, {
       method: 'DELETE',
     });
 
@@ -774,7 +771,7 @@ app.delete('/delete-image/:imageId', async (req, res) => {
 
   try {
     // Call the backend API directly to get better error handling
-    const response = await fetch(`${RAGME_API_URL}/delete-image/${imageId}`, {
+    const response = await fetch(`${INTERNAL_API_URL}/delete-image/${imageId}`, {
       method: 'DELETE',
     });
 
@@ -836,7 +833,7 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
     logger.info('Sending request to backend API');
     let result;
     try {
-      const response = await axios.post(`${RAGME_API_URL}/upload-images`, formData, {
+      const response = await axios.post(`${INTERNAL_API_URL}/upload-images`, formData, {
         headers: {
           ...formData.getHeaders(),
         },
@@ -893,13 +890,22 @@ app.post('/upload-images', upload.array('files'), async (req, res) => {
 io.on('connection', socket => {
   logger.info('Socket.IO: User connected:', socket.id);
 
+  // Handle connection errors more gracefully
   socket.on('error', error => {
     logger.error('Socket.IO error for', socket.id, ':', error);
+    // Don't disconnect on error, let the client handle reconnection
   });
 
   socket.on('disconnect', reason => {
     logger.info('Socket.IO: User disconnected:', socket.id, 'reason:', reason);
   });
+
+  // Session recovery removed to fix connection issues
+  // socket.on('session_recovery', (data) => {
+  //   logger.info('Socket.IO: Session recovery attempt for', socket.id, 'data:', data);
+  //   // Acknowledge the recovery attempt
+  //   socket.emit('session_recovered', { success: true, sessionId: socket.id });
+  // });
 
   // Handle chat messages
   socket.on('chat_message', async data => {
@@ -1106,6 +1112,9 @@ io.on('connection', socket => {
     socket.emit('chat_saved', { success: true, message: 'Chat saved successfully' });
   });
 });
+
+// Serve static files from public directory (before 404 handler)
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Add 404 handler to log missing resources
 app.use((req, res, next) => {

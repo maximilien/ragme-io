@@ -1,0 +1,46 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ragme-cluster
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+        system-reserved: memory=1Gi
+        kube-reserved: memory=1Gi
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 8080
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 8443
+    protocol: TCP
+  - containerPort: 30020  # Frontend
+    hostPort: 30020
+    protocol: TCP
+  - containerPort: 30021  # API
+    hostPort: 30021
+    protocol: TCP
+  - containerPort: 30022  # MCP
+    hostPort: 30022
+    protocol: TCP
+  - containerPort: 30900  # MinIO API
+    hostPort: 30900
+    protocol: TCP
+  - containerPort: 30901  # MinIO Console
+    hostPort: 30901
+    protocol: TCP
+  - containerPort: 30080  # Weaviate
+    hostPort: 30080
+    protocol: TCP
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        system-reserved: memory=1Gi
+        kube-reserved: memory=1Gi

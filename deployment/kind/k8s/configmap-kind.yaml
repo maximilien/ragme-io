@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ragme-config
+  namespace: ragme
+  labels:
+    app: ragme
+data:
+  # RAGme Configuration
+  RAGME_API_PORT: "8021"
+  RAGME_MCP_PORT: "8022"
+  RAGME_FRONTEND_PORT: "8020"
+  
+  # Service URLs (use internal service URL to trigger internal communication logic)
+  RAGME_API_URL: "http://ragme-api:8021"
+  RAGME_MCP_URL: "http://ragme-mcp:8022"
+  RAGME_UI_URL: "http://ragme-frontend:8020"
+  
+  # Vector Database Configuration
+  VECTOR_DB_TYPE: "${VECTOR_DB_TYPE}"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "${VECTOR_DB_TEXT_COLLECTION_NAME}"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "${VECTOR_DB_IMAGE_COLLECTION_NAME}"
+  
+  # MinIO Configuration
+  MINIO_ENDPOINT: "ragme-minio:9000"
+  
+  # Application Configuration
+  APPLICATION_NAME: "${APPLICATION_NAME}"
+  APPLICATION_VERSION: "${APPLICATION_VERSION}"
+  APPLICATION_TITLE: "${APPLICATION_TITLE}"
+  APPLICATION_DESCRIPTION: "${APPLICATION_DESCRIPTION}"
+  
+  # Watch Directory
+  WATCH_DIRECTORY: "/app/watch_directory"
+  MINIO_LOCAL_PATH: "/app/minio_data"
+  
+  # Additional Configuration from .env
+  CONTAINER_REGISTRY: "localhost:5001"
+  CONTAINER_TAG: "latest"
+  K8S_CLUSTER_NAME: "ragme-cluster"
+  K8S_NAMESPACE: "ragme"
+  K8S_STORAGE_CLASS: "standard"
+  K8S_ACCESS_TYPE: "NodePort"
+  K8S_INGRESS_HOST: "ragme.local"
+  
+  # OAuth Configuration (internal service URLs for Kind)
+  GOOGLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://ragme-api:8021/auth/apple/callback"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ragme-secrets
+  namespace: ragme
+  labels:
+    app: ragme
+type: Opaque
+stringData:
+  # These values will be populated from .env file during deployment
+  OPENAI_API_KEY: "${OPENAI_API_KEY}"
+  WEAVIATE_API_KEY: "${WEAVIATE_API_KEY}"
+  WEAVIATE_URL: "${WEAVIATE_URL}"
+  MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+  MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
+  GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID}"
+  GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET}"
+  GITHUB_OAUTH_CLIENT_ID: "${GITHUB_OAUTH_CLIENT_ID}"
+  GITHUB_OAUTH_CLIENT_SECRET: "${GITHUB_OAUTH_CLIENT_SECRET}"
+  APPLE_OAUTH_CLIENT_ID: "${APPLE_OAUTH_CLIENT_ID}"
+  APPLE_OAUTH_CLIENT_SECRET: "${APPLE_OAUTH_CLIENT_SECRET}"
+  SESSION_SECRET_KEY: "${SESSION_SECRET_KEY}"
