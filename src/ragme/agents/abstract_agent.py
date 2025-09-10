@@ -2,13 +2,13 @@
 # Copyright (c) 2025 dr.max
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class AbstractAgent(ABC):
     """
     Abstract base class defining the interface that all RAGme agents must implement.
-    
+
     This interface provides a unified way to interact with different agent frameworks
     (OpenAI, LlamaIndex, Custom) while maintaining a consistent API.
     """
@@ -19,12 +19,12 @@ class AbstractAgent(ABC):
         role: str,
         agent_type: str,
         llm_model: str = "gpt-4o-mini",
-        system_prompt: Optional[str] = None,
-        env: Optional[Dict[str, Any]] = None,
+        system_prompt: str | None = None,
+        env: dict[str, Any] | None = None,
     ):
         """
         Initialize the agent with basic configuration.
-        
+
         Args:
             name: The agent name
             role: The agent role (dispatch, functional, query, react, local)
@@ -39,26 +39,26 @@ class AbstractAgent(ABC):
         self.llm_model = llm_model
         self.system_prompt = system_prompt
         self.env = env or {}
-        
+
     @abstractmethod
     async def run(self, query: str, **kwargs) -> str:
         """
         Run the agent with a query and return the response.
-        
+
         Args:
             query: The user query or input
             **kwargs: Additional arguments specific to the agent
-            
+
         Returns:
             str: The agent's response
         """
         pass
 
     @abstractmethod
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """
         Get information about the agent's capabilities and configuration.
-        
+
         Returns:
             dict: Agent information including description, capabilities, etc.
         """
@@ -69,7 +69,9 @@ class AbstractAgent(ABC):
         Clean up resources when the agent is no longer needed.
         This method can be overridden by subclasses.
         """
-        pass
+        # Default implementation - clear environment variables
+        if hasattr(self, "env") and self.env:
+            self.env.clear()
 
     def __str__(self) -> str:
         """String representation of the agent."""

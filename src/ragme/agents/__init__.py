@@ -6,14 +6,14 @@ local file monitoring agent, and the new agent framework system with adapters.
 """
 
 from .abstract_agent import AbstractAgent
+from .adapters import CustomAdapter, LlamaIndexAdapter, OpenAIAdapter
 from .agent_factory import AgentFactory
 from .local_agent import RagMeLocalAgent
 from .ragme_agent import RagMeAgent
-from .adapters import OpenAIAdapter, LlamaIndexAdapter, CustomAdapter
 
 __all__ = [
     "AbstractAgent",
-    "AgentFactory", 
+    "AgentFactory",
     "RagMeAgent",
     "RagMeLocalAgent",
     "OpenAIAdapter",

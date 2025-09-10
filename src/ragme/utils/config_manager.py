@@ -403,7 +403,7 @@ class ConfigManager:
         """
         # First try agents.yaml
         agents_from_file = self.agents_config.get("agents", [])
-        
+
         if isinstance(agents_from_file, list):
             for agent_config in agents_from_file:
                 if (
@@ -441,16 +441,16 @@ class ConfigManager:
         """
         # First try agents.yaml
         agents_from_file = self.agents_config.get("agents", [])
-        
+
         if isinstance(agents_from_file, list) and agents_from_file:
             return agents_from_file
 
         # Fallback to inline agents in config.yaml for backward compatibility
         agents_inline = self.get("agents", [])
-        
+
         if isinstance(agents_inline, list):
             return agents_inline
-            
+
         return []
 
     def has_agents_file(self) -> bool:
