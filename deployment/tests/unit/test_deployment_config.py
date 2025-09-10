@@ -157,11 +157,14 @@ class TestKubernetesManifests:
     
     def test_kubernetes_manifests_exist(self):
         """Test that all required Kubernetes manifests exist"""
-        k8s_path = Path(__file__).parent.parent.parent / "k8s"
-        manifests = [
+        deployment_path = Path(__file__).parent.parent.parent
+        
+        # Check kind deployment manifests
+        kind_k8s_path = deployment_path / "kind" / "k8s"
+        kind_manifests = [
             'namespace.yaml',
-            'configmap.yaml',
-            'shared-storage.yaml',
+            'configmap-kind.yaml',
+            'shared-storage-kind.yaml',
             'minio-deployment.yaml',
             'weaviate-deployment.yaml',
             'api-deployment.yaml',
@@ -171,25 +174,62 @@ class TestKubernetesManifests:
             'kustomization.yaml'
         ]
         
-        for manifest in manifests:
-            assert (k8s_path / manifest).exists(), f"Kubernetes manifest {manifest} not found"
+        for manifest in kind_manifests:
+            assert (kind_k8s_path / manifest).exists(), f"Kind Kubernetes manifest {manifest} not found"
+        
+        # Check GKE deployment manifests
+        gke_k8s_path = deployment_path / "gke" / "k8s"
+        gke_manifests = [
+            'namespace.yaml',
+            'configmap-gke.yaml',
+            'shared-storage-gke.yaml',
+            'minio-deployment.yaml',
+            'weaviate-deployment.yaml',
+            'api-deployment-gke.yaml',
+            'mcp-deployment-gke.yaml',
+            'agent-deployment-gke.yaml',
+            'frontend-deployment-gke.yaml',
+            'kustomization-gke.yaml'
+        ]
+        
+        for manifest in gke_manifests:
+            assert (gke_k8s_path / manifest).exists(), f"GKE Kubernetes manifest {manifest} not found"
     
     def test_kustomization_yaml_valid(self):
-        """Test that kustomization.yaml is valid"""
-        k8s_path = Path(__file__).parent.parent.parent / "k8s"
+        """Test that kustomization.yaml files are valid"""
+        deployment_path = Path(__file__).parent.parent.parent
         
-        with open(k8s_path / "kustomization.yaml", 'r') as f:
-            kustomization = yaml.safe_load(f)
+        # Test kind kustomization
+        kind_kustomization_path = deployment_path / "kind" / "k8s" / "kustomization.yaml"
+        with open(kind_kustomization_path, 'r') as f:
+            kind_kustomization = yaml.safe_load(f)
         
-        assert 'apiVersion' in kustomization
-        assert 'kind' in kustomization
-        assert kustomization['kind'] == 'Kustomization'
-        assert 'namespace' in kustomization
-        assert 'resources' in kustomization
+        assert 'apiVersion' in kind_kustomization
+        assert 'kind' in kind_kustomization
+        assert kind_kustomization['kind'] == 'Kustomization'
+        assert 'namespace' in kind_kustomization
+        assert 'resources' in kind_kustomization
         
-        # Check that all referenced resources exist
-        for resource in kustomization['resources']:
-            assert (k8s_path / resource).exists(), f"Referenced resource {resource} not found"
+        # Test GKE kustomization
+        gke_kustomization_path = deployment_path / "gke" / "k8s" / "kustomization-gke.yaml"
+        with open(gke_kustomization_path, 'r') as f:
+            gke_kustomization = yaml.safe_load(f)
+        
+        assert 'apiVersion' in gke_kustomization
+        assert 'kind' in gke_kustomization
+        assert gke_kustomization['kind'] == 'Kustomization'
+        assert 'namespace' in gke_kustomization
+        assert 'resources' in gke_kustomization
+        
+        # Check that all referenced resources exist for kind
+        kind_k8s_path = deployment_path / "kind" / "k8s"
+        for resource in kind_kustomization['resources']:
+            assert (kind_k8s_path / resource).exists(), f"Kind referenced resource {resource} not found"
+        
+        # Check that all referenced resources exist for GKE
+        gke_k8s_path = deployment_path / "gke" / "k8s"
+        for resource in gke_kustomization['resources']:
+            assert (gke_k8s_path / resource).exists(), f"GKE referenced resource {resource} not found"
 
 
 class TestDeploymentScripts:
