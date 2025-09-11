@@ -225,10 +225,8 @@ build_and_push_images() {
     for image in "${images[@]}"; do
         print_status "Tagging and pushing ${image}..."
         
-        # Tag for GCR
-        podman tag localhost/${image}:${IMAGE_TAG} ${REGISTRY}/${image}:${IMAGE_TAG}
-        
-        # Push to GCR
+        # For GKE, images are already built with GCR registry format
+        # Just push the existing GCR image
         podman push ${REGISTRY}/${image}:${IMAGE_TAG}
         
         print_status "${image} pushed successfully"
@@ -240,6 +238,20 @@ build_and_push_images() {
 # Function to create ConfigMap and Secrets
 create_config() {
     print_status "Creating ConfigMap and Secrets..."
+    
+    # Get external LoadBalancer IP for OAuth redirect URIs
+    local external_ip=""
+    if kubectl get service -n ${NAMESPACE} ragme-frontend-lb >/dev/null 2>&1; then
+        external_ip=$(kubectl get service -n ${NAMESPACE} ragme-frontend-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+    fi
+    
+    # Fallback to localhost if no external IP found
+    if [ -z "$external_ip" ]; then
+        external_ip="localhost"
+        print_warn "No external LoadBalancer IP found, using localhost for OAuth redirect URIs"
+    else
+        print_status "Using external IP $external_ip for OAuth redirect URIs"
+    fi
     
     # Check if .env file exists
     if [ ! -f "../.env" ]; then
@@ -279,10 +291,10 @@ data:
   # MinIO Configuration
   MINIO_ENDPOINT: "ragme-minio:9000"
   
-  # OAuth Redirect URIs
-  GOOGLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/google/callback"
-  GITHUB_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/github/callback"
-  APPLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/apple/callback"
+  # OAuth Redirect URIs (external LoadBalancer IP)
+  GOOGLE_OAUTH_REDIRECT_URI: "http://${external_ip}/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://${external_ip}/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://${external_ip}/auth/apple/callback"
 EOF
     
     # Apply ConfigMap
