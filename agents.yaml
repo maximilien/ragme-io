@@ -1,0 +1,88 @@
+# RAGme Agents Configuration
+# This file defines the agents available in the RAGme system
+# Each agent specifies its role, type (framework), code location, and configuration
+
+agents:
+  - name: "ragme-agent"
+    role: "dispatch"  # Main dispatcher agent that routes queries
+    type: "llamaindex"  # Framework: openai, llamaindex, custom
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.ragme_agent.RagMeAgent"
+    code:
+      uri: ./src/ragme/agents/ragme_agent.py
+    system_prompt: >-
+      You are a helpful assistant that can write the contents of urls to text document
+      collections, as well as answering questions about stored documents.
+      
+      IMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query.
+      
+      MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
+      
+  - name: "functional-agent"
+    role: "functional"  # Handles tool-based operations
+    type: "llamaindex"
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.functional_agent.FunctionalAgent"
+    code:
+      uri: ./src/ragme/agents/functional_agent.py
+    
+  - name: "query-agent"
+    role: "query"  # Answers questions about document content
+    type: "custom"
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.query_agent.QueryAgent"
+    code:
+      uri: ./src/ragme/agents/query_agent.py
+    
+  - name: "local-agent"
+    role: "local"  # File monitoring and processing
+    type: "custom"
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.local_agent.RagMeLocalAgent"
+    code:
+      uri: ./src/ragme/agents/local_agent.py
+    env:
+      watch_directory: "${WATCH_DIRECTORY}"
+      chunk_size: 1000
+      mcp_servers:
+        - name: "local"
+          url: "http://localhost:8022"
+
+# Example of additional agents that could be added:
+
+  # - name: "custom-research-agent"
+  #   role: "react"  # ReAct-style agent for complex reasoning
+  #   type: "openai"
+  #   llm_model: "gpt-4o"
+  #   system_prompt: "You are a research assistant that can analyze and synthesize information from multiple sources."
+  #   
+  # - name: "github-agent"
+  #   role: "functional"
+  #   type: "custom"
+  #   llm_model: "gpt-4o-mini"
+  #   class_name: "GitHubAgent"
+  #   code:
+  #     uri: https://github.com/example/ragme-agents/blob/main/github_agent.py
+  #   env:
+  #     github_token: "${GITHUB_TOKEN}"
+  #
+  # - name: "inline-agent"
+  #   role: "query"
+  #   type: "custom"
+  #   llm_model: "gpt-4o-mini"
+  #   class_name: "InlineAgent"
+  #   code:
+  #     inline: |
+  #       class InlineAgent:
+  #           def __init__(self, **kwargs):
+  #               self.name = "inline-agent"
+  #           
+  #           async def run(self, query: str, **kwargs) -> str:
+  #               return f"Inline agent processed: {query}"
+  #           
+  #           def get_agent_info(self):
+  #               return {
+  #                   "name": self.name,
+  #                   "description": "Simple inline agent example",
+  #                   "capabilities": ["Basic query processing"]
+  #               }

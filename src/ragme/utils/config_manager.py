@@ -19,12 +19,13 @@ class ConfigManager:
     """
     Configuration manager for RAGme application.
 
-    Loads configuration from config.yaml and handles environment variable substitution.
+    Loads configuration from config.yaml and agents.yaml, handles environment variable substitution.
     Provides a centralized way to access all application settings.
     """
 
     _instance: Optional["ConfigManager"] = None
     _config: dict[str, Any] | None = None
+    _agents_config: dict[str, Any] | None = None
 
     def __new__(cls) -> "ConfigManager":
         """Singleton pattern to ensure only one config manager instance."""
@@ -40,8 +41,9 @@ class ConfigManager:
             # Note: Config will be loaded lazily when first accessed
 
     def reload_config(self) -> None:
-        """Reload the configuration from file."""
+        """Reload the configuration from files."""
         self._config = None
+        self._agents_config = None
         dotenv.load_dotenv()  # Reload environment variables
 
     @property
@@ -50,6 +52,13 @@ class ConfigManager:
         if self._config is None:
             self._config = self._load_config()
         return self._config
+
+    @property
+    def agents_config(self) -> dict[str, Any]:
+        """Get the agents configuration, loading it if necessary."""
+        if self._agents_config is None:
+            self._agents_config = self._load_agents_config()
+        return self._agents_config
 
     def _load_config(self) -> dict[str, Any]:
         """Load configuration from config.yaml file."""
@@ -75,6 +84,30 @@ class ConfigManager:
             raise ValueError(f"Error parsing configuration file: {e}") from e
         except Exception as e:
             raise RuntimeError(f"Error loading configuration: {e}") from e
+
+    def _load_agents_config(self) -> dict[str, Any]:
+        """Load agents configuration from agents.yaml file."""
+        # Look for agents.yaml in the project root directory
+        agents_path = Path(__file__).parent.parent.parent.parent / "agents.yaml"
+
+        if not agents_path.exists():
+            # If agents.yaml doesn't exist, return empty config
+            # This allows backward compatibility with inline agent configuration
+            return {"agents": []}
+
+        try:
+            with open(agents_path, encoding="utf-8") as file:
+                agents_config = yaml.safe_load(file)
+
+            # Substitute environment variables in agents config
+            agents_config = self._substitute_env_vars(agents_config)
+
+            return agents_config if agents_config else {"agents": []}
+
+        except yaml.YAMLError as e:
+            raise ValueError(f"Error parsing agents configuration file: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"Error loading agents configuration: {e}") from e
 
     def _substitute_env_vars(self, obj: Any) -> Any:
         """
@@ -359,19 +392,34 @@ class ConfigManager:
         """
         Get agent configuration by name.
 
+        First checks agents.yaml, then falls back to inline agents in config.yaml
+        for backward compatibility.
+
         Args:
             agent_name: Name of the agent
 
         Returns:
             Agent configuration dictionary or None if not found
         """
-        agents = self.get("agents", [])
+        # First try agents.yaml
+        agents_from_file = self.agents_config.get("agents", [])
+
+        if isinstance(agents_from_file, list):
+            for agent_config in agents_from_file:
+                if (
+                    isinstance(agent_config, dict)
+                    and agent_config.get("name") == agent_name
+                ):
+                    return agent_config
+
+        # Fallback to inline agents in config.yaml for backward compatibility
+        agents_inline = self.get("agents", [])
 
         # Handle case where agents is not a list
-        if not isinstance(agents, list):
+        if not isinstance(agents_inline, list):
             return None
 
-        for agent_config in agents:
+        for agent_config in agents_inline:
             # Handle case where agent_config is not a dict
             if (
                 isinstance(agent_config, dict)
@@ -380,6 +428,50 @@ class ConfigManager:
                 return agent_config
 
         return None
+
+    def get_all_agents(self) -> list[dict[str, Any]]:
+        """
+        Get all agent configurations.
+
+        Returns all agents from agents.yaml and falls back to config.yaml
+        for backward compatibility.
+
+        Returns:
+            List of agent configuration dictionaries
+        """
+        # First try agents.yaml
+        agents_from_file = self.agents_config.get("agents", [])
+
+        if isinstance(agents_from_file, list) and agents_from_file:
+            return agents_from_file
+
+        # Fallback to inline agents in config.yaml for backward compatibility
+        agents_inline = self.get("agents", [])
+
+        if isinstance(agents_inline, list):
+            return agents_inline
+
+        return []
+
+    def has_agents_file(self) -> bool:
+        """
+        Check if agents.yaml file exists.
+
+        Returns:
+            True if agents.yaml exists, False otherwise
+        """
+        agents_path = Path(__file__).parent.parent.parent.parent / "agents.yaml"
+        return agents_path.exists()
+
+    def get_agents_directory(self) -> str:
+        """
+        Get the agents directory path for storing downloaded agent code.
+
+        Returns:
+            Path to the agents directory
+        """
+        agents_dir = self.agents_config.get("agents_directory", "./agents")
+        return str(Path(agents_dir).resolve())
 
     def get_mcp_server_config(self, server_name: str) -> dict[str, Any] | None:
         """

@@ -1,0 +1,168 @@
+# RAGme Agents Configuration Example
+# This file demonstrates various agent configurations including
+# GitHub repositories, inline code, and different frameworks
+
+agents:
+  # Main dispatcher agent using LlamaIndex ReActAgent
+  - name: "ragme-agent"
+    role: "dispatch"  # Routes queries to appropriate specialized agents
+    type: "llamaindex"  # Framework: openai, llamaindex, custom
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.ragme_agent.RagMeAgent"
+    code:
+      uri: ./src/ragme/agents/ragme_agent.py
+    system_prompt: >-
+      You are a helpful assistant that can write the contents of urls to text document
+      collections, as well as answering questions about stored documents.
+      
+      IMPORTANT: You MUST ALWAYS respond in English, regardless of the language used in the user's query.
+      
+      MANDATORY RULE: For ANY question about documents, content, or information, you MUST call query_agent(query) first.
+
+  # Functional agent for tool-based operations
+  - name: "functional-agent"
+    role: "functional"  # Handles document management, URL crawling, etc.
+    type: "llamaindex"  # Uses LlamaIndex FunctionAgent
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.functional_agent.FunctionalAgent"
+    code:
+      uri: ./src/ragme/agents/functional_agent.py
+    
+  # Query agent for content questions
+  - name: "query-agent"
+    role: "query"  # Answers questions about document content
+    type: "custom"  # Custom implementation
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.query_agent.QueryAgent"
+    code:
+      uri: ./src/ragme/agents/query_agent.py
+    
+  # Local file monitoring agent
+  - name: "local-agent"
+    role: "local"  # Monitors and processes local files
+    type: "custom"
+    llm_model: "gpt-4o-mini"
+    class_name: "src.ragme.agents.local_agent.RagMeLocalAgent"
+    code:
+      uri: ./src/ragme/agents/local_agent.py
+    env:
+      watch_directory: "${WATCH_DIRECTORY}"
+      chunk_size: 1000
+      mcp_servers:
+        - name: "local"
+          url: "http://localhost:8022"
+
+  # Example: Simple OpenAI-based agent
+  - name: "openai-agent"
+    role: "react"  # ReAct-style reasoning
+    type: "openai"  # Pure OpenAI implementation
+    llm_model: "gpt-4o"
+    system_prompt: >-
+      You are an intelligent assistant that can reason through complex problems step by step.
+      Use the ReAct (Reason + Act) methodology to break down problems and provide solutions.
+
+  # Example: Agent loaded from GitHub repository
+  - name: "github-agent"
+    role: "functional"
+    type: "custom"
+    llm_model: "gpt-4o-mini"
+    class_name: "GitHubAgent"
+    code:
+      uri: https://github.com/example/ragme-agents/blob/main/github_agent.py
+    env:
+      github_token: "${GITHUB_TOKEN}"
+      repo_owner: "example"
+      repo_name: "my-repo"
+
+  # Example: Agent with inline code
+  - name: "inline-agent"
+    role: "query"
+    type: "custom"
+    llm_model: "gpt-4o-mini"
+    class_name: "InlineAgent"
+    code:
+      inline: |
+        import logging
+        from typing import Any, Dict
+        
+        logger = logging.getLogger(__name__)
+        
+        class InlineAgent:
+            def __init__(self, **kwargs):
+                self.name = "inline-agent"
+                self.kwargs = kwargs
+                logger.info(f"Initialized {self.name}")
+            
+            async def run(self, query: str, **kwargs) -> str:
+                """Process a query and return a response."""
+                logger.info(f"Processing query: {query}")
+                return f"Inline agent processed query: '{query}'"
+            
+            def get_agent_info(self) -> Dict[str, Any]:
+                """Get agent information."""
+                return {
+                    "name": self.name,
+                    "description": "Simple inline agent example",
+                    "capabilities": [
+                        "Basic query processing",
+                        "Inline code execution",
+                        "Example implementation"
+                    ],
+                    "version": "1.0.0"
+                }
+            
+            def cleanup(self):
+                """Clean up resources."""
+                logger.info(f"Cleaning up {self.name}")
+
+  # Example: Research agent with specialized prompting
+  - name: "research-agent"
+    role: "react"
+    type: "openai"
+    llm_model: "gpt-4o"
+    system_prompt: >-
+      You are a research assistant specialized in analyzing and synthesizing information 
+      from multiple sources. You excel at:
+      
+      1. Breaking down complex research questions into manageable parts
+      2. Finding relevant information across different document types
+      3. Synthesizing findings into coherent summaries
+      4. Identifying gaps in available information
+      5. Suggesting additional research directions
+      
+      Always cite your sources and indicate confidence levels for your findings.
+
+  # Example: Domain-specific agent
+  - name: "medical-agent"
+    role: "query"
+    type: "openai"
+    llm_model: "gpt-4o"
+    system_prompt: >-
+      You are a medical information assistant. You help analyze medical documents 
+      and research papers, but you always emphasize that your responses are for 
+      informational purposes only and should not replace professional medical advice.
+      
+      IMPORTANT DISCLAIMERS:
+      - Always include appropriate medical disclaimers
+      - Suggest consulting healthcare professionals for medical decisions
+      - Be conservative with medical interpretations
+    env:
+      domain: "medical"
+      requires_disclaimer: true
+
+  # Example: Multi-language agent
+  - name: "multilingual-agent"
+    role: "query" 
+    type: "openai"
+    llm_model: "gpt-4o"
+    system_prompt: >-
+      You are a multilingual assistant capable of understanding and responding 
+      in multiple languages. You can:
+      
+      1. Translate content between languages
+      2. Answer queries in the user's preferred language
+      3. Analyze documents in different languages
+      4. Provide culturally appropriate responses
+    env:
+      supported_languages: ["en", "fr", "es", "de", "zh", "ja"]
+      auto_detect_language: true
