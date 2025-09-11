@@ -143,11 +143,11 @@ spec:
           periodSeconds: 5
         resources:
           requests:
+            memory: "1Gi"
+            cpu: "250m"
+          limits:
             memory: "2Gi"
             cpu: "500m"
-          limits:
-            memory: "4Gi"
-            cpu: "1000m"
       volumes:
       - name: logs
         emptyDir: {}
