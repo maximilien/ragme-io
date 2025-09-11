@@ -248,7 +248,7 @@ create_config() {
     # Fallback to localhost if no external IP found
     if [ -z "$external_ip" ]; then
         external_ip="localhost"
-        print_warn "No external LoadBalancer IP found, using localhost for OAuth redirect URIs"
+        print_warning "No external LoadBalancer IP found, using localhost for OAuth redirect URIs"
     else
         print_status "Using external IP $external_ip for OAuth redirect URIs"
     fi
