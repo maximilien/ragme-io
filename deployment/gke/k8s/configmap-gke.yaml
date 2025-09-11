@@ -11,15 +11,15 @@ data:
   RAGME_MCP_PORT: "8022"
   RAGME_FRONTEND_PORT: "8020"
   
-  # Service URLs (external LoadBalancer for GKE)
-  RAGME_API_URL: "http://localhost:8021"
-  RAGME_MCP_URL: "http://localhost:8022"
-  RAGME_UI_URL: "http://localhost:8020"
+  # Service URLs (internal Kubernetes services for GKE)
+  RAGME_API_URL: "http://ragme-api:8021"
+  RAGME_MCP_URL: "http://ragme-mcp:8022"
+  RAGME_UI_URL: "http://ragme-frontend:8020"
   
   # Vector Database Configuration
-  VECTOR_DB_TYPE: "weaviate-local"
-  VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-collection"
-  VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-collection"
+  VECTOR_DB_TYPE: "weaviate-cloud"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "RagMeDocs"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "RagMeImages"
   
   # MinIO Configuration
   MINIO_ENDPOINT: "ragme-minio:9000"
@@ -35,9 +35,9 @@ data:
   MINIO_LOCAL_PATH: "/app/minio_data"
   
   # OAuth Configuration (external URLs for GKE)
-  GOOGLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/google/callback"
-  GITHUB_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/github/callback"
-  APPLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/apple/callback"
+  GOOGLE_OAUTH_REDIRECT_URI: "http://34.59.22.209/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://34.59.22.209/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://34.59.22.209/auth/apple/callback"
 
 ---
 apiVersion: v1

@@ -265,6 +265,121 @@ create_config() {
         exit 1
     fi
     
+    # Read vector database configuration from .env file
+    local vector_db_type="weaviate-local"
+    local vector_db_text_collection="ragme-text-collection"
+    local vector_db_image_collection="ragme-image-collection"
+    local weaviate_url="your-weaviate-url-here"
+    local weaviate_api_key="your-weaviate-api-key-here"
+    local openai_api_key="your-openai-api-key-here"
+    
+    # OAuth configuration defaults
+    local google_oauth_client_id="your-google-oauth-client-id"
+    local google_oauth_client_secret="your-google-oauth-client-secret"
+    local github_oauth_client_id="your-github-oauth-client-id"
+    local github_oauth_client_secret="your-github-oauth-client-secret"
+    local apple_oauth_client_id="your-apple-oauth-client-id"
+    local apple_oauth_client_secret="your-apple-oauth-client-secret"
+    
+    if grep -q "^VECTOR_DB_TYPE=" ../.env; then
+        vector_db_type=$(grep "^VECTOR_DB_TYPE=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^VECTOR_DB_TEXT_COLLECTION_NAME=" ../.env; then
+        vector_db_text_collection=$(grep "^VECTOR_DB_TEXT_COLLECTION_NAME=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^VECTOR_DB_IMAGE_COLLECTION_NAME=" ../.env; then
+        vector_db_image_collection=$(grep "^VECTOR_DB_IMAGE_COLLECTION_NAME=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^WEAVIATE_URL=" ../.env; then
+        weaviate_url=$(grep "^WEAVIATE_URL=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^WEAVIATE_API_KEY=" ../.env; then
+        weaviate_api_key=$(grep "^WEAVIATE_API_KEY=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^OPENAI_API_KEY=" ../.env; then
+        openai_api_key=$(grep "^OPENAI_API_KEY=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    # Read OAuth configuration from .env file
+    if grep -q "^GOOGLE_OAUTH_CLIENT_ID=" ../.env; then
+        google_oauth_client_id=$(grep "^GOOGLE_OAUTH_CLIENT_ID=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^GOOGLE_OAUTH_CLIENT_SECRET=" ../.env; then
+        google_oauth_client_secret=$(grep "^GOOGLE_OAUTH_CLIENT_SECRET=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^GITHUB_OAUTH_CLIENT_ID=" ../.env; then
+        github_oauth_client_id=$(grep "^GITHUB_OAUTH_CLIENT_ID=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^GITHUB_OAUTH_CLIENT_SECRET=" ../.env; then
+        github_oauth_client_secret=$(grep "^GITHUB_OAUTH_CLIENT_SECRET=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^APPLE_OAUTH_CLIENT_ID=" ../.env; then
+        apple_oauth_client_id=$(grep "^APPLE_OAUTH_CLIENT_ID=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^APPLE_OAUTH_CLIENT_SECRET=" ../.env; then
+        apple_oauth_client_secret=$(grep "^APPLE_OAUTH_CLIENT_SECRET=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    print_status "Using vector database configuration from .env:"
+    print_status "  VECTOR_DB_TYPE: $vector_db_type"
+    print_status "  VECTOR_DB_TEXT_COLLECTION_NAME: $vector_db_text_collection"
+    print_status "  VECTOR_DB_IMAGE_COLLECTION_NAME: $vector_db_image_collection"
+    print_status "  WEAVIATE_URL: $weaviate_url"
+    print_status "  WEAVIATE_API_KEY: [REDACTED]"
+    print_status "  OPENAI_API_KEY: [REDACTED]"
+    print_status "Using OAuth configuration from .env:"
+    print_status "  GOOGLE_OAUTH_CLIENT_ID: $google_oauth_client_id"
+    print_status "  GOOGLE_OAUTH_CLIENT_SECRET: [REDACTED]"
+    print_status "  GITHUB_OAUTH_CLIENT_ID: $github_oauth_client_id"
+    print_status "  GITHUB_OAUTH_CLIENT_SECRET: [REDACTED]"
+    print_status "  APPLE_OAUTH_CLIENT_ID: $apple_oauth_client_id"
+    print_status "  APPLE_OAUTH_CLIENT_SECRET: [REDACTED]"
+    
+    # Update the static configmap-gke.yaml file with values from .env
+    print_status "Updating static configmap-gke.yaml with .env values..."
+    local configmap_file="gke/k8s/configmap-gke.yaml"
+    
+    # Update VECTOR_DB_TYPE
+    sed -i.bak "s/VECTOR_DB_TYPE: \".*\"/VECTOR_DB_TYPE: \"$vector_db_type\"/" "$configmap_file"
+    
+    # Update VECTOR_DB_TEXT_COLLECTION_NAME
+    sed -i.bak "s/VECTOR_DB_TEXT_COLLECTION_NAME: \".*\"/VECTOR_DB_TEXT_COLLECTION_NAME: \"$vector_db_text_collection\"/" "$configmap_file"
+    
+    # Update VECTOR_DB_IMAGE_COLLECTION_NAME
+    sed -i.bak "s/VECTOR_DB_IMAGE_COLLECTION_NAME: \".*\"/VECTOR_DB_IMAGE_COLLECTION_NAME: \"$vector_db_image_collection\"/" "$configmap_file"
+    
+    # Update WEAVIATE_URL
+    sed -i.bak "s/WEAVIATE_URL: \".*\"/WEAVIATE_URL: \"$weaviate_url\"/" "$configmap_file"
+    
+    # Update WEAVIATE_API_KEY
+    sed -i.bak "s/WEAVIATE_API_KEY: \".*\"/WEAVIATE_API_KEY: \"$weaviate_api_key\"/" "$configmap_file"
+    
+    # Update OPENAI_API_KEY
+    sed -i.bak "s/OPENAI_API_KEY: \".*\"/OPENAI_API_KEY: \"$openai_api_key\"/" "$configmap_file"
+    
+    # Update OAuth configuration
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_ID: \".*\"/GOOGLE_OAUTH_CLIENT_ID: \"$google_oauth_client_id\"/" "$configmap_file"
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_SECRET: \".*\"/GOOGLE_OAUTH_CLIENT_SECRET: \"$google_oauth_client_secret\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_ID: \".*\"/GITHUB_OAUTH_CLIENT_ID: \"$github_oauth_client_id\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_SECRET: \".*\"/GITHUB_OAUTH_CLIENT_SECRET: \"$github_oauth_client_secret\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_ID: \".*\"/APPLE_OAUTH_CLIENT_ID: \"$apple_oauth_client_id\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_SECRET: \".*\"/APPLE_OAUTH_CLIENT_SECRET: \"$apple_oauth_client_secret\"/" "$configmap_file"
+    
+    # Clean up backup files
+    rm -f "$configmap_file.bak"
+    
+    print_status "Updated $configmap_file with .env values"
+    
     # Create temporary ConfigMap file with individual keys
     local temp_configmap="/tmp/ragme-configmap-gke.yaml"
     
@@ -284,9 +399,9 @@ data:
   RAGME_UI_URL: "http://ragme-frontend:8020"
   
   # Vector Database Configuration
-  VECTOR_DB_TYPE: "weaviate-local"
-  VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-collection"
-  VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-collection"
+  VECTOR_DB_TYPE: "${vector_db_type}"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "${vector_db_text_collection}"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "${vector_db_image_collection}"
   
   # MinIO Configuration
   MINIO_ENDPOINT: "ragme-minio:9000"
