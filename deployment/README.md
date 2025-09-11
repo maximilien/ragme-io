@@ -85,6 +85,9 @@ RAGme now supports comprehensive Google Kubernetes Engine (GKE) deployment with 
 
 6. **Clean Up:**
    ```bash
+   # Clean up secrets from configmap file (recommended after successful deployment)
+   ./scripts/gke/deploy-gke.sh cleanup-secrets
+   
    # Destroy deployment
    CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh destroy
    
@@ -164,6 +167,14 @@ APPLE_OAUTH_CLIENT_SECRET=your-apple-client-secret
    # Check pod status and events
    CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get pods -n ragme
    CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl describe pod <pod-name> -n ragme
+   ```
+
+5. **Secrets in ConfigMap File:**
+   ```bash
+   # Clean up actual secrets from configmap-gke.yaml after deployment
+   ./scripts/gke/deploy-gke.sh cleanup-secrets
+   
+   # This restores placeholder values and makes the file safe to commit
    ```
 
 ## 📁 Directory Structure
