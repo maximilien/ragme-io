@@ -55,6 +55,7 @@ show_help() {
     echo "  build     - Build and push container images to GCR"
     echo "  apply     - Apply Kubernetes manifests only"
     echo "  destroy   - Delete all resources from GKE cluster"
+    echo "  cleanup-secrets - Clean up secrets from configmap-gke.yaml file"
     echo "  status    - Show deployment status"
     echo "  logs      - Show logs from all services"
     echo ""
@@ -568,6 +569,37 @@ destroy_deployment() {
     fi
 }
 
+# Cleanup secrets from configmap file
+cleanup_secrets() {
+    print_header "Cleaning up secrets from configmap-gke.yaml"
+    
+    local configmap_file="gke/k8s/configmap-gke.yaml"
+    
+    if [[ ! -f "$configmap_file" ]]; then
+        print_error "ConfigMap file not found: $configmap_file"
+        exit 1
+    fi
+    
+    print_status "Restoring placeholder values in $configmap_file..."
+    
+    # Restore placeholder values for all secrets
+    sed -i.bak "s/WEAVIATE_API_KEY: \".*\"/WEAVIATE_API_KEY: \"your-weaviate-api-key-here\"/" "$configmap_file"
+    sed -i.bak "s/WEAVIATE_URL: \".*\"/WEAVIATE_URL: \"your-weaviate-url-here\"/" "$configmap_file"
+    sed -i.bak "s/OPENAI_API_KEY: \".*\"/OPENAI_API_KEY: \"your-openai-api-key-here\"/" "$configmap_file"
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_ID: \".*\"/GOOGLE_OAUTH_CLIENT_ID: \"your-google-oauth-client-id\"/" "$configmap_file"
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_SECRET: \".*\"/GOOGLE_OAUTH_CLIENT_SECRET: \"your-google-oauth-client-secret\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_ID: \".*\"/GITHUB_OAUTH_CLIENT_ID: \"your-github-oauth-client-id\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_SECRET: \".*\"/GITHUB_OAUTH_CLIENT_SECRET: \"your-github-oauth-client-secret\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_ID: \".*\"/APPLE_OAUTH_CLIENT_ID: \"your-apple-oauth-client-id\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_SECRET: \".*\"/APPLE_OAUTH_CLIENT_SECRET: \"your-apple-oauth-client-secret\"/" "$configmap_file"
+    
+    # Remove backup file
+    rm -f "$configmap_file.bak"
+    
+    print_status "Secrets cleaned up from $configmap_file"
+    print_status "File is now safe to commit to repository"
+}
+
 # Main script logic
 main() {
     case "${1:-deploy}" in
@@ -631,6 +663,9 @@ main() {
             ;;
         "destroy")
             destroy_deployment
+            ;;
+        "cleanup-secrets")
+            cleanup_secrets
             ;;
         *)
             print_error "Unknown command: $1"
