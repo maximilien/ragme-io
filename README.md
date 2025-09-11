@@ -77,19 +77,96 @@ cd deployment
 # MinIO Console: http://localhost:30901
 ```
 
-#### Production Deployment (GKE)
+#### Production Deployment (GKE) ⭐ **ENHANCED!**
+
+RAGme now supports full Google Kubernetes Engine (GKE) deployment with automatic configuration management and dynamic environment variable injection.
+
+**🚀 Complete GKE Deployment from Scratch:**
+
 ```bash
-# Create GKE cluster
+# 1. Prerequisites - Ensure you have:
+# - Google Cloud SDK (gcloud) installed and authenticated
+# - kubectl configured for GKE
+# - .env file with your API keys and OAuth credentials
+
+# 2. Create GKE cluster
 cd deployment
-./create-gke-cluster.sh
+CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/create-gke-cluster.sh
 
-# Deploy to GKE with LoadBalancer services
-./deploy-gke.sh deploy
+# 3. Build container images for GKE (linux/amd64 architecture)
+./scripts/build-containers.sh --target gke --registry gcr.io/YOUR_PROJECT_ID
 
-# Access services via external IP
+# 4. Deploy to GKE with dynamic configuration
+CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh deploy
+
+# 5. Access services via external IP
 # Frontend: http://[EXTERNAL-IP] (LoadBalancer)
-# API: http://[EXTERNAL-IP]:30021 (LoadBalancer)
+# API: http://[EXTERNAL-IP]:30021 (LoadBalancer)  
 # MCP: http://[EXTERNAL-IP]:30022 (LoadBalancer)
+```
+
+**🔧 Dynamic Configuration Management:**
+
+The GKE deployment automatically reads configuration from your `.env` file and applies it to the Kubernetes ConfigMap:
+
+- **Vector Database**: `VECTOR_DB_TYPE`, `WEAVIATE_URL`, `WEAVIATE_API_KEY`
+- **OpenAI API**: `OPENAI_API_KEY` 
+- **OAuth Providers**: All `*_OAUTH_*` client IDs and secrets
+- **External URLs**: Automatic LoadBalancer IP detection for OAuth redirect URIs
+
+**📋 Required .env Configuration:**
+
+```bash
+# Vector Database (Weaviate Cloud recommended)
+VECTOR_DB_TYPE=weaviate-cloud
+WEAVIATE_URL=your-cluster.weaviate.cloud
+WEAVIATE_API_KEY=your-weaviate-api-key
+
+# OpenAI API
+OPENAI_API_KEY=sk-proj-your-openai-key
+
+# OAuth Authentication (optional)
+GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
+GITHUB_OAUTH_CLIENT_ID=your-github-client-id
+GITHUB_OAUTH_CLIENT_SECRET=your-github-client-secret
+APPLE_OAUTH_CLIENT_ID=your-apple-client-id
+APPLE_OAUTH_CLIENT_SECRET=your-apple-client-secret
+```
+
+**🛠️ GKE Deployment Features:**
+
+- **Architecture-Aware Builds**: Automatically builds `linux/amd64` images for GKE
+- **Dynamic ConfigMap Updates**: Reads `.env` values and updates Kubernetes ConfigMap
+- **LoadBalancer Integration**: Automatically configures OAuth redirect URIs with external IP
+- **Resource Optimization**: Optimized resource requests/limits for GKE nodes
+- **High Availability**: Multi-replica deployments with automatic load balancing
+- **Container Registry**: Direct push to Google Container Registry (GCR)
+
+**🔍 Deployment Verification:**
+
+```bash
+# Check deployment status
+CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh status
+
+# View pod status
+CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get pods -n ragme
+
+# Check external IP
+CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get service -n ragme ragme-frontend-lb
+
+# View logs
+CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl logs -f deployment/ragme-api -n ragme
+```
+
+**🧹 Cleanup:**
+
+```bash
+# Destroy GKE deployment
+CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh destroy
+
+# Delete GKE cluster
+CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/create-gke-cluster.sh delete
 ```
 
 ### High Availability Features

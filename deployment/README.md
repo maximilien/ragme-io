@@ -35,32 +35,135 @@ This directory contains everything needed to deploy RAGme on Kubernetes, includi
    ./deploy.sh destroy
    ```
 
-### Production Deployment with GKE
+### Production Deployment with GKE ⭐ **ENHANCED!**
 
-1. **Create GKE cluster:**
+RAGme now supports comprehensive Google Kubernetes Engine (GKE) deployment with automatic configuration management, dynamic environment variable injection, and architecture-aware container builds.
+
+#### 🚀 Complete GKE Deployment from Scratch
+
+**Prerequisites:**
+- Google Cloud SDK (`gcloud`) installed and authenticated
+- `kubectl` configured for GKE access
+- `.env` file with your API keys and OAuth credentials
+- Google Cloud project with Container Registry API enabled
+
+**Step-by-Step Deployment:**
+
+1. **Create GKE Cluster:**
    ```bash
    cd deployment
-   ./create-gke-cluster.sh
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/create-gke-cluster.sh
    ```
 
-2. **Deploy RAGme to GKE:**
+2. **Build Container Images for GKE:**
    ```bash
-   ./deploy-gke.sh deploy
+   # Build with linux/amd64 architecture for GKE
+   ./scripts/build-containers.sh --target gke --registry gcr.io/YOUR_PROJECT_ID
    ```
 
-3. **Access services:**
+3. **Deploy to GKE with Dynamic Configuration:**
+   ```bash
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh deploy
+   ```
+
+4. **Access Services:**
    - Frontend: http://[EXTERNAL-IP] (LoadBalancer)
    - API: http://[EXTERNAL-IP]:30021 (LoadBalancer)
    - MCP: http://[EXTERNAL-IP]:30022 (LoadBalancer)
 
-4. **Check deployment status:**
+5. **Verify Deployment:**
    ```bash
-   ./deploy-gke.sh status
+   # Check deployment status
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh status
+   
+   # View pod status
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get pods -n ragme
+   
+   # Check external IP
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get service -n ragme ragme-frontend-lb
    ```
 
-5. **Clean up:**
+6. **Clean Up:**
    ```bash
-   ./deploy-gke.sh destroy
+   # Destroy deployment
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/deploy-gke.sh destroy
+   
+   # Delete cluster
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a ./scripts/gke/create-gke-cluster.sh delete
+   ```
+
+#### 🔧 Dynamic Configuration Management
+
+The GKE deployment automatically reads configuration from your `.env` file and applies it to the Kubernetes ConfigMap:
+
+**Supported Environment Variables:**
+- **Vector Database**: `VECTOR_DB_TYPE`, `WEAVIATE_URL`, `WEAVIATE_API_KEY`
+- **OpenAI API**: `OPENAI_API_KEY`
+- **OAuth Providers**: All `*_OAUTH_*` client IDs and secrets
+- **External URLs**: Automatic LoadBalancer IP detection for OAuth redirect URIs
+
+**Required .env Configuration:**
+```bash
+# Vector Database (Weaviate Cloud recommended)
+VECTOR_DB_TYPE=weaviate-cloud
+WEAVIATE_URL=your-cluster.weaviate.cloud
+WEAVIATE_API_KEY=your-weaviate-api-key
+
+# OpenAI API
+OPENAI_API_KEY=sk-proj-your-openai-key
+
+# OAuth Authentication (optional)
+GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
+GITHUB_OAUTH_CLIENT_ID=your-github-client-id
+GITHUB_OAUTH_CLIENT_SECRET=your-github-client-secret
+APPLE_OAUTH_CLIENT_ID=your-apple-client-id
+APPLE_OAUTH_CLIENT_SECRET=your-apple-client-secret
+```
+
+#### 🛠️ GKE Deployment Features
+
+- **Architecture-Aware Builds**: Automatically builds `linux/amd64` images for GKE
+- **Dynamic ConfigMap Updates**: Reads `.env` values and updates Kubernetes ConfigMap
+- **LoadBalancer Integration**: Automatically configures OAuth redirect URIs with external IP
+- **Resource Optimization**: Optimized resource requests/limits for GKE nodes
+- **High Availability**: Multi-replica deployments with automatic load balancing
+- **Container Registry**: Direct push to Google Container Registry (GCR)
+- **Secret Management**: Secure handling of API keys and OAuth credentials
+
+#### 🔍 Troubleshooting GKE Deployment
+
+**Common Issues and Solutions:**
+
+1. **Architecture Mismatch (`exec format error`):**
+   ```bash
+   # Ensure building for correct architecture
+   ./scripts/build-containers.sh --target gke --registry gcr.io/YOUR_PROJECT_ID
+   ```
+
+2. **Configuration Not Applied:**
+   ```bash
+   # Check if .env file exists and has correct values
+   cat .env | grep -E "(WEAVIATE|OPENAI|OAUTH)"
+   
+   # Verify ConfigMap was updated
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get configmap ragme-config -n ragme -o yaml
+   ```
+
+3. **OAuth Redirect URI Issues:**
+   ```bash
+   # Check external IP
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get service -n ragme ragme-frontend-lb
+   
+   # Verify OAuth configuration in ConfigMap
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get configmap ragme-config -n ragme -o yaml | grep OAUTH
+   ```
+
+4. **Resource Constraints:**
+   ```bash
+   # Check pod status and events
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl get pods -n ragme
+   CLUSTER_NAME=ragme-test ZONE=us-central1-a kubectl describe pod <pod-name> -n ragme
    ```
 
 ## 📁 Directory Structure
