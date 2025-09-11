@@ -53,6 +53,9 @@ Commands:
   status     - Show deployment status
   logs       - Show logs for all services
   build      - Build container images only
+  apply      - Apply Kubernetes manifests only
+  list       - List available clusters (GKE only)
+  create     - Create a new cluster (GKE only)
   help       - Show this help message
 
 Examples:
@@ -94,11 +97,11 @@ esac
 
 # Validate command
 case "$COMMAND" in
-    deploy|destroy|status|logs|build|help)
+    deploy|destroy|status|logs|build|apply|list|create|help)
         ;;
     *)
         print_error "Invalid command: $COMMAND"
-        print_info "Valid commands: deploy, destroy, status, logs, build, help"
+        print_info "Valid commands: deploy, destroy, status, logs, build, apply, list, create, help"
         exit 1
         ;;
 esac

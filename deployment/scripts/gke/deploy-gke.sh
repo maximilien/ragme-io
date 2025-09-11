@@ -38,7 +38,7 @@ IMAGE_TAG=${IMAGE_TAG:-latest}
 NAMESPACE=${NAMESPACE:-ragme}
 
 # Navigate to project root
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 # Function to show help
 show_help() {
@@ -49,6 +49,8 @@ show_help() {
     echo "Commands:"
     echo "  help      - Show this help message"
     echo "  setup     - Install required dependencies and configure gcloud"
+    echo "  list      - List available GKE clusters"
+    echo "  create    - Create a new GKE cluster"
     echo "  deploy    - Full deployment: build images, push to GCR, deploy services"
     echo "  build     - Build and push container images to GCR"
     echo "  apply     - Apply Kubernetes manifests only"
@@ -93,6 +95,75 @@ check_dependencies() {
     print_status "All dependencies are available"
 }
 
+# Function to list available clusters
+list_clusters() {
+    print_status "Available GKE clusters in project ${PROJECT_ID}:"
+    echo ""
+    
+    local clusters=$(gcloud container clusters list --format="table(name,location,masterVersion,status)" --filter="status:RUNNING")
+    
+    if [ -z "$clusters" ]; then
+        print_warning "No running clusters found in project ${PROJECT_ID}"
+        echo ""
+        print_status "Would you like to create a new cluster? (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            create_cluster
+        else
+            print_error "No cluster available. Exiting."
+            exit 1
+        fi
+    else
+        echo "$clusters"
+        echo ""
+        print_status "Current cluster configuration:"
+        print_status "  CLUSTER_NAME: ${CLUSTER_NAME}"
+        print_status "  ZONE: ${ZONE}"
+        echo ""
+        print_status "To use a different cluster, set CLUSTER_NAME and ZONE environment variables:"
+        print_status "  CLUSTER_NAME=your-cluster-name ZONE=your-zone $0 deploy"
+    fi
+}
+
+# Function to create a new cluster
+create_cluster() {
+    print_status "Creating new GKE cluster..."
+    
+    local cluster_name=${CLUSTER_NAME:-ragme-io}
+    local zone=${ZONE:-us-central1-a}
+    local machine_type=${MACHINE_TYPE:-e2-standard-2}
+    local num_nodes=${NUM_NODES:-2}
+    
+    print_status "Cluster configuration:"
+    print_status "  Name: ${cluster_name}"
+    print_status "  Zone: ${zone}"
+    print_status "  Machine type: ${machine_type}"
+    print_status "  Number of nodes: ${num_nodes}"
+    echo ""
+    
+    print_status "Creating cluster (this may take several minutes)..."
+    
+    gcloud container clusters create ${cluster_name} \
+        --zone=${zone} \
+        --machine-type=${machine_type} \
+        --num-nodes=${num_nodes} \
+        --enable-autoscaling \
+        --min-nodes=1 \
+        --max-nodes=5 \
+        --enable-autorepair \
+        --enable-autoupgrade \
+        --project=${PROJECT_ID}
+    
+    if [ $? -eq 0 ]; then
+        print_status "Cluster created successfully!"
+        print_status "Getting cluster credentials..."
+        gcloud container clusters get-credentials ${cluster_name} --zone=${zone} --project=${PROJECT_ID}
+    else
+        print_error "Failed to create cluster"
+        exit 1
+    fi
+}
+
 # Function to configure gcloud
 configure_gcloud() {
     print_status "Configuring gcloud..."
@@ -113,10 +184,21 @@ configure_gcloud() {
 # Function to get cluster credentials
 get_cluster_credentials() {
     print_status "Getting cluster credentials..."
+    print_status "Cluster: ${CLUSTER_NAME}, Zone: ${ZONE}, Project: ${PROJECT_ID}"
     
-    gcloud container clusters get-credentials ${CLUSTER_NAME} \
+    if ! gcloud container clusters get-credentials ${CLUSTER_NAME} \
         --zone ${ZONE} \
-        --project ${PROJECT_ID}
+        --project ${PROJECT_ID} 2>/dev/null; then
+        
+        print_error "Failed to get credentials for cluster '${CLUSTER_NAME}' in zone '${ZONE}'"
+        print_status "Available clusters:"
+        gcloud container clusters list --format="table(name,location,status)" --filter="status:RUNNING"
+        echo ""
+        print_status "To list all available clusters, run: $0 list"
+        print_status "To create a new cluster, run: $0 create"
+        print_status "To use a different cluster, set CLUSTER_NAME and ZONE environment variables"
+        exit 1
+    fi
     
     print_status "Cluster credentials configured"
 }
@@ -134,8 +216,8 @@ create_namespace() {
 build_and_push_images() {
     print_status "Building and pushing container images..."
     
-    # Build images
-    ./scripts/build-containers.sh
+    # Build images with GCR registry
+    scripts/build-containers.sh --registry ${REGISTRY}
     
     # Tag and push images to GCR
     local images=("ragme-frontend" "ragme-api" "ragme-mcp" "ragme-agent")
@@ -261,7 +343,7 @@ update_manifests() {
             
             # Update image references
             sed "s|localhost/ragme-|${REGISTRY}/ragme-|g" "$manifest" > "$temp_manifest"
-            sed -i "s|:latest|:${IMAGE_TAG}|g" "$temp_manifest"
+            sed "s|:latest|:${IMAGE_TAG}|g" "$temp_manifest" > "${temp_manifest}.tmp" && mv "${temp_manifest}.tmp" "$temp_manifest"
             
             print_status "Updated ${filename}"
         fi
@@ -368,6 +450,14 @@ main() {
         "setup")
             check_dependencies
             configure_gcloud
+            ;;
+        "list")
+            check_dependencies
+            list_clusters
+            ;;
+        "create")
+            check_dependencies
+            create_cluster
             ;;
         "deploy")
             print_header "Starting RAGme GKE deployment"

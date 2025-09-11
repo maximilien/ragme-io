@@ -399,15 +399,35 @@ else
     rm -f config.yaml.processed.bak
 fi
 
-# Set image names based on target
+# Set image names and architecture based on target
 if [ "$TARGET" = "gke" ]; then
-    # For GKE, use GCR registry format
+    # For GKE, use GCR registry format and force no-cache to ensure correct architecture
+    NO_CACHE="--no-cache"
+    # GKE always uses linux/amd64 architecture
+    BUILD_ARCH="amd64"
+    BUILD_OS="linux"
     API_IMAGE="$REGISTRY/ragme-api:$IMAGE_TAG"
     MCP_IMAGE="$REGISTRY/ragme-mcp:$IMAGE_TAG"
     AGENT_IMAGE="$REGISTRY/ragme-agent:$IMAGE_TAG"
     FRONTEND_IMAGE="$REGISTRY/ragme-frontend:$IMAGE_TAG"
 else
-    # For kind/local, use localhost format
+    # For kind/local, use localhost format and detect host architecture
+    BUILD_OS="linux"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS - check if Apple Silicon or Intel
+        if [[ $(uname -m) == "arm64" ]]; then
+            BUILD_ARCH="arm64"
+        else
+            BUILD_ARCH="amd64"
+        fi
+    else
+        # Linux - use host architecture
+        BUILD_ARCH="$(uname -m)"
+        # Convert x86_64 to amd64 for consistency
+        if [ "$BUILD_ARCH" = "x86_64" ]; then
+            BUILD_ARCH="amd64"
+        fi
+    fi
     API_IMAGE="localhost/ragme-api:$IMAGE_TAG"
     MCP_IMAGE="localhost/ragme-mcp:$IMAGE_TAG"
     AGENT_IMAGE="localhost/ragme-agent:$IMAGE_TAG"
@@ -418,6 +438,7 @@ print_status "Building RAGme containers with Podman..."
 print_status "Platform: $PLATFORM"
 print_status "Target: $TARGET"
 print_status "Registry: $REGISTRY"
+print_status "Architecture: $BUILD_OS/$BUILD_ARCH"
 
 # Check disk space before building
 check_disk_space
@@ -425,26 +446,28 @@ check_disk_space
 # Build services based on selection
 if [ -z "$SERVICE" ] || [ "$SERVICE" = "api" ]; then
     print_status "Building API service container..."
-    podman build $NO_CACHE --platform "$PLATFORM" -f deployment/containers/Dockerfile.api -t "$API_IMAGE" .
+    podman build $NO_CACHE --os "$BUILD_OS" --arch "$BUILD_ARCH" --format docker -f deployment/containers/Dockerfile.api -t "$API_IMAGE" .
     check_disk_space
 fi
 
 if [ -z "$SERVICE" ] || [ "$SERVICE" = "mcp" ]; then
     print_status "Building MCP service container..."
-    podman build $NO_CACHE --platform "$PLATFORM" -f deployment/containers/Dockerfile.mcp -t "$MCP_IMAGE" .
+    podman build $NO_CACHE --os "$BUILD_OS" --arch "$BUILD_ARCH" --format docker -f deployment/containers/Dockerfile.mcp -t "$MCP_IMAGE" .
     check_disk_space
 fi
 
 if [ -z "$SERVICE" ] || [ "$SERVICE" = "agent" ]; then
     print_status "Building Agent service container..."
-    podman build $NO_CACHE --platform "$PLATFORM" -f deployment/containers/Dockerfile.agent -t "$AGENT_IMAGE" .
+    podman build $NO_CACHE --os "$BUILD_OS" --arch "$BUILD_ARCH" --format docker -f deployment/containers/Dockerfile.agent -t "$AGENT_IMAGE" .
     check_disk_space
 fi
 
 if [ -z "$SERVICE" ] || [ "$SERVICE" = "frontend" ]; then
     print_status "Building Frontend service container..."
     podman build $NO_CACHE \
-      --platform "$PLATFORM" \
+      --os "$BUILD_OS" \
+      --arch "$BUILD_ARCH" \
+      --format docker \
       --build-arg RAGME_API_URL="$RAGME_API_URL" \
       --build-arg RAGME_MCP_URL="$RAGME_MCP_URL" \
       --build-arg RAGME_UI_URL="$RAGME_UI_URL" \
