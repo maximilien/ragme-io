@@ -38,7 +38,7 @@ IMAGE_TAG=${IMAGE_TAG:-latest}
 NAMESPACE=${NAMESPACE:-ragme}
 
 # Navigate to project root
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 # Function to show help
 show_help() {
@@ -49,10 +49,13 @@ show_help() {
     echo "Commands:"
     echo "  help      - Show this help message"
     echo "  setup     - Install required dependencies and configure gcloud"
+    echo "  list      - List available GKE clusters"
+    echo "  create    - Create a new GKE cluster"
     echo "  deploy    - Full deployment: build images, push to GCR, deploy services"
     echo "  build     - Build and push container images to GCR"
     echo "  apply     - Apply Kubernetes manifests only"
     echo "  destroy   - Delete all resources from GKE cluster"
+    echo "  cleanup-secrets - Clean up secrets from configmap-gke.yaml file"
     echo "  status    - Show deployment status"
     echo "  logs      - Show logs from all services"
     echo ""
@@ -93,6 +96,75 @@ check_dependencies() {
     print_status "All dependencies are available"
 }
 
+# Function to list available clusters
+list_clusters() {
+    print_status "Available GKE clusters in project ${PROJECT_ID}:"
+    echo ""
+    
+    local clusters=$(gcloud container clusters list --format="table(name,location,masterVersion,status)" --filter="status:RUNNING")
+    
+    if [ -z "$clusters" ]; then
+        print_warning "No running clusters found in project ${PROJECT_ID}"
+        echo ""
+        print_status "Would you like to create a new cluster? (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            create_cluster
+        else
+            print_error "No cluster available. Exiting."
+            exit 1
+        fi
+    else
+        echo "$clusters"
+        echo ""
+        print_status "Current cluster configuration:"
+        print_status "  CLUSTER_NAME: ${CLUSTER_NAME}"
+        print_status "  ZONE: ${ZONE}"
+        echo ""
+        print_status "To use a different cluster, set CLUSTER_NAME and ZONE environment variables:"
+        print_status "  CLUSTER_NAME=your-cluster-name ZONE=your-zone $0 deploy"
+    fi
+}
+
+# Function to create a new cluster
+create_cluster() {
+    print_status "Creating new GKE cluster..."
+    
+    local cluster_name=${CLUSTER_NAME:-ragme-io}
+    local zone=${ZONE:-us-central1-a}
+    local machine_type=${MACHINE_TYPE:-e2-standard-2}
+    local num_nodes=${NUM_NODES:-2}
+    
+    print_status "Cluster configuration:"
+    print_status "  Name: ${cluster_name}"
+    print_status "  Zone: ${zone}"
+    print_status "  Machine type: ${machine_type}"
+    print_status "  Number of nodes: ${num_nodes}"
+    echo ""
+    
+    print_status "Creating cluster (this may take several minutes)..."
+    
+    gcloud container clusters create ${cluster_name} \
+        --zone=${zone} \
+        --machine-type=${machine_type} \
+        --num-nodes=${num_nodes} \
+        --enable-autoscaling \
+        --min-nodes=1 \
+        --max-nodes=5 \
+        --enable-autorepair \
+        --enable-autoupgrade \
+        --project=${PROJECT_ID}
+    
+    if [ $? -eq 0 ]; then
+        print_status "Cluster created successfully!"
+        print_status "Getting cluster credentials..."
+        gcloud container clusters get-credentials ${cluster_name} --zone=${zone} --project=${PROJECT_ID}
+    else
+        print_error "Failed to create cluster"
+        exit 1
+    fi
+}
+
 # Function to configure gcloud
 configure_gcloud() {
     print_status "Configuring gcloud..."
@@ -113,10 +185,21 @@ configure_gcloud() {
 # Function to get cluster credentials
 get_cluster_credentials() {
     print_status "Getting cluster credentials..."
+    print_status "Cluster: ${CLUSTER_NAME}, Zone: ${ZONE}, Project: ${PROJECT_ID}"
     
-    gcloud container clusters get-credentials ${CLUSTER_NAME} \
+    if ! gcloud container clusters get-credentials ${CLUSTER_NAME} \
         --zone ${ZONE} \
-        --project ${PROJECT_ID}
+        --project ${PROJECT_ID} 2>/dev/null; then
+        
+        print_error "Failed to get credentials for cluster '${CLUSTER_NAME}' in zone '${ZONE}'"
+        print_status "Available clusters:"
+        gcloud container clusters list --format="table(name,location,status)" --filter="status:RUNNING"
+        echo ""
+        print_status "To list all available clusters, run: $0 list"
+        print_status "To create a new cluster, run: $0 create"
+        print_status "To use a different cluster, set CLUSTER_NAME and ZONE environment variables"
+        exit 1
+    fi
     
     print_status "Cluster credentials configured"
 }
@@ -134,8 +217,8 @@ create_namespace() {
 build_and_push_images() {
     print_status "Building and pushing container images..."
     
-    # Build images
-    ./scripts/build-containers.sh
+    # Build images with GCR registry
+    scripts/build-containers.sh --registry ${REGISTRY}
     
     # Tag and push images to GCR
     local images=("ragme-frontend" "ragme-api" "ragme-mcp" "ragme-agent")
@@ -143,10 +226,8 @@ build_and_push_images() {
     for image in "${images[@]}"; do
         print_status "Tagging and pushing ${image}..."
         
-        # Tag for GCR
-        podman tag localhost/${image}:${IMAGE_TAG} ${REGISTRY}/${image}:${IMAGE_TAG}
-        
-        # Push to GCR
+        # For GKE, images are already built with GCR registry format
+        # Just push the existing GCR image
         podman push ${REGISTRY}/${image}:${IMAGE_TAG}
         
         print_status "${image} pushed successfully"
@@ -159,6 +240,20 @@ build_and_push_images() {
 create_config() {
     print_status "Creating ConfigMap and Secrets..."
     
+    # Get external LoadBalancer IP for OAuth redirect URIs
+    local external_ip=""
+    if kubectl get service -n ${NAMESPACE} ragme-frontend-lb >/dev/null 2>&1; then
+        external_ip=$(kubectl get service -n ${NAMESPACE} ragme-frontend-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+    fi
+    
+    # Fallback to localhost if no external IP found
+    if [ -z "$external_ip" ]; then
+        external_ip="localhost"
+        print_warning "No external LoadBalancer IP found, using localhost for OAuth redirect URIs"
+    else
+        print_status "Using external IP $external_ip for OAuth redirect URIs"
+    fi
+    
     # Check if .env file exists
     if [ ! -f "../.env" ]; then
         print_error ".env file not found. Please create it from .env.example"
@@ -170,6 +265,121 @@ create_config() {
         print_error "config.yaml file not found. Please create it from config.yaml.example"
         exit 1
     fi
+    
+    # Read vector database configuration from .env file
+    local vector_db_type="weaviate-local"
+    local vector_db_text_collection="ragme-text-collection"
+    local vector_db_image_collection="ragme-image-collection"
+    local weaviate_url="your-weaviate-url-here"
+    local weaviate_api_key="your-weaviate-api-key-here"
+    local openai_api_key="your-openai-api-key-here"
+    
+    # OAuth configuration defaults
+    local google_oauth_client_id="your-google-oauth-client-id"
+    local google_oauth_client_secret="your-google-oauth-client-secret"
+    local github_oauth_client_id="your-github-oauth-client-id"
+    local github_oauth_client_secret="your-github-oauth-client-secret"
+    local apple_oauth_client_id="your-apple-oauth-client-id"
+    local apple_oauth_client_secret="your-apple-oauth-client-secret"
+    
+    if grep -q "^VECTOR_DB_TYPE=" ../.env; then
+        vector_db_type=$(grep "^VECTOR_DB_TYPE=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^VECTOR_DB_TEXT_COLLECTION_NAME=" ../.env; then
+        vector_db_text_collection=$(grep "^VECTOR_DB_TEXT_COLLECTION_NAME=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^VECTOR_DB_IMAGE_COLLECTION_NAME=" ../.env; then
+        vector_db_image_collection=$(grep "^VECTOR_DB_IMAGE_COLLECTION_NAME=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^WEAVIATE_URL=" ../.env; then
+        weaviate_url=$(grep "^WEAVIATE_URL=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^WEAVIATE_API_KEY=" ../.env; then
+        weaviate_api_key=$(grep "^WEAVIATE_API_KEY=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^OPENAI_API_KEY=" ../.env; then
+        openai_api_key=$(grep "^OPENAI_API_KEY=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    # Read OAuth configuration from .env file
+    if grep -q "^GOOGLE_OAUTH_CLIENT_ID=" ../.env; then
+        google_oauth_client_id=$(grep "^GOOGLE_OAUTH_CLIENT_ID=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^GOOGLE_OAUTH_CLIENT_SECRET=" ../.env; then
+        google_oauth_client_secret=$(grep "^GOOGLE_OAUTH_CLIENT_SECRET=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^GITHUB_OAUTH_CLIENT_ID=" ../.env; then
+        github_oauth_client_id=$(grep "^GITHUB_OAUTH_CLIENT_ID=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^GITHUB_OAUTH_CLIENT_SECRET=" ../.env; then
+        github_oauth_client_secret=$(grep "^GITHUB_OAUTH_CLIENT_SECRET=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^APPLE_OAUTH_CLIENT_ID=" ../.env; then
+        apple_oauth_client_id=$(grep "^APPLE_OAUTH_CLIENT_ID=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    if grep -q "^APPLE_OAUTH_CLIENT_SECRET=" ../.env; then
+        apple_oauth_client_secret=$(grep "^APPLE_OAUTH_CLIENT_SECRET=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    print_status "Using vector database configuration from .env:"
+    print_status "  VECTOR_DB_TYPE: $vector_db_type"
+    print_status "  VECTOR_DB_TEXT_COLLECTION_NAME: $vector_db_text_collection"
+    print_status "  VECTOR_DB_IMAGE_COLLECTION_NAME: $vector_db_image_collection"
+    print_status "  WEAVIATE_URL: $weaviate_url"
+    print_status "  WEAVIATE_API_KEY: [REDACTED]"
+    print_status "  OPENAI_API_KEY: [REDACTED]"
+    print_status "Using OAuth configuration from .env:"
+    print_status "  GOOGLE_OAUTH_CLIENT_ID: $google_oauth_client_id"
+    print_status "  GOOGLE_OAUTH_CLIENT_SECRET: [REDACTED]"
+    print_status "  GITHUB_OAUTH_CLIENT_ID: $github_oauth_client_id"
+    print_status "  GITHUB_OAUTH_CLIENT_SECRET: [REDACTED]"
+    print_status "  APPLE_OAUTH_CLIENT_ID: $apple_oauth_client_id"
+    print_status "  APPLE_OAUTH_CLIENT_SECRET: [REDACTED]"
+    
+    # Update the static configmap-gke.yaml file with values from .env
+    print_status "Updating static configmap-gke.yaml with .env values..."
+    local configmap_file="gke/k8s/configmap-gke.yaml"
+    
+    # Update VECTOR_DB_TYPE
+    sed -i.bak "s/VECTOR_DB_TYPE: \".*\"/VECTOR_DB_TYPE: \"$vector_db_type\"/" "$configmap_file"
+    
+    # Update VECTOR_DB_TEXT_COLLECTION_NAME
+    sed -i.bak "s/VECTOR_DB_TEXT_COLLECTION_NAME: \".*\"/VECTOR_DB_TEXT_COLLECTION_NAME: \"$vector_db_text_collection\"/" "$configmap_file"
+    
+    # Update VECTOR_DB_IMAGE_COLLECTION_NAME
+    sed -i.bak "s/VECTOR_DB_IMAGE_COLLECTION_NAME: \".*\"/VECTOR_DB_IMAGE_COLLECTION_NAME: \"$vector_db_image_collection\"/" "$configmap_file"
+    
+    # Update WEAVIATE_URL
+    sed -i.bak "s/WEAVIATE_URL: \".*\"/WEAVIATE_URL: \"$weaviate_url\"/" "$configmap_file"
+    
+    # Update WEAVIATE_API_KEY
+    sed -i.bak "s/WEAVIATE_API_KEY: \".*\"/WEAVIATE_API_KEY: \"$weaviate_api_key\"/" "$configmap_file"
+    
+    # Update OPENAI_API_KEY
+    sed -i.bak "s/OPENAI_API_KEY: \".*\"/OPENAI_API_KEY: \"$openai_api_key\"/" "$configmap_file"
+    
+    # Update OAuth configuration
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_ID: \".*\"/GOOGLE_OAUTH_CLIENT_ID: \"$google_oauth_client_id\"/" "$configmap_file"
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_SECRET: \".*\"/GOOGLE_OAUTH_CLIENT_SECRET: \"$google_oauth_client_secret\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_ID: \".*\"/GITHUB_OAUTH_CLIENT_ID: \"$github_oauth_client_id\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_SECRET: \".*\"/GITHUB_OAUTH_CLIENT_SECRET: \"$github_oauth_client_secret\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_ID: \".*\"/APPLE_OAUTH_CLIENT_ID: \"$apple_oauth_client_id\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_SECRET: \".*\"/APPLE_OAUTH_CLIENT_SECRET: \"$apple_oauth_client_secret\"/" "$configmap_file"
+    
+    # Clean up backup files
+    rm -f "$configmap_file.bak"
+    
+    print_status "Updated $configmap_file with .env values"
     
     # Create temporary ConfigMap file with individual keys
     local temp_configmap="/tmp/ragme-configmap-gke.yaml"
@@ -190,17 +400,17 @@ data:
   RAGME_UI_URL: "http://ragme-frontend:8020"
   
   # Vector Database Configuration
-  VECTOR_DB_TYPE: "weaviate-local"
-  VECTOR_DB_TEXT_COLLECTION_NAME: "ragme-text-collection"
-  VECTOR_DB_IMAGE_COLLECTION_NAME: "ragme-image-collection"
+  VECTOR_DB_TYPE: "${vector_db_type}"
+  VECTOR_DB_TEXT_COLLECTION_NAME: "${vector_db_text_collection}"
+  VECTOR_DB_IMAGE_COLLECTION_NAME: "${vector_db_image_collection}"
   
   # MinIO Configuration
   MINIO_ENDPOINT: "ragme-minio:9000"
   
-  # OAuth Redirect URIs
-  GOOGLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/google/callback"
-  GITHUB_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/github/callback"
-  APPLE_OAUTH_REDIRECT_URI: "http://localhost:8021/auth/apple/callback"
+  # OAuth Redirect URIs (external LoadBalancer IP)
+  GOOGLE_OAUTH_REDIRECT_URI: "http://${external_ip}/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://${external_ip}/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://${external_ip}/auth/apple/callback"
 EOF
     
     # Apply ConfigMap
@@ -261,7 +471,7 @@ update_manifests() {
             
             # Update image references
             sed "s|localhost/ragme-|${REGISTRY}/ragme-|g" "$manifest" > "$temp_manifest"
-            sed -i "s|:latest|:${IMAGE_TAG}|g" "$temp_manifest"
+            sed "s|:latest|:${IMAGE_TAG}|g" "$temp_manifest" > "${temp_manifest}.tmp" && mv "${temp_manifest}.tmp" "$temp_manifest"
             
             print_status "Updated ${filename}"
         fi
@@ -359,6 +569,37 @@ destroy_deployment() {
     fi
 }
 
+# Cleanup secrets from configmap file
+cleanup_secrets() {
+    print_header "Cleaning up secrets from configmap-gke.yaml"
+    
+    local configmap_file="gke/k8s/configmap-gke.yaml"
+    
+    if [[ ! -f "$configmap_file" ]]; then
+        print_error "ConfigMap file not found: $configmap_file"
+        exit 1
+    fi
+    
+    print_status "Restoring placeholder values in $configmap_file..."
+    
+    # Restore placeholder values for all secrets
+    sed -i.bak "s/WEAVIATE_API_KEY: \".*\"/WEAVIATE_API_KEY: \"your-weaviate-api-key-here\"/" "$configmap_file"
+    sed -i.bak "s/WEAVIATE_URL: \".*\"/WEAVIATE_URL: \"your-weaviate-url-here\"/" "$configmap_file"
+    sed -i.bak "s/OPENAI_API_KEY: \".*\"/OPENAI_API_KEY: \"your-openai-api-key-here\"/" "$configmap_file"
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_ID: \".*\"/GOOGLE_OAUTH_CLIENT_ID: \"your-google-oauth-client-id\"/" "$configmap_file"
+    sed -i.bak "s/GOOGLE_OAUTH_CLIENT_SECRET: \".*\"/GOOGLE_OAUTH_CLIENT_SECRET: \"your-google-oauth-client-secret\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_ID: \".*\"/GITHUB_OAUTH_CLIENT_ID: \"your-github-oauth-client-id\"/" "$configmap_file"
+    sed -i.bak "s/GITHUB_OAUTH_CLIENT_SECRET: \".*\"/GITHUB_OAUTH_CLIENT_SECRET: \"your-github-oauth-client-secret\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_ID: \".*\"/APPLE_OAUTH_CLIENT_ID: \"your-apple-oauth-client-id\"/" "$configmap_file"
+    sed -i.bak "s/APPLE_OAUTH_CLIENT_SECRET: \".*\"/APPLE_OAUTH_CLIENT_SECRET: \"your-apple-oauth-client-secret\"/" "$configmap_file"
+    
+    # Remove backup file
+    rm -f "$configmap_file.bak"
+    
+    print_status "Secrets cleaned up from $configmap_file"
+    print_status "File is now safe to commit to repository"
+}
+
 # Main script logic
 main() {
     case "${1:-deploy}" in
@@ -368,6 +609,14 @@ main() {
         "setup")
             check_dependencies
             configure_gcloud
+            ;;
+        "list")
+            check_dependencies
+            list_clusters
+            ;;
+        "create")
+            check_dependencies
+            create_cluster
             ;;
         "deploy")
             print_header "Starting RAGme GKE deployment"
@@ -414,6 +663,9 @@ main() {
             ;;
         "destroy")
             destroy_deployment
+            ;;
+        "cleanup-secrets")
+            cleanup_secrets
             ;;
         *)
             print_error "Unknown command: $1"
