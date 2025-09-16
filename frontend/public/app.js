@@ -202,11 +202,17 @@ class RAGmeAssistant {
     }
 
     updateApiConfig() {
-        // For WebSocket connections, always use the frontend server's URL (current page URL)
-        // This ensures the browser can resolve the hostname correctly
-        const frontendUrl = window.location.origin;
-        this.apiConfig.baseUrl = frontendUrl;
-        console.log('API base URL set to frontend server URL for WebSocket connections:', this.apiConfig.baseUrl);
+        // Use the API URL from configuration for both WebSocket and HTTP connections
+        // This ensures proper connectivity in Kubernetes deployments
+        if (this.config && this.config.api_url) {
+            this.apiConfig.baseUrl = this.config.api_url;
+            console.log('API base URL set from configuration:', this.apiConfig.baseUrl);
+        } else {
+            // Fallback to frontend server URL for local development
+            const frontendUrl = window.location.origin;
+            this.apiConfig.baseUrl = frontendUrl;
+            console.log('API base URL set to frontend server URL (fallback):', this.apiConfig.baseUrl);
+        }
         
         // Store the internal API URL for HTTP requests (if needed)
         if (this.config && this.config.api_url) {
