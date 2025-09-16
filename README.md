@@ -25,6 +25,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 
 ### ✨ Recent Features (Last 2 Weeks)
 
+- **🚀 Document Processing Pipeline**: Complete batch document processing system for processing collections of PDFs, DOCX files, and images into RAGme vector database. Features parallel processing, intelligent text chunking, PDF image extraction, comprehensive image analysis (EXIF, AI classification, OCR), robust error handling with retry logic, progress tracking, and detailed reporting (CSV summaries + individual .processed files). Run with `./tools/data_processing.sh /path/to/documents --verbose`! [📖 Full Documentation](docs/DATA_PROCESSING_PIPELINE.md) ⭐ **NEW!**
 - **🔧 Document Grouping Bug Fix**: Fixed critical KeyError 'chunks' bug in document grouping logic that was causing 500 errors in the /list-content API endpoint. The issue occurred when processing mixed chunked/non-chunked documents during Weaviate API migration. Added defensive programming to ensure 'chunks' key exists before accessing it, resolving frontend document display issues! ⭐ **FIXED!**
 - **🔐 OAuth Authentication System**: Complete OAuth authentication system with support for Google, GitHub, and Apple providers. Features include beautiful login modal, JWT-based session management, secure cookie storage, user management, and development bypass mode. All authentication flows are properly implemented with comprehensive error handling and mobile-responsive design! ⭐ **NEW!**
 - **🌍 Internationalization (i18n) Support**: Comprehensive internationalization support ensuring LLM agents respond consistently in the configured language. Features automatic system language detection, 80+ language support, and frontend speech recognition integration. All system prompts now include language specification to prevent mixed-language responses! ⭐ **NEW!**
@@ -48,6 +49,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **[📖 User Guide](docs/USER_GUIDE.md)** - Complete user guide with installation, configuration, and usage
 - **[🎛️ Configuration Reference](docs/CONFIGURATION.md)** - Detailed configuration options and examples
 - **[🏗️ Architecture Guide](docs/ARCHITECTURE.md)** - System architecture, three-agent system, and technical design
+- **[🚀 Data Processing Pipeline](docs/DATA_PROCESSING_PIPELINE.md)** - Batch document processing system with parallel processing and comprehensive reporting
 - **[🛠️ Development Guide](docs/DEVELOPMENT.md)** - Development setup, testing, and contribution guidelines
 - **[🔧 Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues, solutions, and debugging techniques
 - **[📖 Documentation Index](docs/README.md)** - Documentation overview and navigation
