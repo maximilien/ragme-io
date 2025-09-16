@@ -37,6 +37,13 @@ REGISTRY=${REGISTRY:-gcr.io/${PROJECT_ID}}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 NAMESPACE=${NAMESPACE:-ragme}
 
+# Detect if this is a test deployment
+IS_TEST_DEPLOYMENT=false
+if [[ "${NAMESPACE}" == *"test"* ]] || [[ "${CLUSTER_NAME}" == *"test"* ]] || [[ "${IMAGE_TAG}" == "test" ]]; then
+    IS_TEST_DEPLOYMENT=true
+    print_status "Detected test deployment configuration"
+fi
+
 # Navigate to project root
 cd "$(dirname "$0")/../.."
 
@@ -134,12 +141,16 @@ create_cluster() {
     local zone=${ZONE:-us-central1-a}
     local machine_type=${MACHINE_TYPE:-e2-standard-2}
     local num_nodes=${NUM_NODES:-2}
+    local disk_size=${DISK_SIZE:-50}
+    local disk_type=${DISK_TYPE:-pd-standard}
     
     print_status "Cluster configuration:"
     print_status "  Name: ${cluster_name}"
     print_status "  Zone: ${zone}"
     print_status "  Machine type: ${machine_type}"
     print_status "  Number of nodes: ${num_nodes}"
+    print_status "  Disk size: ${disk_size}GB"
+    print_status "  Disk type: ${disk_type}"
     echo ""
     
     print_status "Creating cluster (this may take several minutes)..."
@@ -148,6 +159,8 @@ create_cluster() {
         --zone=${zone} \
         --machine-type=${machine_type} \
         --num-nodes=${num_nodes} \
+        --disk-size=${disk_size} \
+        --disk-type=${disk_type} \
         --enable-autoscaling \
         --min-nodes=1 \
         --max-nodes=5 \
@@ -226,11 +239,14 @@ build_and_push_images() {
     for image in "${images[@]}"; do
         print_status "Tagging and pushing ${image}..."
         
-        # For GKE, images are already built with GCR registry format
-        # Just push the existing GCR image
+        # Tag with the specified image tag (test or latest)
+        podman tag ${REGISTRY}/${image}:latest ${REGISTRY}/${image}:${IMAGE_TAG}
+        
+        # Push both latest and the specified tag
+        podman push ${REGISTRY}/${image}:latest
         podman push ${REGISTRY}/${image}:${IMAGE_TAG}
         
-        print_status "${image} pushed successfully"
+        print_status "${image} pushed successfully with tag ${IMAGE_TAG}"
     done
     
     print_status "All images built and pushed to GCR"
@@ -242,8 +258,13 @@ create_config() {
     
     # Get external LoadBalancer IP for OAuth redirect URIs
     local external_ip=""
-    if kubectl get service -n ${NAMESPACE} ragme-frontend-lb >/dev/null 2>&1; then
-        external_ip=$(kubectl get service -n ${NAMESPACE} ragme-frontend-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+    local service_name="ragme-frontend-lb"
+    if [ "$IS_TEST_DEPLOYMENT" = true ]; then
+        service_name="test-ragme-frontend-lb"
+    fi
+    
+    if kubectl get service -n ${NAMESPACE} ${service_name} >/dev/null 2>&1; then
+        external_ip=$(kubectl get service -n ${NAMESPACE} ${service_name} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
     fi
     
     # Fallback to localhost if no external IP found
@@ -292,6 +313,13 @@ create_config() {
     
     if grep -q "^VECTOR_DB_IMAGE_COLLECTION_NAME=" ../.env; then
         vector_db_image_collection=$(grep "^VECTOR_DB_IMAGE_COLLECTION_NAME=" ../.env | cut -d'=' -f2 | tr -d '"')
+    fi
+    
+    # Add test suffix for test deployments
+    if [ "$IS_TEST_DEPLOYMENT" = true ]; then
+        vector_db_text_collection="${vector_db_text_collection}-test"
+        vector_db_image_collection="${vector_db_image_collection}-test"
+        print_status "Added test suffix to collection names for test deployment"
     fi
     
     if grep -q "^WEAVIATE_URL=" ../.env; then
@@ -485,8 +513,18 @@ update_manifests() {
 apply_manifests() {
     print_status "Applying Kubernetes manifests using GKE-specific kustomization..."
     
-    # Apply using kustomization for GKE
-    kubectl apply -k gke/k8s/
+    # Use test-specific kustomization for test deployments
+    if [ "$IS_TEST_DEPLOYMENT" = true ]; then
+        print_status "Using test-specific kustomization..."
+        # Create a temporary kustomization file for test deployment
+        cp gke/k8s/kustomization-test.yaml gke/k8s/kustomization.yaml
+        kubectl apply -k gke/k8s/
+        # Restore original kustomization
+        cp gke/k8s/kustomization-gke.yaml gke/k8s/kustomization.yaml
+    else
+        print_status "Using production kustomization..."
+        kubectl apply -k gke/k8s/
+    fi
     
     # Clean up temp directory
     if [ -d "/tmp/ragme-manifests-gke" ]; then
@@ -502,6 +540,11 @@ wait_for_deployments() {
     print_status "Waiting for deployments to be ready..."
     
     local deployments=("ragme-weaviate" "ragme-minio" "ragme-api" "ragme-mcp" "ragme-agent" "ragme-frontend")
+    
+    # Add test prefix for test deployments
+    if [ "$IS_TEST_DEPLOYMENT" = true ]; then
+        deployments=("test-ragme-weaviate" "test-ragme-minio" "test-ragme-api" "test-ragme-mcp" "test-ragme-agent" "test-ragme-frontend")
+    fi
     
     for deployment in "${deployments[@]}"; do
         print_status "Waiting for ${deployment}..."

@@ -35,9 +35,9 @@ data:
   MINIO_LOCAL_PATH: "/app/minio_data"
   
   # OAuth Configuration (external URLs for GKE)
-  GOOGLE_OAUTH_REDIRECT_URI: "http://34.59.22.209/auth/google/callback"
-  GITHUB_OAUTH_REDIRECT_URI: "http://34.59.22.209/auth/github/callback"
-  APPLE_OAUTH_REDIRECT_URI: "http://34.59.22.209/auth/apple/callback"
+  GOOGLE_OAUTH_REDIRECT_URI: "http://your-external-ip/auth/google/callback"
+  GITHUB_OAUTH_REDIRECT_URI: "http://your-external-ip/auth/github/callback"
+  APPLE_OAUTH_REDIRECT_URI: "http://your-external-ip/auth/apple/callback"
 
 ---
 apiVersion: v1
@@ -50,11 +50,11 @@ metadata:
 type: Opaque
 stringData:
   # Required secrets - update these values
-  OPENAI_API_KEY: "your-openai-api-key-here"
+  OPENAI_API_KEY: "your-openai-api-key"
   
   # Optional secrets for external services
-  WEAVIATE_API_KEY: "your-weaviate-api-key-here"
-  WEAVIATE_URL: "your-weaviate-url-here"
+  WEAVIATE_API_KEY: "your-weaviate-api-key"
+  WEAVIATE_URL: "your-weaviate-url"
   MILVUS_URI: "your-milvus-uri"
   MILVUS_TOKEN: "your-milvus-token"
   

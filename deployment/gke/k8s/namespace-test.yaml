@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ragme-test
+  labels:
+    app: ragme
+    environment: test
+    version: v1
