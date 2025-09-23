@@ -181,6 +181,12 @@ check_prerequisites() {
     
     # Test Python import
     cd "$PROJECT_ROOT"
+    
+    # Activate virtual environment if it exists
+    if [[ -f "$PROJECT_ROOT/.venv/bin/activate" ]]; then
+        source "$PROJECT_ROOT/.venv/bin/activate"
+    fi
+    
     if ! python -c "from src.ragme.data_processing import DocumentProcessingPipeline" 2>/dev/null; then
         print_color $RED "❌ Error: Cannot import RAGme data processing pipeline."
         print_color $RED "   Make sure all dependencies are installed: pip install -r requirements.txt"
@@ -207,6 +213,19 @@ run_pipeline() {
     # Change to project root
     cd "$PROJECT_ROOT"
     
+    # Activate virtual environment if it exists
+    if [[ -f "$PROJECT_ROOT/.venv/bin/activate" ]]; then
+        source "$PROJECT_ROOT/.venv/bin/activate"
+    fi
+    
+    # Convert verbose to Python boolean
+    local python_verbose
+    if [[ "$verbose" == "true" ]]; then
+        python_verbose="True"
+    else
+        python_verbose="False"
+    fi
+    
     # Create Python script to run the pipeline
     local python_script=$(cat << EOF
 import sys
@@ -221,7 +240,7 @@ def main():
             input_directory="$directory",
             batch_size=$batch_size,
             retry_limit=$retry_limit,
-            verbose=$verbose
+            verbose=$python_verbose
         ) as pipeline:
             stats = pipeline.run()
             
