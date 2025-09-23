@@ -31,7 +31,7 @@ def create_vector_database(
         db_type = os.getenv("VECTOR_DB_TYPE")
         if db_type is None:
             # Use default from config
-            db_type = config.get("vector_databases.default", "weaviate-local")
+            db_type = config.get("databases.default", "weaviate-local")
             # If config returns the unsubstituted placeholder, use fallback
             if db_type == "${VECTOR_DB_TYPE}":
                 db_type = "weaviate-local"
@@ -71,11 +71,11 @@ def create_vector_database(
 
     db_type_normalized = db_config.get("type", db_type).lower()
 
-    if db_type_normalized == "weaviate":
+    if db_type_normalized in ["weaviate", "weaviate-cloud"]:
         return _create_weaviate_cloud(db_config, collections)
     elif db_type_normalized == "weaviate-local":
         return _create_weaviate_local(db_config, collections)
-    elif db_type_normalized == "milvus":
+    elif db_type_normalized in ["milvus", "milvus-local", "milvus-cloud"]:
         return _create_milvus(db_config, collections)
     else:
         raise ValueError(f"Unsupported vector database type: {db_type_normalized}")

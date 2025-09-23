@@ -192,9 +192,9 @@ class ConfigManager:
             Database configuration dictionary or None if not found
         """
         if db_name is None:
-            db_name = self.get("vector_databases.default")
+            db_name = self.get("databases.default")
 
-        databases = self.get("vector_databases.databases", [])
+        databases = self.get("databases.vector_databases", [])
 
         # Handle case where databases is not a list
         if not isinstance(databases, list):

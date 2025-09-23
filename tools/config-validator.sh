@@ -144,7 +144,7 @@ except Exception as e:
 
 # Required sections
 required_sections = [
-    'application', 'network', 'vector_databases', 'agents',
+    'application', 'network', 'databases', 'agents',
     'mcp_servers', 'frontend', 'features', 'environment'
 ]
 
@@ -189,40 +189,56 @@ if 'network' in config:
         else:
             print_success(f"network.{service}.port: {service_config['port']}")
 
-# Validate vector_databases section
-if 'vector_databases' in config:
-    vdb = config['vector_databases']
+# Validate databases section
+if 'databases' in config:
+    databases = config['databases']
     
-    print("\nValidating vector_databases section...")
-    if 'default' not in vdb:
-        print_error("Missing vector_databases.default")
-    elif not isinstance(vdb['default'], str):
-        print_error("vector_databases.default must be a string")
-    
-    if 'databases' not in vdb:
-        print_error("Missing vector_databases.databases")
-    elif not isinstance(vdb['databases'], list):
-        print_error("vector_databases.databases must be a list")
-    elif len(vdb['databases']) == 0:
-        print_error("vector_databases.databases cannot be empty")
+    print("\nValidating databases section...")
+    if 'default' not in databases:
+        print_error("Missing databases.default")
+    elif not isinstance(databases['default'], str):
+        print_error("databases.default must be a string")
     else:
-        print_success(f"Found {len(vdb['databases'])} database configurations")
+        print_success(f"Default database: {databases['default']}")
+    
+    if 'vector_databases' not in databases:
+        print_error("Missing databases.vector_databases")
+    elif not isinstance(databases['vector_databases'], list):
+        print_error("databases.vector_databases must be a list")
+    elif len(databases['vector_databases']) == 0:
+        print_error("databases.vector_databases cannot be empty")
+    else:
+        print_success(f"Found {len(databases['vector_databases'])} database configurations")
         
         # Check if default database exists in list
-        default_db = vdb.get('default')
-        db_names = [db.get('name') for db in vdb['databases'] if isinstance(db, dict)]
+        default_db = databases.get('default')
+        db_names = [db.get('name') for db in databases['vector_databases'] if isinstance(db, dict)]
         
-        if default_db and default_db not in db_names:
-            print_error(f"Default database '{default_db}' not found in databases list")
-        elif default_db:
-            print_success(f"Default database '{default_db}' found in databases list")
+        if default_db:
+            # Handle environment variable references
+            if default_db.startswith('${') and default_db.endswith('}'):
+                # Extract the default value from env var syntax like ${VAR:-default}
+                import re
+                match = re.search(r':-(.+?)}', default_db)
+                if match:
+                    resolved_default = match.group(1)
+                    if resolved_default in db_names:
+                        print_success(f"Default database resolves to '{resolved_default}' and exists in databases list")
+                    else:
+                        print_error(f"Default database resolves to '{resolved_default}' but not found in databases list")
+                else:
+                    print_warning(f"Default database uses environment variable '{default_db}' - cannot validate without resolution")
+            elif default_db in db_names:
+                print_success(f"Default database '{default_db}' found in databases list")
+            else:
+                print_error(f"Default database '{default_db}' not found in databases list")
         
         # Validate each database configuration
-        for i, db in enumerate(vdb['databases']):
+        for i, db in enumerate(databases['vector_databases']):
             if not isinstance(db, dict):
                 print_error(f"Database {i} must be a dictionary")
                 continue
-                
+            
             # Base required fields
             required_db_fields = ['name', 'type']
             for field in required_db_fields:
@@ -809,10 +825,10 @@ app_name = config.get('application', {}).get('name', 'Unknown')
 app_version = config.get('application', {}).get('version', 'Unknown')
 print(f"  Application: {app_name} v{app_version}")
 
-if 'vector_databases' in config:
-    vdb = config['vector_databases']
-    db_count = len(vdb.get('databases', []))
-    default_db = vdb.get('default', 'None')
+if 'databases' in config:
+    databases = config['databases']
+    db_count = len(databases.get('vector_databases', []))
+    default_db = databases.get('default', 'None')
     print(f"  Vector Databases: {db_count} configured, default: {default_db}")
 
 try:

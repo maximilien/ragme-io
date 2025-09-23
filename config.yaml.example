@@ -86,13 +86,13 @@ authentication:
     httponly: true
     samesite: "lax"
 
-# Vector Database Configuration
-vector_databases:
+# Databases Configuration
+databases:
   # Default vector database to use (can be overridden by VECTOR_DB_TYPE environment variable)
-  default: "weaviate-cloud"
+  default: "${VECTOR_DB_TYPE:-weaviate-cloud}"
   
   # Available vector database configurations
-  databases:
+  vector_databases:
     - name: "weaviate-local"
       type: "weaviate-local"
       url: "http://localhost:8080"
