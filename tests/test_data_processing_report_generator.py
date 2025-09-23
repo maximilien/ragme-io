@@ -17,28 +17,29 @@ class TestReportGenerator(unittest.TestCase):
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.report_generator = ReportGenerator(self.temp_dir)
-    
+
     def tearDown(self):
         """Clean up after tests."""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
-    
+
     def test_init(self):
         """Test report generator initialization."""
         self.assertEqual(str(self.report_generator.output_directory), self.temp_dir)
-    
+
     def test_aggregate_results_empty(self):
         """Test aggregation with empty results."""
         results = []
         stats = self.report_generator.aggregate_results(results)
-        
+
         self.assertEqual(stats["total_files"], 0)
         self.assertEqual(stats["successful_files"], 0)
         self.assertEqual(stats["failed_files"], 0)
         self.assertEqual(stats["total_documents"], 0)
         self.assertEqual(stats["total_images"], 0)
         self.assertEqual(stats["avg_processing_time"], 0)
-    
+
     def test_aggregate_results_mixed(self):
         """Test aggregation with mixed success/failure results."""
         results = [
@@ -74,9 +75,9 @@ class TestReportGenerator(unittest.TestCase):
                 "retry_count": 3,
             },
         ]
-        
+
         stats = self.report_generator.aggregate_results(results)
-        
+
         self.assertEqual(stats["total_files"], 3)
         self.assertEqual(stats["successful_files"], 2)
         self.assertEqual(stats["failed_files"], 1)
@@ -85,19 +86,21 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(stats["total_chunks"], 5)
         self.assertEqual(stats["total_extracted_images"], 2)
         self.assertEqual(stats["total_errors"], 2)  # Only from failed file
-        
+
         # Check averages
         expected_avg_time = (2.5 + 1.0 + 0.5) / 3
-        self.assertAlmostEqual(stats["avg_processing_time"], expected_avg_time, places=2)
-        
+        self.assertAlmostEqual(
+            stats["avg_processing_time"], expected_avg_time, places=2
+        )
+
         expected_avg_size = (100.0 + 50.0 + 75.0) / 3
         self.assertAlmostEqual(stats["avg_file_size_kb"], expected_avg_size, places=2)
-        
+
         expected_doc_time = (2.5 + 0.5) / 2  # Two documents
         self.assertAlmostEqual(stats["avg_document_time"], expected_doc_time, places=2)
-        
+
         self.assertEqual(stats["avg_image_time"], 1.0)  # One image
-    
+
     def test_create_processed_file(self):
         """Test creation of .processed file."""
         test_result = {
@@ -115,7 +118,7 @@ class TestReportGenerator(unittest.TestCase):
                     "ai_classification_features": 5,
                     "ocr_success": True,
                     "ocr_text_length": 25,
-                    "errors": []
+                    "errors": [],
                 }
             ],
             "errors": [],
@@ -124,23 +127,23 @@ class TestReportGenerator(unittest.TestCase):
             "metadata": {"author": "Test Author", "title": "Test Document"},
             "retry_count": 0,
         }
-        
+
         # Create test file path
         test_file_path = os.path.join(self.temp_dir, "test.pdf")
         with open(test_file_path, "w") as f:
             f.write("dummy content")
-        
+
         # Create processed file
         self.report_generator.create_processed_file(test_file_path, test_result)
-        
+
         # Check if .processed file was created
         processed_file_path = test_file_path + ".processed"
         self.assertTrue(os.path.exists(processed_file_path))
-        
+
         # Read and verify content
-        with open(processed_file_path, "r", encoding="utf-8") as f:
+        with open(processed_file_path, encoding="utf-8") as f:
             content = f.read()
-        
+
         # Check for key sections
         self.assertIn("RAGme Document Processing Pipeline", content)
         self.assertIn("FILE INFORMATION", content)
@@ -154,7 +157,7 @@ class TestReportGenerator(unittest.TestCase):
         self.assertIn("Total Time: 2.500s", content)
         self.assertIn("DOCUMENT METADATA", content)
         self.assertIn("Test Author", content)
-    
+
     def test_create_csv_report(self):
         """Test creation of CSV report."""
         results = [
@@ -165,7 +168,14 @@ class TestReportGenerator(unittest.TestCase):
                 "document_type": "pdf",
                 "chunk_count": 5,
                 "average_chunk_size_kb": 20.0,
-                "extracted_images": [{"exif_extracted": True, "ai_classification_features": 3, "ocr_success": True, "ocr_text_length": 50}],
+                "extracted_images": [
+                    {
+                        "exif_extracted": True,
+                        "ai_classification_features": 3,
+                        "ocr_success": True,
+                        "ocr_text_length": 50,
+                    }
+                ],
                 "errors": [],
                 "timing": {"total": 2.5},
                 "processing_start_time": "2025-01-01T12:00:00",
@@ -189,20 +199,20 @@ class TestReportGenerator(unittest.TestCase):
                 "retry_count": 2,
             },
         ]
-        
+
         self.report_generator.create_csv_report(results, "test_results.csv")
-        
+
         # Check if CSV file was created
         csv_file_path = os.path.join(self.temp_dir, "test_results.csv")
         self.assertTrue(os.path.exists(csv_file_path))
-        
+
         # Read and verify CSV content
-        with open(csv_file_path, "r", newline="", encoding="utf-8") as csvfile:
+        with open(csv_file_path, newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
             rows = list(reader)
-        
+
         self.assertEqual(len(rows), 2)
-        
+
         # Check first row (document)
         row1 = rows[0]
         self.assertEqual(row1["file_name"], "doc1.pdf")
@@ -220,7 +230,7 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(row1["processing_time_seconds"], "2.5")
         self.assertEqual(row1["success"], "True")
         self.assertEqual(row1["retry_count"], "0")
-        
+
         # Check second row (image)
         row2 = rows[1]
         self.assertEqual(row2["file_name"], "img1.jpg")
@@ -238,39 +248,39 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(row2["processing_time_seconds"], "1.0")
         self.assertEqual(row2["success"], "False")
         self.assertEqual(row2["retry_count"], "2")
-    
+
     def test_load_processed_files_results_empty(self):
         """Test loading processed files when directory is empty."""
         processed_files = self.report_generator.load_processed_files_results()
         self.assertEqual(len(processed_files), 0)
-    
+
     def test_load_processed_files_results_with_files(self):
         """Test loading processed files when .processed files exist."""
         # Create some .processed files
         test_files = ["doc1.pdf", "img1.jpg", "doc2.docx"]
-        
+
         for file_name in test_files:
             processed_path = os.path.join(self.temp_dir, file_name + ".processed")
             with open(processed_path, "w") as f:
                 f.write("dummy processed content")
-        
+
         # Also create a non-.processed file to ensure it's ignored
         with open(os.path.join(self.temp_dir, "other.txt"), "w") as f:
             f.write("not processed")
-        
+
         processed_files = self.report_generator.load_processed_files_results()
-        
+
         # Should find the original file names (without .processed extension)
         expected_files = [
             os.path.join(self.temp_dir, "doc1.pdf"),
             os.path.join(self.temp_dir, "img1.jpg"),
             os.path.join(self.temp_dir, "doc2.docx"),
         ]
-        
+
         self.assertEqual(len(processed_files), 3)
         for expected_file in expected_files:
             self.assertIn(expected_file, processed_files)
-    
+
     def test_generate_human_readable_summary_document(self):
         """Test human-readable summary generation for document."""
         result = {
@@ -283,14 +293,19 @@ class TestReportGenerator(unittest.TestCase):
             "average_chunk_size_kb": 41.15,
             "extracted_images": [],
             "errors": [],
-            "timing": {"total": 2.5, "text_extraction": 1.5, "chunking": 0.5, "vdb_storage": 0.5},
+            "timing": {
+                "total": 2.5,
+                "text_extraction": 1.5,
+                "chunking": 0.5,
+                "vdb_storage": 0.5,
+            },
             "processing_start_time": "2025-01-01T12:00:00",
             "metadata": {"page_count": 5, "author": "Test Author"},
             "retry_count": 0,
         }
-        
+
         summary = self.report_generator._generate_human_readable_summary(result)
-        
+
         # Check key content
         self.assertIn("RAGme Document Processing Pipeline", summary)
         self.assertIn("test.pdf", summary)
@@ -303,7 +318,7 @@ class TestReportGenerator(unittest.TestCase):
         self.assertIn("Total Time: 2.500s", summary)
         self.assertIn("Test Author", summary)
         self.assertNotIn("❌ ERRORS", summary)  # No errors section
-    
+
     def test_generate_human_readable_summary_image(self):
         """Test human-readable summary generation for image."""
         result = {
@@ -321,9 +336,9 @@ class TestReportGenerator(unittest.TestCase):
             "processing_start_time": "2025-01-01T12:00:00",
             "retry_count": 0,
         }
-        
+
         summary = self.report_generator._generate_human_readable_summary(result)
-        
+
         # Check key content
         self.assertIn("test.jpg", summary)
         self.assertIn("67.89 KB", summary)
@@ -334,7 +349,7 @@ class TestReportGenerator(unittest.TestCase):
         self.assertIn("OCR Text Length: 42 chars", summary)
         self.assertIn("Image Processing: 1.300s", summary)
         self.assertIn("Total Time: 1.800s", summary)
-    
+
     def test_generate_human_readable_summary_with_errors(self):
         """Test human-readable summary generation with errors."""
         result = {
@@ -348,9 +363,9 @@ class TestReportGenerator(unittest.TestCase):
             "processing_start_time": "2025-01-01T12:00:00",
             "retry_count": 3,
         }
-        
+
         summary = self.report_generator._generate_human_readable_summary(result)
-        
+
         # Check error content
         self.assertIn("❌ FAILED", summary)
         self.assertIn("Retry Attempts: 3", summary)
@@ -359,5 +374,5 @@ class TestReportGenerator(unittest.TestCase):
         self.assertIn("2. Corrupted PDF structure", summary)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
