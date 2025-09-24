@@ -202,24 +202,28 @@ class RAGmeAssistant {
     }
 
     updateApiConfig() {
-        // For WebSocket connections, always use the frontend server's URL (current page URL)
-        // This ensures the browser can resolve the hostname correctly
-        const frontendUrl = window.location.origin;
-        this.apiConfig.baseUrl = frontendUrl;
-        console.log('API base URL set to frontend server URL for WebSocket connections:', this.apiConfig.baseUrl);
-        
-        // Store the internal API URL for HTTP requests (if needed)
+        // For HTTP API requests, use the API server URL
         if (this.config && this.config.api_url) {
-            this.apiConfig.internalApiUrl = this.config.api_url;
-            console.log('Internal API URL stored:', this.apiConfig.internalApiUrl);
+            this.apiConfig.baseUrl = this.config.api_url;
+            console.log('API base URL set to API server URL:', this.apiConfig.baseUrl);
         } else if (this.config && this.config.network && this.config.network.api) {
             const apiConfig = this.config.network.api;
             if (apiConfig.host && apiConfig.port) {
                 const protocol = apiConfig.ssl ? 'https' : 'http';
-                this.apiConfig.internalApiUrl = `${protocol}://${apiConfig.host}:${apiConfig.port}`;
-                console.log('Internal API URL stored:', this.apiConfig.internalApiUrl);
+                this.apiConfig.baseUrl = `${protocol}://${apiConfig.host}:${apiConfig.port}`;
+                console.log('API base URL constructed from config:', this.apiConfig.baseUrl);
             }
+        } else {
+            // Fallback to frontend URL if no API config is available
+            const frontendUrl = window.location.origin;
+            this.apiConfig.baseUrl = frontendUrl;
+            console.log('API base URL fallback to frontend server URL:', this.apiConfig.baseUrl);
         }
+        
+        // Store the frontend URL for WebSocket connections
+        const frontendUrl = window.location.origin;
+        this.apiConfig.frontendUrl = frontendUrl;
+        console.log('Frontend URL stored for WebSocket connections:', this.apiConfig.frontendUrl);
     }
 
     buildApiUrl(endpoint) {
@@ -848,7 +852,7 @@ class RAGmeAssistant {
                 forceNew: true
             };
 
-            this.socket = io(this.apiConfig.baseUrl, socketOptions);
+            this.socket = io(this.apiConfig.frontendUrl || this.apiConfig.baseUrl, socketOptions);
             console.log('Socket.io connection created with options:', socketOptions);
         } catch (error) {
             console.error('Failed to create socket connection:', error);
