@@ -234,9 +234,8 @@ class WeaviateVectorDatabase(VectorDatabase):
                         if "image_data" in metadata:
                             del metadata["image_data"]
 
-                        # Store image data in metadata for API access, but not in the main image field
+                        # Store image data in dedicated field, not in metadata to avoid duplication
                         # This avoids Weaviate cloud UI display issues with large BLOB data
-                        metadata["base64_data"] = image_data
 
                         metadata_text = json.dumps(metadata, ensure_ascii=False)
 
@@ -250,6 +249,7 @@ class WeaviateVectorDatabase(VectorDatabase):
                             properties={
                                 "url": img.get("url", ""),
                                 "image": f"data:image/jpeg;base64,{image_data[:100]}...",  # Store truncated reference
+                                "image_data": image_data,  # Store full image data
                                 "metadata": metadata_text,
                             }
                         )
@@ -273,13 +273,13 @@ class WeaviateVectorDatabase(VectorDatabase):
                             if "image_data" in metadata:
                                 del metadata["image_data"]
 
-                            metadata["base64_data"] = image_data
                             metadata_text = json.dumps(metadata, ensure_ascii=False)
 
                             single_batch.add_object(
                                 properties={
                                     "url": img.get("url", ""),
                                     "image": f"data:image/jpeg;base64,{image_data[:100]}...",
+                                    "image_data": image_data,  # Store full image data
                                     "metadata": metadata_text,
                                 }
                             )
@@ -860,10 +860,10 @@ class WeaviateVectorDatabase(VectorDatabase):
                 image_value = obj.properties["image"]
                 if image_value:  # Only add if not empty/null
                     result["image"] = image_value
-                # For images, the actual data is stored in metadata.base64_data
+                # Get the full image data from the dedicated image_data field
                 # The image field contains a truncated reference
-                if "metadata" in result and "base64_data" in result["metadata"]:
-                    result["image_data"] = result["metadata"]["base64_data"]
+                if "image_data" in obj.properties:
+                    result["image_data"] = obj.properties["image_data"]
                 else:
                     result["image_data"] = image_value
 

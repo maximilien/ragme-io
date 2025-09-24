@@ -5094,7 +5094,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 console.log(`Processing metadata key: ${key}, value type: ${typeof value}, value length: ${typeof value === 'string' ? value.length : 'N/A'}`);
 
                 // Special handling for base64 data
-                const isBase64Field = key === 'image_data' || key === 'base64_data' || key === 'image' || 
+                const isBase64Field = key === 'image_data' || key === 'image' || 
                     key.toLowerCase().includes('base64') || key.toLowerCase().includes('image_data');
                 const isBase64Content = typeof value === 'string' && value.length > 100 && 
                     /^[A-Za-z0-9+/=\s]+$/.test(value.trim());
@@ -5204,7 +5204,6 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             // Check for image_data in various locations including the root level and metadata
             const imageData = doc.image_data ||
                             doc.metadata?.image_data ||
-                            doc.metadata?.base64_data ||
                             doc.metadata?.image ||
                             doc.image;
 
@@ -5301,7 +5300,6 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         // Get image data from the selected image
         const imageData = selectedImage.image_data ||
                          selectedImage.metadata?.image_data ||
-                         selectedImage.metadata?.base64_data ||
                          selectedImage.metadata?.image ||
                          selectedImage.image;
 

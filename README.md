@@ -39,6 +39,7 @@ A personalized agent to [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_
 - **🎯 Intelligent Image Ranking**: Enhanced image relevance scoring with intelligent pre-filtering and improved LLM reranking to exclude irrelevant images. Now properly filters out UI elements, screenshots, and documents when searching for content (e.g., Vectras PDF screenshots won't appear in dog queries)! ⭐ **NEW!**
 - **🔧 Weaviate UUID Bug Fix**: Fixed critical bug where Weaviate UUID objects were causing "'_WeaviateUUIDInt' object is not subscriptable" errors in logging utilities. Now properly handles Weaviate UUID types for safe logging! ⭐ **FIXED!**
 - **⚙️ Configuration Structure Reorganization**: Reorganized the `query` section in `config.yaml` with a nested `rerank` structure for better organization. Updated config manager, QueryAgent, and frontend to use the new nested structure with proper defaults and UI controls for rerank settings. ⭐ **IMPROVED!**
+- **🚀 Image Data Optimization**: Removed duplicated `base64_data` from metadata to improve performance and reduce data redundancy. Image data is now stored only in the dedicated `image_data` field, eliminating duplication in metadata. This optimization improves frontend processing speed, reduces memory usage, and makes image extraction more efficient! ⭐ **OPTIMIZED!**
 
 > **📚 For complete feature history and detailed documentation, see the [docs/](docs/) directory.**
 

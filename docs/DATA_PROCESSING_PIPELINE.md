@@ -220,6 +220,7 @@ python -c "from src.ragme.data_processing import DocumentProcessingPipeline; pri
 - **Text Fallback**: Text representation for VDBs without image support
 - **Metadata Integration**: Combined EXIF, classification, and OCR metadata
 - **Processing Provenance**: Full pipeline processing history
+- **Optimized Data Storage**: Image data stored in dedicated `image_data` field, eliminating duplication in metadata for improved performance
 
 ## Output & Reporting
 

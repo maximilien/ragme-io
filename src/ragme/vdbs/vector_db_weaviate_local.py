@@ -234,7 +234,7 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
 
                 # Store image data in metadata for API access, but not in the main image field
                 # This avoids Weaviate cloud UI display issues with large BLOB data
-                metadata["base64_data"] = image_data
+                # Note: base64_data is now stored in the image_data field, not duplicated in metadata
 
                 metadata_text = json.dumps(metadata, ensure_ascii=False)
 
@@ -248,6 +248,7 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                     properties={
                         "url": img.get("url", ""),
                         "image": f"data:image/jpeg;base64,{image_data[:100]}...",  # Store truncated reference
+                        "image_data": image_data,  # Store full image data
                         "metadata": metadata_text,
                     }
                 )
@@ -619,10 +620,9 @@ class WeaviateLocalVectorDatabase(VectorDatabase):
                 image_value = obj.properties["image"]
                 if image_value:  # Only add if not empty/null
                     result["image"] = image_value
-                # For images, the actual data is stored in metadata.base64_data
-                # The image field contains a truncated reference
-                if "metadata" in result and "base64_data" in result["metadata"]:
-                    result["image_data"] = result["metadata"]["base64_data"]
+                # Get the full image data from the dedicated image_data field
+                if "image_data" in obj.properties:
+                    result["image_data"] = obj.properties["image_data"]
                 else:
                     result["image_data"] = image_value
 
