@@ -2551,6 +2551,68 @@ body {
     flex: 1;
 }
 
+.tag-value.ocr-text-content {
+    white-space: pre-wrap !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 0.85rem !important;
+    line-height: 1.4 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+.metadata-tag .tag-value.ocr-text-content {
+    white-space: pre-wrap !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    font-size: 0.85rem !important;
+    line-height: 1.4 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    display: block !important;
+    width: 100% !important;
+}
+
+.metadata-tag .tag-value.ocr-text-content .ocr-preview {
+    color: #666;
+    font-style: italic;
+    margin-right: 0.5rem;
+}
+
+.ocr-content {
+    margin-top: 0.5rem;
+}
+
+.ocr-text-scrollable {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    max-height: 7.5rem; /* About 5 lines at 1.5rem line height */
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.ocr-text-scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ocr-text-scrollable::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.ocr-text-scrollable::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.ocr-text-scrollable::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
 /* Image metadata sections */
 .metadata-section {
     margin-bottom: 1.5rem;
@@ -2697,13 +2759,31 @@ body {
     overflow-y: auto !important;
     white-space: pre-wrap !important;
     word-break: break-word !important;
-    background: #f8f9fa !important;
-    border: 1px solid #e9ecef !important;
-    border-radius: 4px !important;
-    padding: 0.75rem !important;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
-    font-size: 0.8rem !important;
-    line-height: 1.4 !important;
+}
+
+.ocr-preview {
+    color: #666;
+    font-style: italic;
+    margin-right: 0.5rem;
+}
+
+.ocr-content {
+    margin-top: 0.5rem;
+}
+
+.ocr-text-full {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
 .ocr-text-content::-webkit-scrollbar {

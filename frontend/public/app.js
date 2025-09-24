@@ -4504,6 +4504,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             this.checkDetailValuesTruncation();
         }, 100);
 
+        // Set up event listeners for collapsible sections (including Base64 expand/collapse)
+        setTimeout(() => {
+            this.setupCollapsibleSections();
+        }, 100);
+
         // Check storage availability and update the storage section
         if (isImageStack && doc.images && doc.images.length > 0) {
             // For image stacks, check storage for the first image
@@ -4703,7 +4708,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         if (!metadata) return '';
 
         // Special handling for image metadata - check for various image-related types
-        if (metadata.type === 'image' || metadata.type === 'image_classification' || metadata.format === 'image') {
+        console.log('createMetadataTags called with metadata type:', metadata.type, 'format:', metadata.format, 'content_type:', metadata.content_type);
+        if (metadata.type === 'image' || metadata.type === 'image_classification' || metadata.format === 'image' || metadata.content_type === 'image') {
+            console.log('Calling createImageMetadataTags for image metadata');
             return this.createImageMetadataTags(metadata);
         }
 
@@ -5011,10 +5018,31 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 `);
             }
             if (ocrContent.extracted_text) {
+                const extractedText = ocrContent.extracted_text;
+                
+                // Simple formatting to make OCR text more readable
+                const formatOcrText = (text) => {
+                    return text
+                        // Add line breaks after periods followed by space and capital letter
+                        .replace(/\.\s+([A-Z])/g, '.\n$1')
+                        // Add line breaks after colons followed by space and capital letter
+                        .replace(/:\s+([A-Z])/g, ':\n$1')
+                        // Add line breaks before common section headers (words that are all caps)
+                        .replace(/\s+([A-Z]{2,}\s+[A-Z]{2,})/g, '\n$1')
+                        // Clean up multiple consecutive line breaks
+                        .replace(/\n\s*\n/g, '\n')
+                        .trim();
+                };
+
+                const formattedText = formatOcrText(extractedText);
+                
+                // Always show OCR text in a scrollable container (no expand/collapse)
                 ocrTags.push(`
                     <div class="metadata-tag">
                         <span class="tag-key">Extracted Text</span>
-                        <span class="tag-value ocr-text-content">${this.escapeHtml(ocrContent.extracted_text)}</span>
+                        <span class="tag-value ocr-text-content">
+                            <div class="ocr-text-scrollable">${this.escapeHtml(formattedText)}</div>
+                        </span>
                     </div>
                 `);
             }
@@ -5062,22 +5090,31 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
             const otherTags = otherKeys.map(key => {
                 let value = metadata[key];
 
+                // Debug logging for Base64 detection
+                console.log(`Processing metadata key: ${key}, value type: ${typeof value}, value length: ${typeof value === 'string' ? value.length : 'N/A'}`);
+
                 // Special handling for base64 data
-                if (key === 'image_data' || key === 'base64_data' || key === 'image') {
-                    if (typeof value === 'string' && value.length > 50) {
-                        const byteEstimate = Math.round(value.length * 0.75); // Base64 is ~75% of original size
-                        return `
-                            <div class="metadata-tag">
-                                <span class="tag-key">${this.escapeHtml(this.formatMetadataKey(key))}</span>
-                                <span class="tag-value">
-                                    <span class="base64-preview">${byteEstimate} bytes</span>
-                                    <button class="expand-btn" data-action="expand-base64" data-key="${key}" data-value="${this.escapeHtml(value)}">
-                                        <i class="fas fa-expand-alt"></i> Show content
-                                    </button>
-                                </span>
-                            </div>
-                        `;
-                    }
+                const isBase64Field = key === 'image_data' || key === 'base64_data' || key === 'image' || 
+                    key.toLowerCase().includes('base64') || key.toLowerCase().includes('image_data');
+                const isBase64Content = typeof value === 'string' && value.length > 100 && 
+                    /^[A-Za-z0-9+/=\s]+$/.test(value.trim());
+                
+                console.log(`Key: ${key}, isBase64Field: ${isBase64Field}, isBase64Content: ${isBase64Content}, value length: ${typeof value === 'string' ? value.length : 'N/A'}`);
+                
+                if ((isBase64Field || isBase64Content) && typeof value === 'string' && value.length > 50) {
+                    console.log(`Applying Base64 truncation for key: ${key}`);
+                    const byteEstimate = Math.round(value.length * 0.75); // Base64 is ~75% of original size
+                    return `
+                        <div class="metadata-tag">
+                            <span class="tag-key">${this.escapeHtml(this.formatMetadataKey(key))}</span>
+                            <span class="tag-value">
+                                <span class="base64-preview">${byteEstimate} bytes</span>
+                                <button class="expand-btn" data-action="expand-base64" data-key="${key}" data-value="${this.escapeHtml(value)}">
+                                    <i class="fas fa-expand-alt"></i> Show content
+                                </button>
+                            </span>
+                        </div>
+                    `;
                 }
 
                 if (typeof value === 'object') {
@@ -5212,6 +5249,9 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                 this.fetchImageFromBackend(doc.id, contentPreview);
             }
 
+            // Update metadata section for the image
+            this.updateMetadataSection(doc);
+
             // Mark summary as generated for images
             this.documentDetailsModal.summaryGenerated = true;
 
@@ -5319,6 +5359,7 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
 
     updateMetadataSection(selectedImage) {
         console.log('updateMetadataSection called with image:', selectedImage);
+        console.log('DEBUG: updateMetadataSection function is being called');
         console.log('Selected image metadata keys:', Object.keys(selectedImage.metadata || {}));
         console.log('Selected image OCR content:', selectedImage.metadata?.ocr_content);
         console.log('Selected image OCR text:', selectedImage.metadata?.ocr_content?.extracted_text);
@@ -5362,8 +5403,11 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
         }
 
         // Create new metadata tags for the selected image (includes OCR content)
+        console.log('About to call createMetadataTags with metadata:', processedMetadata);
+        console.log('Metadata type:', processedMetadata.type, 'format:', processedMetadata.format, 'content_type:', processedMetadata.content_type);
         const metadataTags = this.createMetadataTags(processedMetadata);
         console.log('Generated metadata tags length:', metadataTags ? metadataTags.length : 0);
+        console.log('First 200 chars of metadata tags:', metadataTags ? metadataTags.substring(0, 200) : 'No tags');
 
         if (metadataTags) {
             metadataContainer.innerHTML = metadataTags;
@@ -5525,6 +5569,54 @@ Try asking me to add some URLs, documents, or images, or ask questions about you
                         <span class="base64-preview">${byteEstimate} bytes</span>
                         <button class="expand-btn" data-action="expand-base64" data-key="${key}" data-value="${this.escapeHtml(value)}">
                             <i class="fas fa-expand-alt"></i> Show content
+                        </button>
+                    `;
+
+                    // Re-add event listener to the new expand button
+                    const newExpandBtn = tagValue.querySelector('.expand-btn');
+                    newExpandBtn.addEventListener('click', arguments.callee);
+                });
+            });
+        });
+
+        // Find all expand buttons for OCR text and add event listeners
+        const ocrExpandButtons = document.querySelectorAll('.expand-btn[data-action="expand-ocr-text"]');
+        ocrExpandButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const key = button.getAttribute('data-key');
+                const value = button.getAttribute('data-value');
+                const parent = button.closest('.metadata-tag');
+                const tagValue = parent.querySelector('.tag-value');
+
+                // Replace the preview and button with the full content
+                tagValue.innerHTML = `
+                    <div class="ocr-content">
+                        <pre>${this.escapeHtml(value)}</pre>
+                        <button class="collapse-btn" data-action="collapse-ocr-text" data-key="${key}" data-value="${this.escapeHtml(value)}">
+                            <i class="fas fa-compress-alt"></i> Hide full text
+                        </button>
+                    </div>
+                `;
+
+                // Add event listener to the new collapse button
+                const collapseBtn = tagValue.querySelector('.collapse-btn');
+                collapseBtn.addEventListener('click', () => {
+                    // Apply the same formatting to the full text for consistency
+                    const formatOcrText = (text) => {
+                        return text
+                            .replace(/\.\s+([A-Z])/g, '.\n$1')
+                            .replace(/:\s+([A-Z])/g, ':\n$1')
+                            .replace(/\s+([A-Z]{2,}\s+[A-Z]{2,})/g, '\n$1')
+                            .replace(/\n\s*\n/g, '\n')
+                            .trim();
+                    };
+                    
+                    const formattedValue = formatOcrText(value);
+                    const truncatedText = formattedValue.substring(0, 500) + '...';
+                    tagValue.innerHTML = `
+                        <span class="ocr-preview">${this.escapeHtml(truncatedText)}</span>
+                        <button class="expand-btn" data-action="expand-ocr-text" data-key="${key}" data-value="${this.escapeHtml(formattedValue)}">
+                            <i class="fas fa-expand-alt"></i> Show full text
                         </button>
                     `;
 
@@ -7251,6 +7343,19 @@ Generated by ${this.config?.application?.title || 'RAGme.io Assistant'} on ${new
         console.log('Checking', detailValues.length, 'detail values for truncation');
 
         detailValues.forEach((value, index) => {
+            // Skip Base64 data fields - they are handled by our custom expand/collapse logic
+            if (value.querySelector('.base64-preview') || value.querySelector('.expand-btn[data-action="expand-base64"]')) {
+                console.log('Skipping Base64 data field for truncation check');
+                return;
+            }
+            
+            // Also skip if the content looks like Base64 data (long string of base64 characters)
+            const content = value.textContent || value.innerText;
+            if (content && content.length > 100 && /^[A-Za-z0-9+/=\s]+$/.test(content.trim())) {
+                console.log('Skipping potential Base64 content for truncation check');
+                return;
+            }
+            
             console.log('Checking detail value', index, ':', value.textContent || value.innerText);
             this.checkTextTruncation(value);
         });

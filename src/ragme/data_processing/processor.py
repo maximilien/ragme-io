@@ -22,6 +22,7 @@ except ImportError:
 
 from ..utils.config_manager import config
 from ..utils.image_processor import image_processor
+from ..utils.storage import StorageService
 from ..vdbs.vector_db_factory import create_vector_database
 
 
@@ -54,6 +55,9 @@ class DocumentProcessor:
         self.image_vdb = create_vector_database(
             collection_name=self.image_collection_name
         )
+
+        # Create storage service
+        self.storage_service = StorageService(config)
 
         # Ensure collections are set up
         self.text_vdb.setup()
@@ -463,6 +467,11 @@ class DocumentProcessor:
                 "ocr_content": processed_image.get("ocr_content", {}),
             }
 
+            # For images extracted from PDFs, set pdf_filename for API compatibility
+            if is_extracted and source_document and source_document.endswith(".pdf"):
+                combined_metadata["pdf_filename"] = source_document
+                combined_metadata["source_type"] = "pdf_extracted_image"
+
             results["metadata"] = combined_metadata
 
             # Store in VDB
@@ -487,11 +496,44 @@ class DocumentProcessor:
 
         return results
 
+    def _copy_file_to_storage(
+        self, file_path: str, filename: str, content_type: str = None
+    ) -> str | None:
+        """Copy file to storage service if enabled."""
+        try:
+            if not config.is_copy_uploaded_docs_enabled():
+                return None
+
+            # Read file content
+            with open(file_path, "rb") as f:
+                content = f.read()
+
+            # Create storage path with timestamp to avoid conflicts
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            storage_path = f"documents/{timestamp}_{filename}"
+
+            # Upload to storage
+            self.storage_service.upload_data(
+                data=content,
+                object_name=storage_path,
+                content_type=content_type or "application/octet-stream",
+            )
+
+            print(f"Copied file to storage: {storage_path}")
+            return storage_path
+
+        except Exception as e:
+            print(f"Failed to copy file to storage: {e}")
+            return None
+
     def _store_document_chunks(
         self, file_path: str, filename: str, chunks: list[str], metadata: dict[str, Any]
     ):
         """Store document chunks in the text VDB collection."""
         unique_url = f"file://{file_path}"
+
+        # Copy file to storage if enabled
+        storage_path = self._copy_file_to_storage(file_path, filename)
 
         if len(chunks) == 1:
             # Single chunk - store as regular document
@@ -503,6 +545,10 @@ class DocumentProcessor:
                 "processed_by": "RAGme document processing pipeline",
                 "processing_time": metadata.get("processing_time", 0),
             }
+
+            # Add storage path if file was copied to storage
+            if storage_path:
+                combined_metadata["storage_path"] = storage_path
 
             documents = [
                 {
@@ -529,6 +575,10 @@ class DocumentProcessor:
                     "original_filename": filename,
                 }
 
+                # Add storage path if file was copied to storage
+                if storage_path:
+                    chunk_metadata["storage_path"] = storage_path
+
                 documents.append(
                     {
                         "text": chunk,
@@ -548,13 +598,48 @@ class DocumentProcessor:
         metadata: dict[str, Any],
     ):
         """Store image in the image VDB collection."""
+        # Copy image to storage if enabled
+        storage_path = None
+        if config.is_copy_uploaded_images_enabled():
+            try:
+                # Extract file path from image_url (remove file:// prefix)
+                file_path = image_url.replace("file://", "")
+
+                # Read image content
+                with open(file_path, "rb") as f:
+                    content = f.read()
+
+                # Create storage path with timestamp to avoid conflicts
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                storage_path = f"images/{timestamp}_{filename}"
+
+                # Upload to storage
+                self.storage_service.upload_data(
+                    data=content,
+                    object_name=storage_path,
+                    content_type="image/png",  # Extracted images are saved as PNG
+                )
+
+                print(f"Copied image to storage: {storage_path}")
+            except Exception as storage_error:
+                print(f"Failed to copy image to storage: {storage_error}")
+                storage_path = None
+
+        # Add storage path to metadata if image was copied to storage
+        if storage_path:
+            metadata["storage_path"] = storage_path
+
+        # Encode image to base64 for storage
+        base64_data = image_processor.encode_image_to_base64(image_url)
+
         # Check if VDB supports images directly
         if self.image_vdb.supports_images():
-            # Store as image with metadata
+            # Store as image with metadata and base64 data
             self.image_vdb.write_images(
                 [
                     {
                         "url": image_url,
+                        "image_data": base64_data,
                         "metadata": metadata,
                     }
                 ]
@@ -583,6 +668,7 @@ class DocumentProcessor:
                         "url": image_url,
                         "text": text_representation,
                         "metadata": metadata,
+                        "image_data": base64_data,  # Include base64 data even in fallback
                     }
                 ]
             )
