@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.9.9.7)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: latest
+        
+    - name: Cache Python dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          .venv
+          uv.lock
+        key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+          
+    - name: Install Python dependencies
+      run: |
+        uv sync --extra dev
+        
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Run linting
+      env:
+        CI: true
+      run: |
+        chmod +x tools/lint.sh
+        ./tools/lint.sh
+        
+    - name: Run tests
+      run: |
+        cp config.yaml.example config.yaml
+        chmod +x test.sh
+        ./test.sh
+        
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Get version from tag
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "## Changes since $PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "CHANGELOG=## Initial Release" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ${{ steps.changelog.outputs.CHANGELOG }}
+          
+          ## Installation
+          
+          ### Docker Compose
+          ```bash
+          git clone https://github.com/maximilien/ragme-io.git
+          cd ragme-io
+          git checkout ${{ steps.get_version.outputs.VERSION }}
+          docker-compose up -d
+          ```
+          
+          ### Local Development
+          ```bash
+          git clone https://github.com/maximilien/ragme-io.git
+          cd ragme-io
+          git checkout ${{ steps.get_version.outputs.VERSION }}
+          ./setup.sh
+          ./start.sh
+          ```
+          
+          ## What's New
+          
+          - Improved OCR text display in document details modal
+          - Fixed Base64 data truncation for image documents
+          - Enhanced text formatting with intelligent line breaks
+          - Simplified user interface with scrollable content areas
+          - Code quality improvements and bug fixes
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./frontend/dist/
+        asset_name: frontend-dist-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        asset_content_type: application/gzip
+      if: always()
